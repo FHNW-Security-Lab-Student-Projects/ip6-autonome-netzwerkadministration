@@ -29,12 +29,13 @@ LOGFIRE_TOKEN = os.getenv('LOGFIRE_TOKEN')
 if LOGFIRE_TOKEN:
     logfire.configure(
         token=LOGFIRE_TOKEN,
-        service_name='Agent B - Translator Client',
+        service_name='Client Agent',
         console=False,
+        distributed_tracing=True,  # manual instrumentation — links traces across Agent B → Agent A
     )
     logfire.instrument_pydantic_ai()
     logfire.instrument_openai()
-    logfire.instrument_httpx()
+    logfire.instrument_httpx(capture_headers=True, capture_request_body=True, capture_response_body=True)  # manual instrumentation — captures full HTTP payloads
 else:
     print('LOGFIRE_TOKEN not found. Running without Logfire observability.')
 
@@ -69,55 +70,51 @@ async def main():
     message = Message(
         role='user',
         parts=[Part(root=TextPart(text='Tell me a joke about programming'))],
-        messageId=uuid4().hex,
+        message_id=uuid4().hex,
     )
 
     print('Sending message to Agent A (Joke Agent)...')
 
     # send_message returns an async iterator of events
     joke_text = None
-    async for event in client.send_message(message):
-        if isinstance(event, Message) and event.role == 'agent':
-            # Direct message response
-            for part in event.parts:
-                part_data = part.root if hasattr(part, 'root') else part
-                if hasattr(part_data, 'text'):
-                    joke_text = part_data.text
-                    break
-        elif isinstance(event, Task):
-            # Task-based response — extract from artifacts or history
-            if event.artifacts:
-                for artifact in event.artifacts:
-                    for part in artifact.parts:
-                        part_data = part.root if hasattr(part, 'root') else part
-                        if hasattr(part_data, 'text'):
-                            joke_text = part_data.text
-                            break
-                    if joke_text:
+    with logfire.span('A2A send_message', message_id=message.message_id, user_text='Tell me a joke about programming'):  # manual instrumentation
+        async for event in client.send_message(message):
+            if isinstance(event, Message) and event.role == 'agent':
+                logfire.info('A2A received Message', role=event.role, parts=[str(p) for p in event.parts])  # manual instrumentation
+                # Direct message response
+                for part in event.parts:
+                    part_data = part.root if hasattr(part, 'root') else part
+                    if hasattr(part_data, 'text'):
+                        joke_text = part_data.text
                         break
-            if not joke_text and event.history:
-                for msg in reversed(event.history):
-                    if msg.role == 'agent':
-                        for part in msg.parts:
+            elif isinstance(event, Task):
+                logfire.info('A2A received Task', task_id=event.id, status=str(event.status))  # manual instrumentation
+                # Task-based response — extract from artifacts or history
+                if event.artifacts:
+                    for artifact in event.artifacts:
+                        for part in artifact.parts:
                             part_data = part.root if hasattr(part, 'root') else part
                             if hasattr(part_data, 'text'):
                                 joke_text = part_data.text
                                 break
                         if joke_text:
                             break
+                if not joke_text and event.history:
+                    for msg in reversed(event.history):
+                        if msg.role == 'agent':
+                            for part in msg.parts:
+                                part_data = part.root if hasattr(part, 'root') else part
+                                if hasattr(part_data, 'text'):
+                                    joke_text = part_data.text
+                                    break
+                            if joke_text:
+                                break
 
     if not joke_text:
         print('Could not extract joke from Agent A response.')
         return
 
     print(f'\nOriginal joke from Agent A:\n{joke_text}')
-
-    # Use Agent B's own LLM to translate to German
-    print('\nTranslating to German with Agent B...')
-    result = await translator_agent.run(joke_text)
-
-    print(f'\nGerman translation:\n{result.output}')
-
 
 if __name__ == '__main__':
     asyncio.run(main())

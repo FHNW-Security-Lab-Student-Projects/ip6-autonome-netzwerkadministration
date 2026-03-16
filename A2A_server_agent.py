@@ -29,7 +29,7 @@ LOGFIRE_TOKEN = os.getenv('LOGFIRE_TOKEN')
 if LOGFIRE_TOKEN:
     logfire.configure(
         token=LOGFIRE_TOKEN,
-        service_name='Agent A - Joke Server',
+        service_name='A2A Server Agent',
         console=False,
         distributed_tracing=True,
     )
@@ -74,8 +74,11 @@ class JokeAgentExecutor(AgentExecutor):
         if not user_text:
             user_text = str(user_input)
 
-        result = await agent.run(user_text)
-        await event_queue.enqueue_event(new_agent_text_message(result.output))
+        with logfire.span('JokeAgentExecutor.execute', user_text=user_text, task_id=context.task_id):  # manual instrumentation
+            result = await agent.run(user_text)
+            response_text = result.output
+            logfire.info('Joke generated', response_text=response_text)  # manual instrumentation
+            await event_queue.enqueue_event(new_agent_text_message(response_text))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise Exception('Cancel not supported')
