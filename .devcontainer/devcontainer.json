@@ -1,0 +1,14 @@
+{
+    "image": "ghcr.io/srl-labs/containerlab/devcontainer-dind-slim:latest",
+    "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.cargo/bin:$PATH\" && uv sync",
+    "customizations": {
+        "vscode": {
+            "settings": {},
+            "extensions": [
+                "srl-labs.vscode-containerlab",
+                "charliermarsh.ruff",
+                "ms-python.mypy-type-checker"
+            ]
+        }
+    }
+}
