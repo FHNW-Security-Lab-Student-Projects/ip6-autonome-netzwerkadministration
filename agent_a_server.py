@@ -9,6 +9,7 @@ Run with: uv run uvicorn agent_a_server:app --port 8000
 import os
 from pathlib import Path
 
+import logfire
 from dotenv import load_dotenv
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -23,6 +24,19 @@ from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2a.utils import new_agent_text_message
 
 load_dotenv(Path(__file__).parent / '.env')
+
+LOGFIRE_TOKEN = os.getenv('LOGFIRE_TOKEN')
+if LOGFIRE_TOKEN:
+    logfire.configure(
+        token=LOGFIRE_TOKEN,
+        service_name='Agent A - Joke Server',
+        console=False,
+        distributed_tracing=True,
+    )
+    logfire.instrument_pydantic_ai()
+    logfire.instrument_openai()
+else:
+    print('LOGFIRE_TOKEN not found. Running without Logfire observability.')
 
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if not OPENROUTER_API_KEY:
@@ -97,3 +111,6 @@ server = A2AStarletteApplication(
 )
 
 app = server.build()
+
+if LOGFIRE_TOKEN:
+    logfire.instrument_starlette(app)

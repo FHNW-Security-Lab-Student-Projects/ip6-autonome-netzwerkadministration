@@ -13,6 +13,7 @@ import logging
 from uuid import uuid4
 from pathlib import Path
 
+import logfire
 from dotenv import load_dotenv
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -23,6 +24,19 @@ from a2a.client import ClientFactory, ClientConfig
 from a2a.types import Message, Part, TextPart, Task
 
 load_dotenv(Path(__file__).parent / '.env')
+
+LOGFIRE_TOKEN = os.getenv('LOGFIRE_TOKEN')
+if LOGFIRE_TOKEN:
+    logfire.configure(
+        token=LOGFIRE_TOKEN,
+        service_name='Agent B - Translator Client',
+        console=False,
+    )
+    logfire.instrument_pydantic_ai()
+    logfire.instrument_openai()
+    logfire.instrument_httpx()
+else:
+    print('LOGFIRE_TOKEN not found. Running without Logfire observability.')
 
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if not OPENROUTER_API_KEY:
