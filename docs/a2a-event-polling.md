@@ -57,6 +57,31 @@ The timeout-based polling lets the consumer **periodically check** if the produc
 
 Each `CancelledError` gets recorded as an exception span even though it is intentional control flow. This is a known quirk of how the a2a-sdk instruments its internals. The `otel_status_code` stays `UNSET` (not `ERROR`), confirming the SDK does not consider these actual failures.
 
+## Where in the Layered Architecture
+
+The polling is entirely within the `DefaultRequestHandler` layer:
+
+```
+HTTP Request (JSON-RPC)
+        │
+        ▼
+  JSONRPCHandler              ← just delegates down, streams back results
+        │
+        ▼
+  DefaultRequestHandler       ← polling happens HERE
+        │
+        ├── _setup_message_execution()  → spawns AgentExecutor as asyncio task (producer)
+        │
+        └── _run_event_stream()         → polls EventQueue via dequeue_event() (consumer)
+        │
+        ▼
+  AgentExecutor               ← your code, just produces events via enqueue_event()
+```
+
+- **JSONRPCHandler** (above) doesn't poll — it just passes through and streams whatever DefaultRequestHandler yields
+- **AgentExecutor** (below) doesn't poll — it only writes to the queue when the LLM responds
+- The 0.5s timeout loop is an internal detail of DefaultRequestHandler's event consumption
+
 ## Architecture Diagram
 
 ```
