@@ -3,7 +3,10 @@
     "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.cargo/bin:$PATH\" && uv sync",
     "customizations": {
         "vscode": {
-            "settings": {},
+            "settings": {
+                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+                "mypy-type-checker.interpreter": ["${workspaceFolder}/.venv/bin/python"]
+            },
             "extensions": [
                 "srl-labs.vscode-containerlab",
                 "charliermarsh.ruff",
