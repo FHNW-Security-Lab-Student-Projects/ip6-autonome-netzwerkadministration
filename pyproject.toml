@@ -2,7 +2,7 @@
 name = "a2a-demo"
 version = "0.1.0"
 description = "A2A Protocol demo with two Pydantic AI agents"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "pydantic-ai-slim[openai,logfire]",
     "a2a-sdk[http-server]",

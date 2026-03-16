@@ -58,57 +58,58 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    # Connect to Agent A using ClientFactory (replaces deprecated A2AClient)
-    client = await ClientFactory.connect(
-        agent='http://localhost:8000',
-        client_config=ClientConfig(httpx_client=httpx.AsyncClient(timeout=60)),
-    )
-    agent_card = await client.get_card()
-    logger.info('Connected to agent: %s', agent_card.name)
+    async with httpx.AsyncClient(timeout=60) as http_client:
+        # Connect to Agent A using ClientFactory (replaces deprecated A2AClient)
+        client = await ClientFactory.connect(
+            agent='http://localhost:8000',
+            client_config=ClientConfig(httpx_client=http_client),
+        )
+        agent_card = await client.get_card()
+        logger.info('Connected to agent: %s', agent_card.name)
 
-    # Build the A2A message
-    message = Message(
-        role='user',
-        parts=[Part(root=TextPart(text='Tell me a joke about programming'))],
-        message_id=uuid4().hex,
-    )
+        # Build the A2A message
+        message = Message(
+            role='user',
+            parts=[Part(root=TextPart(text='Tell me a joke about programming'))],
+            message_id=uuid4().hex,
+        )
 
-    print('Sending message to Agent A (Joke Agent)...')
+        print('Sending message to Agent A (Joke Agent)...')
 
-    # send_message returns an async iterator of events
-    joke_text = None
-    with logfire.span('A2A send_message', message_id=message.message_id, user_text='Tell me a joke about programming'):  # manual instrumentation
-        async for event in client.send_message(message):
-            if isinstance(event, Message) and event.role == 'agent':
-                logfire.info('A2A received Message', role=event.role, parts=[str(p) for p in event.parts])  # manual instrumentation
-                # Direct message response
-                for part in event.parts:
-                    part_data = part.root if hasattr(part, 'root') else part
-                    if hasattr(part_data, 'text'):
-                        joke_text = part_data.text
-                        break
-            elif isinstance(event, Task):
-                logfire.info('A2A received Task', task_id=event.id, status=str(event.status))  # manual instrumentation
-                # Task-based response — extract from artifacts or history
-                if event.artifacts:
-                    for artifact in event.artifacts:
-                        for part in artifact.parts:
-                            part_data = part.root if hasattr(part, 'root') else part
-                            if hasattr(part_data, 'text'):
-                                joke_text = part_data.text
-                                break
-                        if joke_text:
+        # send_message returns an async iterator of events
+        joke_text = None
+        with logfire.span('A2A send_message', message_id=message.message_id, user_text='Tell me a joke about programming'):  # manual instrumentation
+            async for event in client.send_message(message):
+                if isinstance(event, Message) and event.role == 'agent':
+                    logfire.info('A2A received Message', role=event.role, parts=[str(p) for p in event.parts])  # manual instrumentation
+                    # Direct message response
+                    for part in event.parts:
+                        part_data = part.root if hasattr(part, 'root') else part
+                        if hasattr(part_data, 'text'):
+                            joke_text = part_data.text
                             break
-                if not joke_text and event.history:
-                    for msg in reversed(event.history):
-                        if msg.role == 'agent':
-                            for part in msg.parts:
+                elif isinstance(event, Task):
+                    logfire.info('A2A received Task', task_id=event.id, status=str(event.status))  # manual instrumentation
+                    # Task-based response — extract from artifacts or history
+                    if event.artifacts:
+                        for artifact in event.artifacts:
+                            for part in artifact.parts:
                                 part_data = part.root if hasattr(part, 'root') else part
                                 if hasattr(part_data, 'text'):
                                     joke_text = part_data.text
                                     break
                             if joke_text:
                                 break
+                    if not joke_text and event.history:
+                        for msg in reversed(event.history):
+                            if msg.role == 'agent':
+                                for part in msg.parts:
+                                    part_data = part.root if hasattr(part, 'root') else part
+                                    if hasattr(part_data, 'text'):
+                                        joke_text = part_data.text
+                                        break
+                                if joke_text:
+                                    break
 
     if not joke_text:
         print('Could not extract joke from Agent A response.')
