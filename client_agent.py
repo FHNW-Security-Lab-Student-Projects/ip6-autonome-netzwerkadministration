@@ -1,12 +1,3 @@
-"""Agent B - Translator (A2A Client)
-
-Connects to Agent A's A2A server, requests a joke, then translates it to German
-using its own Pydantic AI agent.
-
-Prerequisites: Agent A must be running on port 8000
-Run with: uv run python agent_b_client.py
-"""
-
 import asyncio
 import os
 import logging
@@ -74,7 +65,7 @@ async def main():
             message_id=uuid4().hex,
         )
 
-        print('Sending message to Agent A (Joke Agent)...')
+        print('Sending message to A2A Server Agent')
 
         # send_message returns an async iterator of events
         joke_text = None
@@ -112,10 +103,10 @@ async def main():
                                     break
 
     if not joke_text:
-        print('Could not extract joke from Agent A response.')
+        print('Could not extract joke from A2A server Agent.')
         return
 
-    print(f'\nOriginal joke from Agent A:\n{joke_text}')
+    print(f'\nOriginal joke from A2A Server agent:\n{joke_text}')
 
 if __name__ == '__main__':
     asyncio.run(main())
