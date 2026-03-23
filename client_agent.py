@@ -12,7 +12,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 import httpx
 from a2a.client import ClientFactory, ClientConfig
-from a2a.types import Message, Part, TextPart, Task
+from a2a.types import Message, Part, TextPart
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -67,23 +67,31 @@ async def main():
 
         print('Sending message to A2A Server Agent')
 
-        # send_message returns an async iterator of events
+        # send_message yields ClientEvent (tuple[Task, UpdateEvent]) or Message
         joke_text = None
         with logfire.span('A2A send_message', message_id=message.message_id, user_text='Tell me a joke about programming'):  # manual instrumentation
             async for event in client.send_message(message):
                 if isinstance(event, Message) and event.role == 'agent':
                     logfire.info('A2A received Message', role=event.role, parts=[str(p) for p in event.parts])  # manual instrumentation
-                    # Direct message response
                     for part in event.parts:
                         part_data = part.root if hasattr(part, 'root') else part
                         if hasattr(part_data, 'text'):
                             joke_text = part_data.text
                             break
-                elif isinstance(event, Task):
-                    logfire.info('A2A received Task', task_id=event.id, status=str(event.status))  # manual instrumentation
-                    # Task-based response — extract from artifacts or history
-                    if event.artifacts:
-                        for artifact in event.artifacts:
+                elif isinstance(event, tuple):
+                    task, update_event = event
+                    logger.info(f'Task: ${task} \n, update_event: ${update_event}')
+                    logfire.info('A2A received ClientEvent', task_id=task.id, status=str(task.status), update_type=type(update_event).__name__)  # manual instrumentation
+                    # Check status message (set by TaskUpdater.complete/failed/etc.)
+                    if task.status and task.status.message and task.status.message.parts:
+                        for part in task.status.message.parts:
+                            part_data = part.root if hasattr(part, 'root') else part
+                            if hasattr(part_data, 'text'):
+                                joke_text = part_data.text
+                                break
+                    # Fallback: check artifacts
+                    if not joke_text and task.artifacts:
+                        for artifact in task.artifacts:
                             for part in artifact.parts:
                                 part_data = part.root if hasattr(part, 'root') else part
                                 if hasattr(part_data, 'text'):
@@ -91,16 +99,6 @@ async def main():
                                     break
                             if joke_text:
                                 break
-                    if not joke_text and event.history:
-                        for msg in reversed(event.history):
-                            if msg.role == 'agent':
-                                for part in msg.parts:
-                                    part_data = part.root if hasattr(part, 'root') else part
-                                    if hasattr(part_data, 'text'):
-                                        joke_text = part_data.text
-                                        break
-                                if joke_text:
-                                    break
 
     if not joke_text:
         print('Could not extract joke from A2A server Agent.')
