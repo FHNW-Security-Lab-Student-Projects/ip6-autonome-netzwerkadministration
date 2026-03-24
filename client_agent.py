@@ -12,7 +12,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 import httpx
 from a2a.client import ClientFactory, ClientConfig
-from a2a.types import Message, Part, TextPart
+from a2a.types import Message, Part, TextPart, TaskState
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -45,12 +45,61 @@ translator_agent = Agent(
 )
 
 
+def extract_text(parts) -> str | None:
+    """Extract text from a list of A2A message parts."""
+    for part in parts:
+        part_data = part.root if hasattr(part, 'root') else part
+        if hasattr(part_data, 'text'):
+            return part_data.text
+    return None
+
+
+async def send_and_process(client, message, logger) -> tuple[str | None, str | None, str | None, bool]:
+    """Send a message and process the response.
+
+    Returns (response_text, task_id, context_id, needs_input).
+    If needs_input is True, the server requires further user input to continue.
+    """
+    response_text = None
+    task_id = None
+    context_id = None
+    needs_input = False
+
+    with logfire.span('A2A send_message', message_id=message.message_id):
+        async for event in client.send_message(message):
+            if isinstance(event, Message) and event.role == 'agent':
+                logfire.info('A2A received Message', role=event.role, parts=[str(p) for p in event.parts])
+                response_text = extract_text(event.parts)
+            elif isinstance(event, tuple):
+                task, update_event = event
+                task_id = task.id
+                context_id = task.context_id
+                logger.info(f'Task: {task.id}, status: {task.status.state if task.status else "unknown"}, update: {type(update_event).__name__}')
+                logfire.info('A2A received ClientEvent', task_id=task.id, status=str(task.status), update_type=type(update_event).__name__)
+
+                if task.status and task.status.state == TaskState.input_required:
+                    needs_input = True
+
+                # Extract text from status message
+                if task.status and task.status.message and task.status.message.parts:
+                    response_text = extract_text(task.status.message.parts)
+
+                # Fallback: check artifacts
+                if not response_text and task.artifacts:
+                    for artifact in task.artifacts:
+                        text = extract_text(artifact.parts)
+                        if text:
+                            response_text = text
+                            break
+
+    return response_text, task_id, context_id, needs_input
+
+
 async def main():
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
     async with httpx.AsyncClient(timeout=60) as http_client:
-        # Connect to Agent A using ClientFactory (replaces deprecated A2AClient)
         client = await ClientFactory.connect(
             agent='http://localhost:8000',
             client_config=ClientConfig(httpx_client=http_client),
@@ -58,53 +107,45 @@ async def main():
         agent_card = await client.get_card()
         logger.info('Connected to agent: %s', agent_card.name)
 
-        # Build the A2A message
-        message = Message(
-            role='user',
-            parts=[Part(root=TextPart(text='Tell me a joke about programming'))],
-            message_id=uuid4().hex,
-        )
+        task_id = None
+        context_id = None
 
-        print('Sending message to A2A Server Agent')
+        print('Type your message and press Enter. Press Ctrl+C or type "exit" to quit.\n')
 
-        # send_message yields ClientEvent (tuple[Task, UpdateEvent]) or Message
-        joke_text = None
-        with logfire.span('A2A send_message', message_id=message.message_id, user_text='Tell me a joke about programming'):  # manual instrumentation
-            async for event in client.send_message(message):
-                if isinstance(event, Message) and event.role == 'agent':
-                    logfire.info('A2A received Message', role=event.role, parts=[str(p) for p in event.parts])  # manual instrumentation
-                    for part in event.parts:
-                        part_data = part.root if hasattr(part, 'root') else part
-                        if hasattr(part_data, 'text'):
-                            joke_text = part_data.text
-                            break
-                elif isinstance(event, tuple):
-                    task, update_event = event
-                    logger.info(f'Task: ${task} \n, update_event: ${update_event}')
-                    logfire.info('A2A received ClientEvent', task_id=task.id, status=str(task.status), update_type=type(update_event).__name__)  # manual instrumentation
-                    # Check status message (set by TaskUpdater.complete/failed/etc.)
-                    if task.status and task.status.message and task.status.message.parts:
-                        for part in task.status.message.parts:
-                            part_data = part.root if hasattr(part, 'root') else part
-                            if hasattr(part_data, 'text'):
-                                joke_text = part_data.text
-                                break
-                    # Fallback: check artifacts
-                    if not joke_text and task.artifacts:
-                        for artifact in task.artifacts:
-                            for part in artifact.parts:
-                                part_data = part.root if hasattr(part, 'root') else part
-                                if hasattr(part_data, 'text'):
-                                    joke_text = part_data.text
-                                    break
-                            if joke_text:
-                                break
+        while True:
+            try:
+                user_text = input('You: ').strip()
+            except (KeyboardInterrupt, EOFError):
+                print('\nGoodbye!')
+                break
 
-    if not joke_text:
-        print('Could not extract joke from A2A server Agent.')
-        return
+            if not user_text:
+                continue
+            if user_text.lower() in ('exit', 'quit', '/exit', '/quit'):
+                print('Goodbye!')
+                break
 
-    print(f'\nOriginal joke from A2A Server agent:\n{joke_text}')
+            message = Message(
+                role='user',
+                parts=[Part(root=TextPart(text=user_text))],
+                message_id=uuid4().hex,
+                task_id=task_id,
+                context_id=context_id,
+            )
+
+            print(f'Sending message to {agent_card.name}...')
+            response_text, task_id, context_id, needs_input = await send_and_process(client, message, logger)
+
+            if not response_text:
+                print('No response received from server agent.')
+                continue
+
+            print(f'\n{agent_card.name}: {response_text}\n')
+
+            if not needs_input:
+                # Task completed — reset task_id so the next message starts a new task,
+                # but keep context_id to maintain conversational continuity (same "chat window").
+                task_id = None
 
 if __name__ == '__main__':
     asyncio.run(main())
