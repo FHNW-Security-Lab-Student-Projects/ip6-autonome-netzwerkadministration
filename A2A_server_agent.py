@@ -7,6 +7,7 @@ Run with: uv run uvicorn agent_a_server:app --port 8000
 """
 
 import os
+from enum import Enum
 from pathlib import Path
 from uuid import uuid4
 
@@ -69,6 +70,43 @@ agent = Agent(
 )
 
 
+# --- Routing agent: classifies user intent as message or task ---
+
+class ResponseType(str, Enum):
+    message = 'message'
+    task = 'task'
+
+
+class RoutingDecision(BaseModel):
+    response_type: ResponseType
+    reasoning: str
+
+
+routing_agent = Agent(
+    OpenAIChatModel(
+        'z-ai/glm-5',
+        provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
+    ),
+    output_type=RoutingDecision,
+    instructions=(
+        'You classify user messages as "message" or "task".\n\n'
+        'Use "message" for: greetings, small talk, capability questions '
+        '("what can you do?"), thanks, goodbyes.\n'
+        'Use "task" for: joke requests, creative generation, anything '
+        'goal-oriented or needing follow-up.\n\n'
+        'When in doubt, prefer "task".'
+    ),
+)
+
+conversational_agent = Agent(
+    llm,
+    instructions=(
+        'You are a friendly joke agent assistant. Respond briefly to greetings, '
+        'small talk, and simple questions. Keep responses short and natural.'
+    ),
+)
+
+
 class JokeAgentExecutor(AgentExecutor):
     """Bridges the Pydantic AI joke agent with the a2a-sdk AgentExecutor interface."""
 
@@ -78,13 +116,27 @@ class JokeAgentExecutor(AgentExecutor):
             await event_queue.enqueue_event(new_agent_text_message('No input provided.'))
             return
 
-        updater = TaskUpdater(
-            event_queue,
-            task_id=context.task_id or uuid4().hex,
-            context_id=context.context_id or uuid4().hex,
-        )
-
         with logfire.span('JokeAgentExecutor.execute', user_text=user_text, task_id=context.task_id):
+            # Skip routing if continuing an existing task (e.g., answering a clarification)
+            if context.current_task is None:
+                routing_result = await routing_agent.run(user_text)
+                decision = routing_result.output
+                logfire.info('Routing decision', response_type=decision.response_type, reasoning=decision.reasoning)
+
+                if decision.response_type == ResponseType.message:
+                    conv_result = await conversational_agent.run(user_text)
+                    await event_queue.enqueue_event(
+                        new_agent_text_message(str(conv_result.output))
+                    )
+                    return
+
+            # Task path — joke agent with lifecycle tracking
+            updater = TaskUpdater(
+                event_queue,
+                task_id=context.task_id or uuid4().hex,
+                context_id=context.context_id or uuid4().hex,
+            )
+
             result = await agent.run(user_text)
             output = result.output
 
@@ -114,7 +166,7 @@ skill = AgentSkill(
 
 agent_card = AgentCard(
     name='Joke Agent',
-    description='Generates jokes on any topic via A2A protocol',
+    description='A conversational joke agent. Handles greetings and simple questions directly via messages, and creates tasks for joke generation and other goal-oriented requests.',
     url='http://localhost:8000/',
     version='1.0.0',
     default_input_modes=['text'],

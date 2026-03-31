@@ -96,6 +96,8 @@ If a server agent needs to be aware of prior messages within the same context:
 
 2. **Custom `RequestContextBuilder`** — Subclass `RequestContextBuilder` and add a query that fetches all tasks by `context_id` from the store. The `DatabaseTaskStore` already has `context_id` indexed, so you'd only need to add the query method (e.g., subclass `DatabaseTaskStore` with a `get_by_context_id()` method). This goes beyond what the protocol envisions.
 
+For a deeper look at how `context_id` fits into the ID lifecycle and why it's a metadata label rather than a retrieval key, see [a2a-task-and-context-id-lifecycle.md](a2a-task-and-context-id-lifecycle.md).
+
 ## Implications for Our Project
 
 - The client agent should maintain a mapping of `context_id -> list[task_id]` and include relevant `reference_task_ids` when sending follow-up messages.

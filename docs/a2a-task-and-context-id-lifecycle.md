@@ -75,6 +75,44 @@ In practice:
 - **The client decides when to start a new context** (by sending a new `context_id` or omitting it).
 - **The server decides the canonical value** and enforces consistency on follow-up messages.
 
+## `contextId` Is a Metadata Label, Not a Retrieval Key
+
+A common misconception is that the server uses `context_id` to retrieve all tasks belonging to a conversation. **It does not.** The `contextId` is stored on each task, but there is no mechanism in the SDK to query tasks by it.
+
+### What `TaskStore` actually provides
+
+```python
+class TaskStore(ABC):
+    async def save(self, task, context) -> None
+    async def get(self, task_id, context) -> Task | None   # by task_id only
+    async def delete(self, task_id, context) -> None        # by task_id only
+```
+
+No `get_by_context_id()`. No `list_tasks()`. No `search()`.
+
+### How context retrieval actually works
+
+The server has **two** ways to access conversational history, and neither uses `context_id`:
+
+| Mechanism | How it works | Who drives it |
+|---|---|---|
+| **Same `task_id`** | Client sends follow-up messages with the same `task_id`. The task accumulates messages in its `history: list[Message]` field. | Client (reuses `task_id` from response) |
+| **`reference_task_ids`** | Client explicitly lists other task IDs in `message.reference_task_ids`. The server's `SimpleRequestContextBuilder` (if configured with `should_populate_referred_tasks=True`) fetches each referenced task and passes them as `related_tasks` to the `AgentExecutor`. | Client (provides the IDs) |
+
+### So what is `contextId` for?
+
+It's a **grouping label** — metadata that tags tasks as belonging to the same session. It enables:
+
+- **Consistency validation**: The server rejects messages where `context_id` doesn't match the existing task's `context_id` (context.py:74-78).
+- **Custom extensions**: A developer could subclass `TaskStore` to add a `get_by_context_id()` method (the `DatabaseTaskStore` already indexes `context_id` as a column). But this is outside the SDK's built-in behavior.
+- **Observability / debugging**: Knowing which tasks belong together is useful for logging and tracing.
+
+### Key takeaway
+
+> **Building conversational context across tasks is the client's responsibility.** The client must track which `task_id`s belong to a conversation and pass the relevant ones via `reference_task_ids`. The server cannot reconstruct a conversation from `context_id` alone.
+
+For the full analysis of context retrieval responsibility, see [a2a-message-context-responsibility.md](a2a-message-context-responsibility.md).
+
 ## Multi-Turn Conversations (`input-required`)
 
 When a server agent needs clarification, it sets the task state to `input-required` via `TaskUpdater.requires_input()`. The client must then send a follow-up message with both `task_id` and `context_id` to continue the same task.
