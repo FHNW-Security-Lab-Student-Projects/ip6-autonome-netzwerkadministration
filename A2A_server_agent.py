@@ -18,7 +18,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
-from a2a.server.agent_execution import AgentExecutor, RequestContext, SimpleRequestContextBuilder
+from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.events import EventQueue
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -140,21 +140,7 @@ class JokeAgentExecutor(AgentExecutor):
             # Build prompt, injecting prior context
             prompt_parts: list[str] = []
 
-            # 1. Related task context (prior completed tasks referenced by the client)
-            if context.related_tasks:
-                related_lines: list[str] = []
-                for related_task in context.related_tasks:
-                    if related_task.history:
-                        for msg in related_task.history:
-                            for part in msg.parts:
-                                part_data = part.root if hasattr(part, 'root') else part
-                                if hasattr(part_data, 'text') and part_data.text:
-                                    related_lines.append(f'{msg.role}: {part_data.text}')
-                if related_lines:
-                    prompt_parts.append('Context from prior related tasks:\n' + '\n'.join(related_lines))
-                    logfire.info('Injecting related task context', lines=len(related_lines))
-
-            # 2. Current task conversation history (prior turns of this ongoing task)
+            # 1. Current task conversation history (prior turns of this ongoing task)
             if context.current_task and context.current_task.history:
                 current_lines: list[str] = []
                 for msg in context.current_task.history:
@@ -166,7 +152,7 @@ class JokeAgentExecutor(AgentExecutor):
                     prompt_parts.append('Conversation so far in this task:\n' + '\n'.join(current_lines))
                     logfire.info('Injecting current task history', lines=len(current_lines))
 
-            # 3. New user message
+            # 2. New user message
             prompt_parts.append(f'New message: {user_text}' if prompt_parts else user_text)
             prompt = '\n\n'.join(prompt_parts)
 
@@ -213,10 +199,6 @@ task_store = InMemoryTaskStore()
 request_handler = DefaultRequestHandler(
     agent_executor=JokeAgentExecutor(),
     task_store=task_store,
-    request_context_builder=SimpleRequestContextBuilder(
-        should_populate_referred_tasks=True,
-        task_store=task_store,
-    ),
 )
 
 server = A2AStarletteApplication(
