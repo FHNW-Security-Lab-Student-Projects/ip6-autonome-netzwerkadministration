@@ -9,6 +9,7 @@ from pathlib import Path
 
 import logfire
 from dotenv import load_dotenv
+from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
@@ -48,12 +49,76 @@ translator_agent = Agent(
 )
 
 
+class RelevanceResult(BaseModel):
+    relevant_task_ids: list[str]  # subset of the candidate task IDs passed in the prompt
+
+
+relevance_agent = Agent(
+    llm,
+    output_type=RelevanceResult,
+    instructions=(
+        'You decide which prior conversation tasks are relevant context for a new user request. '
+        'You will receive the new request and a list of prior tasks with their conversation history. '
+        'Return only the task IDs that directly inform or relate to the new request. '
+        'Return an empty list if none are relevant. '
+        'Only return IDs that were explicitly listed in the input.'
+    ),
+)
+
+
+async def select_reference_task_ids(
+    ctx: 'ContextState',
+    new_message: str,
+    current_task_id: str | None,
+    max_refs: int = 2,
+) -> list[str]:
+    """Use an LLM to select which prior task IDs are relevant to reference in a new request.
+
+    Applies hard filters first (completed, non-empty history, not the active task),
+    then asks the relevance_agent to score candidates against the new message.
+    Returns at most max_refs task IDs, validated against the known candidate set.
+    """
+    candidates = [
+        rec for rec in ctx.tasks.values()
+        if rec.task_id != current_task_id
+        and rec.final_state == 'completed'
+        and rec.history
+    ]
+    if not candidates:
+        return []
+    if len(candidates) == 1:
+        return [candidates[0].task_id]  # only one option, no need for LLM
+
+    # Build compact per-task summaries (truncated to keep the prompt cheap)
+    summaries: list[str] = []
+    for rec in candidates:
+        lines: list[str] = []
+        for msg in rec.history:
+            text = extract_text(msg.parts)
+            if text:
+                lines.append(f'  {msg.role}: {text[:150]}')
+        summaries.append(f'task_id={rec.task_id}\n' + '\n'.join(lines))
+
+    prompt = (
+        f'New request: "{new_message}"\n\n'
+        f'Prior tasks:\n\n' + '\n\n---\n\n'.join(summaries)
+    )
+
+    result = await relevance_agent.run(prompt)
+
+    # Validate: only return IDs that actually exist in the candidate set
+    valid_ids = {rec.task_id for rec in candidates}
+    selected = [tid for tid in result.output.relevant_task_ids if tid in valid_ids]
+    return selected[:max_refs]
+
+
 @dataclass
 class TaskRecord:
     task_id: str
     context_id: str       # denormalised; always matches parent ContextState
     response_text: str | None
     final_state: str      # e.g. "completed", "input_required", "failed"
+    history: list[Message] = field(default_factory=list)  # full Task.history from the server
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -95,10 +160,13 @@ class ServerState:
         response_text: str | None,
         needs_input: bool,
         final_state: str,
+        history: list[Message] | None = None,
     ) -> None:
         """Update context/task records after a server response.
 
-        Creates a new ContextState if context_id is unseen. Upserts the TaskRecord.
+        Creates a new ContextState if context_id is unseen. Upserts the TaskRecord,
+        storing the full Task.history so callers can evaluate whether a task_id is
+        worth referencing in a future request.
         Sets active_task_id to task_id when server expects further input, else None
         (so the next message starts a fresh task within the same context).
         """
@@ -111,11 +179,17 @@ class ServerState:
             context_id=context_id,
             response_text=response_text,
             final_state=final_state,
+            history=history or [],
         ))
         ctx.active_task_id = task_id if needs_input else None
 
-    def build_message(self, user_text: str) -> Message:
-        """Build a Message correctly scoped to the active context and task."""
+    def build_message(self, user_text: str, reference_task_ids: list[str] | None = None) -> Message:
+        """Build a Message correctly scoped to the active context and task.
+
+        reference_task_ids: prior task IDs (same server, same context) the server
+        should fetch and inject as related context into the executor. Only meaningful
+        when the server has should_populate_referred_tasks=True.
+        """
         ctx = self.active_context()
         return Message(
             role='user',
@@ -123,24 +197,29 @@ class ServerState:
             message_id=uuid4().hex,
             task_id=ctx.active_task_id if ctx else None,
             context_id=self.active_context_id,
+            reference_task_ids=reference_task_ids or None,
         )
 
     def summarise_for_injection(self) -> str | None:
-        """Return a plain-text summary of all known responses from this server.
+        """Return a plain-text summary of all known task histories from this server.
 
         Intended for injecting into a *different* server's message prompt when
         cross-server context sharing is needed. Returns None if nothing to inject.
-        Task IDs are scoped to their context and must not be used as
-        reference_task_ids on a different server.
+        Uses Task.history (full message exchange) when available; falls back to the
+        extracted response_text. Task IDs are scoped to their context and must not
+        be used as reference_task_ids on a different server.
         """
         lines: list[str] = []
         for ctx in self.contexts.values():
             for rec in ctx.tasks.values():
-                if rec.response_text:
-                    lines.append(
-                        f'[{self.agent_name} / ctx {ctx.context_id[:8]} / task {rec.task_id[:8]}]: '
-                        f'{rec.response_text}'
-                    )
+                prefix = f'[{self.agent_name} / ctx {ctx.context_id[:8]} / task {rec.task_id[:8]}]'
+                if rec.history:
+                    for msg in rec.history:
+                        text = extract_text(msg.parts)
+                        if text:
+                            lines.append(f'{prefix} {msg.role}: {text}')
+                elif rec.response_text:
+                    lines.append(f'{prefix} agent: {rec.response_text}')
         return '\n'.join(lines) if lines else None
 
     def debug_summary(self) -> str:
@@ -156,6 +235,7 @@ class ServerState:
                 task_marker = ' [active task]' if tid == ctx.active_task_id else ''
                 lines.append(
                     f'    task {tid[:8]}{task_marker}  state={rec.final_state}'
+                    f'  history={len(rec.history)} msg(s)'
                     f'  created={rec.created_at.strftime("%H:%M:%S")}'
                 )
         return '\n'.join(lines)
@@ -181,6 +261,7 @@ async def send_and_process(server: ServerState, message: Message, logger: loggin
     context_id = None
     needs_input = False
     final_state = 'unknown'
+    last_task = None  # holds the most recent Task object; its .history is the authoritative record
 
     with logfire.span('A2A send_message', message_id=message.message_id):
         async for event in server.client.send_message(message):
@@ -189,6 +270,7 @@ async def send_and_process(server: ServerState, message: Message, logger: loggin
                 response_text = extract_text(event.parts)
             elif isinstance(event, tuple):
                 task, update_event = event
+                last_task = task  # keep updating — the last event has the most complete history
                 task_id = task.id
                 context_id = task.context_id
                 if task.status:
@@ -212,7 +294,10 @@ async def send_and_process(server: ServerState, message: Message, logger: loggin
                             break
 
     if task_id and context_id:
-        server.apply_response(task_id, context_id, response_text, needs_input, final_state)
+        server.apply_response(
+            task_id, context_id, response_text, needs_input, final_state,
+            history=last_task.history if last_task and last_task.history else [],
+        )
 
     return response_text
 
@@ -254,7 +339,14 @@ async def main():
                 print(server.debug_summary())
                 continue
 
-            message = server.build_message(user_text)
+            ctx = server.active_context()
+            ref_ids: list[str] = []
+            if ctx and len(ctx.tasks) > 0:
+                ref_ids = await select_reference_task_ids(ctx, user_text, ctx.active_task_id)
+                if ref_ids:
+                    logger.info('Referencing prior tasks: %s', [tid[:8] for tid in ref_ids])
+
+            message = server.build_message(user_text, reference_task_ids=ref_ids or None)
 
             print(f'Sending message to {server.agent_name}...')
             response_text = await send_and_process(server, message, logger)
