@@ -110,6 +110,10 @@ conversational_agent = Agent(
 class JokeAgentExecutor(AgentExecutor):
     """Bridges the Pydantic AI joke agent with the a2a-sdk AgentExecutor interface."""
 
+    def __init__(self) -> None:
+        # Keyed by context_id; values are the full Pydantic AI message history for that context.
+        self._context_history: dict[str, list] = {}
+
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         user_text = context.get_user_input()
         if not user_text:
@@ -137,27 +141,19 @@ class JokeAgentExecutor(AgentExecutor):
                 context_id=context.context_id or uuid4().hex,
             )
 
-            # Build prompt, injecting prior context
-            prompt_parts: list[str] = []
+            # Retrieve per-context Pydantic AI message history (tool calls, model turns, etc.)
+            ctx_key = context.context_id or context.task_id
+            history = self._context_history.get(ctx_key, [])
+            logfire.info('Context history', ctx_key=ctx_key, messages=len(history))
+            print(f'\n[HISTORY] ctx_key={ctx_key!r}  messages={len(history)}')
+            for i, msg in enumerate(history):
+                print(f'  [{i}] {msg}')
 
-            # 1. Current task conversation history (prior turns of this ongoing task)
-            if context.current_task and context.current_task.history:
-                current_lines: list[str] = []
-                for msg in context.current_task.history:
-                    for part in msg.parts:
-                        part_data = part.root if hasattr(part, 'root') else part
-                        if hasattr(part_data, 'text') and part_data.text:
-                            current_lines.append(f'{msg.role}: {part_data.text}')
-                if current_lines:
-                    prompt_parts.append('Conversation so far in this task:\n' + '\n'.join(current_lines))
-                    logfire.info('Injecting current task history', lines=len(current_lines))
-
-            # 2. New user message
-            prompt_parts.append(f'New message: {user_text}' if prompt_parts else user_text)
-            prompt = '\n\n'.join(prompt_parts)
-
-            result = await agent.run(prompt)
+            result = await agent.run(user_text, message_history=history)
             output = result.output
+
+            # Persist updated history for next turn in this context
+            self._context_history[ctx_key] = result.all_messages()
 
             if output.needs_input:
                 logfire.info('Clarification needed', question=output.clarification_question)

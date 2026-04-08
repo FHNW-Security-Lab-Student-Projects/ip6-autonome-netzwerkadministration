@@ -47,7 +47,6 @@ llm = OpenAIChatModel(
 @dataclass
 class TaskRecord:
     task_id: str
-    context_id: str       # denormalised; always matches parent ContextState
     final_state: str      # e.g. "completed", "input_required", "failed"
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -74,10 +73,6 @@ class ServerState:
     def active_context(self) -> ContextState | None:
         return self.contexts.get(self.active_context_id) if self.active_context_id else None
 
-    def active_task_id(self) -> str | None:
-        ctx = self.active_context()
-        return ctx.active_task_id if ctx else None
-
     def apply_response(
         self,
         task_id: str,
@@ -90,7 +85,7 @@ class ServerState:
             self.contexts[context_id] = ContextState(context_id=context_id)
         ctx = self.contexts[context_id]
         self.active_context_id = context_id
-        ctx.record_task(TaskRecord(task_id=task_id, context_id=context_id, final_state=final_state))
+        ctx.record_task(TaskRecord(task_id=task_id, final_state=final_state))
         ctx.active_task_id = task_id if needs_input else None
 
     def build_message(self, user_text: str) -> Message:
@@ -214,6 +209,9 @@ def build_orchestrator(joke_card) -> Agent:
         f'- call_joke_agent ({joke_card.name}): {joke_card.description}\n'
         f'  Skills:\n{skill_lines}\n\n'
         'Delegate requests to the appropriate agent.\n\n'
+        'When composing the `request` argument for any remote agent call, include relevant '
+        'responses or results from other remote agents that were called earlier in this '
+        'conversation — so each agent has the context it needs to do its job well.\n\n'
         'IMPORTANT: When a tool returns input_required=True, the remote agent is waiting for '
         'the user to answer a clarification question. You MUST output the text field verbatim '
         'as your final response — do NOT answer the question yourself, do NOT call any tool again.'
