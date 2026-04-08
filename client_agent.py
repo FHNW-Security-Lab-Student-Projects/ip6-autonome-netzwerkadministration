@@ -176,6 +176,7 @@ async def send_and_process(server: ServerState, message: Message, logger: loggin
 @dataclass
 class OrchestratorDeps:
     joke_server: ServerState
+    network_server: ServerState
 
 
 @dataclass
@@ -198,16 +199,32 @@ async def _call_joke_agent(ctx: RunContext[OrchestratorDeps], request: str) -> R
     )
 
 
-def build_orchestrator(joke_card) -> Agent:
-    skill_lines = '\n'.join(
-        f'    - {s.name}: {s.description}' for s in joke_card.skills
+async def _call_network_agent(ctx: RunContext[OrchestratorDeps], request: str) -> RemoteAgentResponse:
+    """Delegate a read-only network query to the remote Network Agent."""
+    logger = logging.getLogger(__name__)
+    server = ctx.deps.network_server
+    message = server.build_message(request)
+    result = await send_and_process(server, message, logger)
+    ctx_state = server.active_context()
+    needs_input = ctx_state is not None and ctx_state.active_task_id is not None
+    return RemoteAgentResponse(
+        text=result or 'No response received from network agent.',
+        input_required=needs_input,
     )
+
+
+def build_orchestrator(joke_card, network_card) -> Agent:
+    def _skill_lines(card) -> str:
+        return '\n'.join(f'    - {s.name}: {s.description}' for s in card.skills)
+
     instructions = (
         'You are an orchestrator agent that coordinates between specialised remote agents '
         'to fulfil user requests.\n\n'
-        f'Available remote agents:\n'
+        'Available remote agents:\n'
         f'- call_joke_agent ({joke_card.name}): {joke_card.description}\n'
-        f'  Skills:\n{skill_lines}\n\n'
+        f'  Skills:\n{_skill_lines(joke_card)}\n\n'
+        f'- call_network_agent ({network_card.name}): {network_card.description}\n'
+        f'  Skills:\n{_skill_lines(network_card)}\n\n'
         'Delegate requests to the appropriate agent.\n\n'
         'When composing the `request` argument for any remote agent call, include relevant '
         'responses or results from other remote agents that were called earlier in this '
@@ -218,6 +235,7 @@ def build_orchestrator(joke_card) -> Agent:
     )
     agent = Agent(llm, deps_type=OrchestratorDeps, instructions=instructions)
     agent.tool(_call_joke_agent)
+    agent.tool(_call_network_agent)
     return agent
 
 
@@ -233,15 +251,27 @@ async def main():
         joke_card = await joke_client.get_card()
         logger.info('Connected to agent: %s', joke_card.name)
 
-        orchestrator = build_orchestrator(joke_card)
+        network_client = await ClientFactory.connect(
+            agent='http://localhost:8001',
+            client_config=ClientConfig(httpx_client=http_client),
+        )
+        network_card = await network_client.get_card()
+        logger.info('Connected to agent: %s', network_card.name)
+
+        orchestrator = build_orchestrator(joke_card, network_card)
 
         joke_server = ServerState(
             url='http://localhost:8000',
             agent_name=joke_card.name,
             client=joke_client,
         )
+        network_server = ServerState(
+            url='http://localhost:8001',
+            agent_name=network_card.name,
+            client=network_client,
+        )
 
-        deps = OrchestratorDeps(joke_server=joke_server)
+        deps = OrchestratorDeps(joke_server=joke_server, network_server=network_server)
         message_history = []
 
         print('Type your message and press Enter. Press Ctrl+C or type "exit" to quit.')
@@ -261,6 +291,7 @@ async def main():
                 break
             if user_text == '/state':
                 print(joke_server.debug_summary())
+                print(network_server.debug_summary())
                 continue
 
             result = await orchestrator.run(user_text, deps=deps, message_history=message_history)

@@ -1,0 +1,7 @@
+Node1:
+  hostname: clab-demolab-srl1
+  platform: nokia_srl
+
+Node2:
+  hostname: clab-demolab-srl2
+  platform: nokia_srl

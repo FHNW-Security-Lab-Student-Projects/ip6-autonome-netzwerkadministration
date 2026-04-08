@@ -3,3 +3,8 @@ __pycache__/
 .venv/
 CLAUDE.md
 .mcp.json
+.mypy_cache/
+
+# Containerlab runtime output (auto-generated on clab deploy)
+clab-testlab/
+*.clab.yml.annotations.json

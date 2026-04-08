@@ -1,0 +1,16 @@
+# Testlab topology devices
+switch1:
+  hostname: clab-testlab-switch1
+  platform: nokia_srl
+
+switch2:
+  hostname: clab-testlab-switch2
+  platform: nokia_srl
+
+router1:
+  hostname: clab-testlab-router1
+  platform: nokia_srl
+
+router2:
+  hostname: clab-testlab-router2
+  platform: nokia_srl

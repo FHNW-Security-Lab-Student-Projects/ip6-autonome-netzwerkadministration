@@ -4,10 +4,13 @@ version = "0.1.0"
 description = "A2A Protocol demo with two Pydantic AI agents"
 requires-python = ">=3.13"
 dependencies = [
-    "pydantic-ai-slim[openai,logfire]",
+    "pydantic-ai-slim[openai,logfire,mcp]",
     "a2a-sdk[http-server]",
     "python-dotenv",
     "httpx",
     "uvicorn",
     "logfire[httpx,starlette]>=4.29.0",
+    "pyyaml",
+    "netmiko",
+    "fastmcp",
 ]
