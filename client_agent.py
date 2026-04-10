@@ -3,6 +3,7 @@ import os
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
 from uuid import uuid4
 from pathlib import Path
@@ -44,6 +45,11 @@ llm = OpenAIChatModel(
 
 
 
+class ContextMode(Enum):
+    STICKY = 'sticky'      # current behaviour: one persistent context per remote agent
+    PER_TURN = 'per_turn'  # new: fresh context each orchestrator turn (unless input_required)
+
+
 @dataclass
 class TaskRecord:
     task_id: str
@@ -69,6 +75,7 @@ class ServerState:
     client: Any
     contexts: dict[str, ContextState] = field(default_factory=dict)  # context_id -> ContextState
     active_context_id: str | None = None
+    context_mode: ContextMode = ContextMode.STICKY
 
     def active_context(self) -> ContextState | None:
         return self.contexts.get(self.active_context_id) if self.active_context_id else None
@@ -99,9 +106,20 @@ class ServerState:
             context_id=self.active_context_id,
         )
 
+    def maybe_reset_context(self) -> None:
+        """In PER_TURN mode, clear the active context after a completed turn.
+
+        Skipped when a task is still waiting for input — the context must stay
+        alive so the follow-up message reaches the same task.
+        """
+        if self.context_mode == ContextMode.PER_TURN:
+            ctx = self.active_context()
+            if ctx is None or ctx.active_task_id is None:
+                self.active_context_id = None
+
     def debug_summary(self) -> str:
         """Return a multi-line string showing all tracked contexts and tasks."""
-        lines = [f'ServerState({self.agent_name} @ {self.url})']
+        lines = [f'ServerState({self.agent_name} @ {self.url})  mode={self.context_mode.value}']
         if not self.contexts:
             lines.append('  (no contexts yet)')
             return '\n'.join(lines)
@@ -226,9 +244,13 @@ def build_orchestrator(joke_card, network_card) -> Agent:
         f'- call_network_agent ({network_card.name}): {network_card.description}\n'
         f'  Skills:\n{_skill_lines(network_card)}\n\n'
         'Delegate requests to the appropriate agent.\n\n'
-        'When composing the `request` argument for any remote agent call, include relevant '
-        'responses or results from other remote agents that were called earlier in this '
-        'conversation — so each agent has the context it needs to do its job well.\n\n'
+        'When composing the `request` argument for any remote agent call, write it as a '
+        'self-contained message — the remote agent has no access to the conversation history '
+        'and depends entirely on what you include. Specifically:\n'
+        '- Include all relevant context from the user\'s messages: their goal, preferences, '
+        'constraints, or any details they mentioned that could help the remote agent.\n'
+        '- Include relevant results or outputs from other remote agents called earlier in '
+        'this conversation, if they inform the current task.\n\n'
         'IMPORTANT: When a tool returns input_required=True, the remote agent is waiting for '
         'the user to answer a clarification question. You MUST output the text field verbatim '
         'as your final response — do NOT answer the question yourself, do NOT call any tool again.'
@@ -275,7 +297,8 @@ async def main():
         message_history = []
 
         print('Type your message and press Enter. Press Ctrl+C or type "exit" to quit.')
-        print('Type "/state" to show tracked contexts and tasks.\n')
+        print('Type "/state" to show tracked contexts and tasks.')
+        print('Type "/mode" to toggle between sticky and per-turn context modes.\n')
 
         while True:
             try:
@@ -293,10 +316,19 @@ async def main():
                 print(joke_server.debug_summary())
                 print(network_server.debug_summary())
                 continue
+            if user_text == '/mode':
+                new_mode = ContextMode.PER_TURN if joke_server.context_mode == ContextMode.STICKY else ContextMode.STICKY
+                for server in [joke_server, network_server]:
+                    server.context_mode = new_mode
+                print(f'Context mode → {new_mode.value}')
+                continue
 
             result = await orchestrator.run(user_text, deps=deps, message_history=message_history)
             message_history = result.all_messages()
             print(f'\nOrchestrator: {result.output}\n')
+
+            for server in [joke_server, network_server]:
+                server.maybe_reset_context()
 
 
 if __name__ == '__main__':
