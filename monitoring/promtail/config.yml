@@ -1,0 +1,74 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://172.20.20.101:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: network-syslog
+    syslog:
+      listen_address: 0.0.0.0:1514
+      listen_protocol: udp
+      idle_timeout: 60s
+      label_structured_data: true
+      labels:
+        job: network-syslog
+    relabel_configs:
+      # Hostname from syslog header → label (e.g. clab-testlab-router1)
+      - source_labels: [__syslog_message_hostname]
+        target_label: host
+      # App name (process) from RFC 5424 header
+      - source_labels: [__syslog_message_app_name]
+        target_label: app
+      # Severity and facility for filtering in Grafana
+      - source_labels: [__syslog_message_severity]
+        target_label: severity
+      - source_labels: [__syslog_message_facility]
+        target_label: facility
+
+    pipeline_stages:
+      # ── Nokia SR Linux ────────────────────────────────────────────────────────
+      # Matches nodes named clab-testlab-switch* or clab-testlab-router*
+      # Adjust the regex if your SR Linux nodes use different names.
+      - match:
+          selector: '{host=~"clab-testlab-(switch|router)[0-9]+"}'
+          stages:
+            - static_labels:
+                vendor: nokia_srlinux
+
+      # ── Arista cEOS ───────────────────────────────────────────────────────────
+      # Matches nodes whose name contains: eos, arista, leaf, spine
+      # Adjust the regex to match your Arista node names.
+      - match:
+          selector: '{host=~"clab-testlab-.*(eos|arista|leaf|spine).*"}'
+          stages:
+            - static_labels:
+                vendor: arista_eos
+            # Arista log format: %FACILITY-SEVERITY-MNEMONIC: message
+            - regex:
+                expression: '%(?P<facility_code>[A-Z0-9_]+-[A-Z0-9]+-[A-Z0-9_]+): (?P<log_message>.*)'
+
+      # ── Cisco IOS-XR / XRd ───────────────────────────────────────────────────
+      # Matches nodes whose name contains: xrd, cisco, pe, ce (adjust as needed)
+      - match:
+          selector: '{host=~"clab-testlab-.*(xrd|cisco|pe[0-9]|ce[0-9]).*"}'
+          stages:
+            - static_labels:
+                vendor: cisco_xrd
+            # Cisco IOS-XR log format: %FACILITY-SEVERITY-MNEMONIC : message
+            - regex:
+                expression: '%(?P<facility>[A-Z0-9_]+)-(?P<severity_code>[A-Z0-9]+)-(?P<mnemonic>[A-Z0-9_]+) : (?P<log_message>.*)'
+
+      # ── Cisco IOS-XE ─────────────────────────────────────────────────────────
+      # Matches nodes whose name contains: iosxe, csr, cat (adjust as needed)
+      - match:
+          selector: '{host=~"clab-testlab-.*(iosxe|csr|cat)[0-9]*.*"}'
+          stages:
+            - static_labels:
+                vendor: cisco_iosxe
+            - regex:
+                expression: '%(?P<facility>[A-Z0-9_]+)-[0-9]-(?P<mnemonic>[A-Z0-9_]+): (?P<log_message>.*)'
