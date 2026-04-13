@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
 
+
 import logfire
 from dotenv import load_dotenv
 from pydantic_ai import Agent
@@ -69,22 +70,15 @@ mcp_server = MCPServerStdio(
 network_agent = Agent(
     model=llm,
     toolsets=[mcp_server],
-    system_prompt=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.
+    instructions=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.
 
-ALLOWED TOOLS (read-only):
-- network_execute_show_command: Run show/info commands on a device
-- network_get_device_info: Look up a device in the inventory
+AVAILABLE TOOLS:
+- network_execute_show_command: Run a show/info command on a specific device
+- network_get_device_info: Look up a device's hostname and platform from the inventory
 - network_list_all_devices: List all devices in the inventory
-- network_get_topology: Read the ContainerLab topology file
-- network_list_backups: List available configuration backups for a device
-
-FORBIDDEN: You must NEVER call network_configure_device, network_validate_config,
-network_backup_config, or network_restore_config. These tools make changes and are
-disabled in this read-only server.
 
 WORKFLOW:
-- For device queries, show commands, or topology questions: use the appropriate tool and
-  report the result clearly.
+- For device queries or show commands: use the appropriate tool and report the result clearly.
 - For greetings or capability questions: respond directly without using tools.
 - Always format output in a readable way (use lists or tables where appropriate).
 

@@ -75,7 +75,7 @@ class ServerState:
     client: Any
     contexts: dict[str, ContextState] = field(default_factory=dict)  # context_id -> ContextState
     active_context_id: str | None = None
-    context_mode: ContextMode = ContextMode.STICKY
+    context_mode: ContextMode = ContextMode.PER_TURN
 
     def active_context(self) -> ContextState | None:
         return self.contexts.get(self.active_context_id) if self.active_context_id else None
@@ -193,28 +193,14 @@ async def send_and_process(server: ServerState, message: Message, logger: loggin
 
 @dataclass
 class OrchestratorDeps:
-    joke_server: ServerState
     network_server: ServerState
+    topology_server: ServerState
 
 
 @dataclass
 class RemoteAgentResponse:
     text: str
     input_required: bool
-
-
-async def _call_joke_agent(ctx: RunContext[OrchestratorDeps], request: str) -> RemoteAgentResponse:
-    """Delegate a request to the remote Joke Agent."""
-    logger = logging.getLogger(__name__)
-    server = ctx.deps.joke_server
-    message = server.build_message(request)
-    result = await send_and_process(server, message, logger)
-    ctx_state = server.active_context()
-    needs_input = ctx_state is not None and ctx_state.active_task_id is not None
-    return RemoteAgentResponse(
-        text=result or 'No response received from joke agent.',
-        input_required=needs_input,
-    )
 
 
 async def _call_network_agent(ctx: RunContext[OrchestratorDeps], request: str) -> RemoteAgentResponse:
@@ -231,7 +217,21 @@ async def _call_network_agent(ctx: RunContext[OrchestratorDeps], request: str) -
     )
 
 
-def build_orchestrator(joke_card, network_card) -> Agent:
+async def _call_topology_agent(ctx: RunContext[OrchestratorDeps], request: str) -> RemoteAgentResponse:
+    """Retrieve network topology from the dedicated Topology Agent."""
+    logger = logging.getLogger(__name__)
+    server = ctx.deps.topology_server
+    message = server.build_message(request)
+    result = await send_and_process(server, message, logger)
+    ctx_state = server.active_context()
+    needs_input = ctx_state is not None and ctx_state.active_task_id is not None
+    return RemoteAgentResponse(
+        text=result or 'No response received from topology agent.',
+        input_required=needs_input,
+    )
+
+
+def build_orchestrator(network_card, topology_card) -> Agent:
     def _skill_lines(card) -> str:
         return '\n'.join(f'    - {s.name}: {s.description}' for s in card.skills)
 
@@ -239,10 +239,10 @@ def build_orchestrator(joke_card, network_card) -> Agent:
         'You are an orchestrator agent that coordinates between specialised remote agents '
         'to fulfil user requests.\n\n'
         'Available remote agents:\n'
-        f'- call_joke_agent ({joke_card.name}): {joke_card.description}\n'
-        f'  Skills:\n{_skill_lines(joke_card)}\n\n'
         f'- call_network_agent ({network_card.name}): {network_card.description}\n'
         f'  Skills:\n{_skill_lines(network_card)}\n\n'
+        f'- call_topology_agent ({topology_card.name}): {topology_card.description}\n'
+        f'  Skills:\n{_skill_lines(topology_card)}\n\n'
         'Delegate requests to the appropriate agent.\n\n'
         'When composing the `request` argument for any remote agent call, write it as a '
         'self-contained message — the remote agent has no access to the conversation history '
@@ -256,8 +256,8 @@ def build_orchestrator(joke_card, network_card) -> Agent:
         'as your final response — do NOT answer the question yourself, do NOT call any tool again.'
     )
     agent = Agent(llm, deps_type=OrchestratorDeps, instructions=instructions)
-    agent.tool(_call_joke_agent)
     agent.tool(_call_network_agent)
+    agent.tool(_call_topology_agent)
     return agent
 
 
@@ -266,13 +266,6 @@ async def main():
     logger = logging.getLogger(__name__)
 
     async with httpx.AsyncClient(timeout=60) as http_client:
-        joke_client = await ClientFactory.connect(
-            agent='http://localhost:8000',
-            client_config=ClientConfig(httpx_client=http_client),
-        )
-        joke_card = await joke_client.get_card()
-        logger.info('Connected to agent: %s', joke_card.name)
-
         network_client = await ClientFactory.connect(
             agent='http://localhost:8001',
             client_config=ClientConfig(httpx_client=http_client),
@@ -280,20 +273,30 @@ async def main():
         network_card = await network_client.get_card()
         logger.info('Connected to agent: %s', network_card.name)
 
-        orchestrator = build_orchestrator(joke_card, network_card)
-
-        joke_server = ServerState(
-            url='http://localhost:8000',
-            agent_name=joke_card.name,
-            client=joke_client,
+        topology_client = await ClientFactory.connect(
+            agent='http://localhost:8002',
+            client_config=ClientConfig(httpx_client=http_client),
         )
+        topology_card = await topology_client.get_card()
+        logger.info('Connected to agent: %s', topology_card.name)
+
+        orchestrator = build_orchestrator(network_card, topology_card)
+
         network_server = ServerState(
             url='http://localhost:8001',
             agent_name=network_card.name,
             client=network_client,
         )
+        topology_server = ServerState(
+            url='http://localhost:8002',
+            agent_name=topology_card.name,
+            client=topology_client,
+        )
 
-        deps = OrchestratorDeps(joke_server=joke_server, network_server=network_server)
+        deps = OrchestratorDeps(
+            network_server=network_server,
+            topology_server=topology_server,
+        )
         message_history = []
 
         print('Type your message and press Enter. Press Ctrl+C or type "exit" to quit.')
@@ -313,12 +316,12 @@ async def main():
                 print('Goodbye!')
                 break
             if user_text == '/state':
-                print(joke_server.debug_summary())
                 print(network_server.debug_summary())
+                print(topology_server.debug_summary())
                 continue
             if user_text == '/mode':
-                new_mode = ContextMode.PER_TURN if joke_server.context_mode == ContextMode.STICKY else ContextMode.STICKY
-                for server in [joke_server, network_server]:
+                new_mode = ContextMode.PER_TURN if network_server.context_mode == ContextMode.STICKY else ContextMode.STICKY
+                for server in [network_server, topology_server]:
                     server.context_mode = new_mode
                 print(f'Context mode → {new_mode.value}')
                 continue
@@ -327,7 +330,7 @@ async def main():
             message_history = result.all_messages()
             print(f'\nOrchestrator: {result.output}\n')
 
-            for server in [joke_server, network_server]:
+            for server in [network_server, topology_server]:
                 server.maybe_reset_context()
 
 

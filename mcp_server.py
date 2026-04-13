@@ -29,7 +29,6 @@ mcp = FastMCP("MCP Server")
 
 INVENTORY_DIR = Path(__file__).parent / "inventory"
 # BACKUP_DIR = Path(__file__).parent / "config_backups"
-TOPOLOGY_FILE = "testlab.clab.yml"
 
 
 def load_inventory():
@@ -127,33 +126,6 @@ def list_all_devices() -> str:
     except Exception as e:
         return f"Error loading inventory: {str(e)}"
 
-
-@mcp.tool()
-def get_topology(topology_file: str = TOPOLOGY_FILE) -> str:
-    """
-    Read and return Container Lab topology file content.
-
-    Shows the raw YAML topology file which defines network nodes and their connections.
-
-    Args:
-        topology_file: Path to Container Lab topology YAML file (configurable via TOPOLOGY_FILE constant)
-
-    Returns:
-        Raw content of the topology YAML file
-    """
-    try:
-        topo_path = Path(__file__).parent / topology_file
-
-        if not topo_path.exists():
-            return f"Topology file not found: {topology_file}"
-
-        with open(topo_path, 'r') as f:
-            content = f.read()
-
-        return f"Container Lab Topology ({topology_file}):\n\n{content}"
-
-    except Exception as e:
-        return f"Error reading topology file: {str(e)}"
 
 
 if __name__ == "__main__":
