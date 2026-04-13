@@ -18,7 +18,6 @@ Run with: uv run uvicorn topology_agent:app --port 8001
 
 import asyncio
 import json
-import os
 import re
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -32,26 +31,16 @@ from dotenv import load_dotenv
 from netmiko import ConnectHandler
 from pydantic import BaseModel
 
-from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
+from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
-from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
+from a2a.server.tasks import TaskUpdater
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2a.utils import new_agent_text_message
 
-load_dotenv(Path(__file__).parent / '.env')
+from a2a_utils import BaseAgentExecutor, build_a2a_app, setup_logfire
 
-LOGFIRE_TOKEN = os.getenv('LOGFIRE_TOKEN')
-if LOGFIRE_TOKEN:
-    logfire.configure(
-        token=LOGFIRE_TOKEN,
-        service_name='Topology Agent',
-        console=False,
-        distributed_tracing=True,
-    )
-else:
-    print('LOGFIRE_TOKEN not found. Running without Logfire observability.')
+load_dotenv(Path(__file__).parent / '.env')
+setup_logfire('Topology Agent', instrument_llm=False)
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +388,7 @@ async def _refresh_loop(interval: int = REFRESH_INTERVAL) -> None:
 # A2A Executor
 # ---------------------------------------------------------------------------
 
-class TopologyAgentExecutor(AgentExecutor):
+class TopologyAgentExecutor(BaseAgentExecutor):
     """Returns the latest cached topology. No LLM or SSH on the request path."""
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
@@ -420,10 +409,6 @@ class TopologyAgentExecutor(AgentExecutor):
         with logfire.span('TopologyAgentExecutor.execute', task_id=context.task_id):
             response = _format_response(_cache.result, _cache.collected_at)
         await updater.complete(message=new_agent_text_message(response))
-
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise Exception('Cancel not supported')
-
 
 def _format_response(topology: TopologyResult, collected_at: datetime) -> str:
     """Render topology as a readable markdown response with data freshness."""
@@ -487,19 +472,6 @@ agent_card = AgentCard(
     skills=[skill],
 )
 
-task_store = InMemoryTaskStore()
-
-request_handler = DefaultRequestHandler(
-    agent_executor=TopologyAgentExecutor(),
-    task_store=task_store,
-)
-
-server = A2AStarletteApplication(
-    agent_card=agent_card,
-    http_handler=request_handler,
-)
-
-
 @asynccontextmanager
 async def lifespan(_):
     """Start the background refresh loop alongside the A2A server."""
@@ -516,7 +488,4 @@ async def lifespan(_):
         print('Topology refresh stopped.')
 
 
-app = server.build(lifespan=lifespan)
-
-if LOGFIRE_TOKEN:
-    logfire.instrument_starlette(app)
+app = build_a2a_app(agent_card, TopologyAgentExecutor(), lifespan=lifespan)

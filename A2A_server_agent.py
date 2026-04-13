@@ -6,7 +6,6 @@ Implements AgentExecutor to bridge Pydantic AI with the A2A protocol.
 Run with: uv run uvicorn agent_a_server:app --port 8000
 """
 
-import os
 from enum import Enum
 from pathlib import Path
 from uuid import uuid4
@@ -18,32 +17,17 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
-from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
+from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
-from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
+from a2a.server.tasks import TaskUpdater
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2a.utils import new_agent_text_message
 
+from a2a_utils import BaseAgentExecutor, build_a2a_app, require_openrouter_key, setup_logfire
+
 load_dotenv(Path(__file__).parent / '.env')
-
-LOGFIRE_TOKEN = os.getenv('LOGFIRE_TOKEN')
-if LOGFIRE_TOKEN:
-    logfire.configure(
-        token=LOGFIRE_TOKEN,
-        service_name='A2A Server Agent',
-        console=False,
-        distributed_tracing=True,
-    )
-    logfire.instrument_pydantic_ai()
-    logfire.instrument_openai()
-else:
-    print('LOGFIRE_TOKEN not found. Running without Logfire observability.')
-
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
-if not OPENROUTER_API_KEY:
-    raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
+setup_logfire('A2A Server Agent')
+OPENROUTER_API_KEY = require_openrouter_key()
 
 llm = OpenAIChatModel(
     'z-ai/glm-5',
@@ -107,12 +91,8 @@ conversational_agent = Agent(
 )
 
 
-class JokeAgentExecutor(AgentExecutor):
+class JokeAgentExecutor(BaseAgentExecutor):
     """Bridges the Pydantic AI joke agent with the a2a-sdk AgentExecutor interface."""
-
-    def __init__(self) -> None:
-        # Keyed by context_id; values are the full Pydantic AI message history for that context.
-        self._context_history: dict[str, list] = {}
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         user_text = context.get_user_input()
@@ -167,10 +147,6 @@ class JokeAgentExecutor(AgentExecutor):
                     message=new_agent_text_message(output.response_text),
                 )
 
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise Exception('Cancel not supported')
-
-
 skill = AgentSkill(
     id='joke_generator',
     name='Joke Generator',
@@ -190,19 +166,4 @@ agent_card = AgentCard(
     skills=[skill],
 )
 
-task_store = InMemoryTaskStore()
-
-request_handler = DefaultRequestHandler(
-    agent_executor=JokeAgentExecutor(),
-    task_store=task_store,
-)
-
-server = A2AStarletteApplication(
-    agent_card=agent_card,
-    http_handler=request_handler,
-)
-
-app = server.build()
-
-if LOGFIRE_TOKEN:
-    logfire.instrument_starlette(app)
+app = build_a2a_app(agent_card, JokeAgentExecutor())

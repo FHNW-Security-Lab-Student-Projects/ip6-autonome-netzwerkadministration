@@ -7,11 +7,9 @@ Adapted from /IP5/Repo/ip-5-autonome-netzwerkadministration.
 Run with: uv run uvicorn network_A2A_server_agent:app --port 8001
 """
 
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
-
 
 import logfire
 from dotenv import load_dotenv
@@ -21,32 +19,17 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 
-from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
+from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
-from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
+from a2a.server.tasks import TaskUpdater
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2a.utils import new_agent_text_message
 
+from a2a_utils import BaseAgentExecutor, build_a2a_app, require_openrouter_key, setup_logfire
+
 load_dotenv(Path(__file__).parent / '.env')
-
-LOGFIRE_TOKEN = os.getenv('LOGFIRE_TOKEN')
-if LOGFIRE_TOKEN:
-    logfire.configure(
-        token=LOGFIRE_TOKEN,
-        service_name='Network A2A Server Agent',
-        console=False,
-        distributed_tracing=True,
-    )
-    logfire.instrument_pydantic_ai()
-    logfire.instrument_openai()
-else:
-    print('LOGFIRE_TOKEN not found. Running without Logfire observability.')
-
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
-if not OPENROUTER_API_KEY:
-    raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
+setup_logfire('Network A2A Server Agent')
+OPENROUTER_API_KEY = require_openrouter_key()
 
 knowledge_base_file = Path(__file__).parent / 'sr_linux_knowledge.txt'
 SR_LINUX_KNOWLEDGE = ''
@@ -56,9 +39,9 @@ else:
     print(f'Warning: sr_linux_knowledge.txt not found at {knowledge_base_file}')
 
 llm = OpenAIChatModel(
-    'anthropic/claude-opus-4.5',
+    'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
-    settings=ModelSettings(parallel_tool_calls=False),
+    settings=ModelSettings(parallel_tool_calls=True),
 )
 
 mcp_server = MCPServerStdio(
@@ -93,11 +76,8 @@ END OF KNOWLEDGE BASE
 )
 
 
-class NetworkAgentExecutor(AgentExecutor):
+class NetworkAgentExecutor(BaseAgentExecutor):
     """Bridges the read-only network agent with the a2a-sdk AgentExecutor interface."""
-
-    def __init__(self) -> None:
-        self._context_history: dict[str, list] = {}
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         user_text = context.get_user_input()
@@ -126,10 +106,6 @@ class NetworkAgentExecutor(AgentExecutor):
             self._context_history[ctx_key] = result.all_messages()
             logfire.info('Network query completed')
             await updater.complete(message=new_agent_text_message(str(result.output)))
-
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise Exception('Cancel not supported')
-
 
 skill_show = AgentSkill(
     id='network_show',
@@ -161,19 +137,6 @@ agent_card = AgentCard(
     skills=[skill_show],
 )
 
-task_store = InMemoryTaskStore()
-
-request_handler = DefaultRequestHandler(
-    agent_executor=NetworkAgentExecutor(),
-    task_store=task_store,
-)
-
-server = A2AStarletteApplication(
-    agent_card=agent_card,
-    http_handler=request_handler,
-)
-
-
 @asynccontextmanager
 async def lifespan(_):
     """Start the MCP server subprocess alongside the A2A server."""
@@ -184,7 +147,4 @@ async def lifespan(_):
     print('MCP server stopped.')
 
 
-app = server.build(lifespan=lifespan)
-
-if LOGFIRE_TOKEN:
-    logfire.instrument_starlette(app)
+app = build_a2a_app(agent_card, NetworkAgentExecutor(), lifespan=lifespan)
