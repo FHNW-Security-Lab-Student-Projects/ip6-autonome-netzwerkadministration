@@ -1,0 +1,79 @@
+"""Network Agent
+
+Read-only network monitoring agent for Nokia SR Linux devices.
+Uses MCP tools (execute_show_command, get_device_info, list_all_devices) via a
+FastMCP stdio subprocess.
+
+Import and use via agent delegation:
+    from network_agent import network_agent, network_lifespan
+"""
+
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from dotenv import load_dotenv
+from pydantic_ai import Agent
+from pydantic_ai.mcp import MCPServerStdio
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openrouter import OpenRouterProvider
+from pydantic_ai.settings import ModelSettings
+
+load_dotenv(Path(__file__).parent / '.env')
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+if not OPENROUTER_API_KEY:
+    raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
+
+knowledge_base_file = Path(__file__).parent / 'sr_linux_knowledge.txt'
+SR_LINUX_KNOWLEDGE = ''
+if knowledge_base_file.exists():
+    SR_LINUX_KNOWLEDGE = knowledge_base_file.read_text()
+else:
+    print(f'Warning: sr_linux_knowledge.txt not found at {knowledge_base_file}')
+
+llm = OpenAIChatModel(
+    'z-ai/glm-5',
+    provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
+    settings=ModelSettings(parallel_tool_calls=True),
+)
+
+mcp_server = MCPServerStdio(
+    command='uv',
+    args=['run', 'mcp_server.py'],
+    tool_prefix='network_',
+)
+
+network_agent = Agent(
+    model=llm,
+    toolsets=[mcp_server],
+    instructions=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.
+
+AVAILABLE TOOLS:
+- network_execute_show_command: Run a show/info command on a specific device
+- network_get_device_info: Look up a device's hostname and platform from the inventory
+- network_list_all_devices: List all devices in the inventory
+
+WORKFLOW:
+- For device queries or show commands: use the appropriate tool and report the result clearly.
+- For greetings or capability questions: respond directly without using tools.
+- Always format output in a readable way (use lists or tables where appropriate).
+
+{'-' * 80}
+NOKIA SR LINUX KNOWLEDGE BASE (for interpreting output):
+{'-' * 80}
+{SR_LINUX_KNOWLEDGE}
+{'-' * 80}
+END OF KNOWLEDGE BASE
+{'-' * 80}
+""",
+)
+
+
+@asynccontextmanager
+async def network_lifespan():
+    """Start the MCP server subprocess for the network agent."""
+    print('Starting network agent MCP server...')
+    async with network_agent:
+        print('Network agent MCP server running.')
+        yield
+    print('Network agent MCP server stopped.')

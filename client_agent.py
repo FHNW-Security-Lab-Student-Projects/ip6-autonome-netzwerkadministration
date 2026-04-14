@@ -1,11 +1,8 @@
 import asyncio
 import os
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any
-from uuid import uuid4
 from pathlib import Path
 
 import logfire
@@ -14,9 +11,9 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
-import httpx
-from a2a.client import ClientFactory, ClientConfig
-from a2a.types import Message, Part, TextPart, TaskState
+from network_agent import network_agent, network_lifespan
+from topology_agent import get_topology_response, topology_lifespan
+from syslog_agent import handle_syslog_request, syslog_lifespan
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -24,13 +21,11 @@ LOGFIRE_TOKEN = os.getenv('LOGFIRE_TOKEN')
 if LOGFIRE_TOKEN:
     logfire.configure(
         token=LOGFIRE_TOKEN,
-        service_name='Client Agent',
+        service_name='Orchestrator',
         console=False,
-        distributed_tracing=True,  # manual instrumentation — links traces across Agent B → Agent A
     )
     logfire.instrument_pydantic_ai()
     logfire.instrument_openai()
-    logfire.instrument_httpx(capture_headers=True, capture_request_body=True, capture_response_body=True)  # manual instrumentation — captures full HTTP payloads
 else:
     print('LOGFIRE_TOKEN not found. Running without Logfire observability.')
 
@@ -44,295 +39,84 @@ llm = OpenAIChatModel(
 )
 
 
-
-class ContextMode(Enum):
-    STICKY = 'sticky'      # current behaviour: one persistent context per remote agent
-    PER_TURN = 'per_turn'  # new: fresh context each orchestrator turn (unless input_required)
-
-
-@dataclass
-class TaskRecord:
-    task_id: str
-    final_state: str      # e.g. "completed", "input_required", "failed"
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-@dataclass
-class ContextState:
-    context_id: str
-    tasks: dict[str, TaskRecord] = field(default_factory=dict)  # task_id -> TaskRecord
-    active_task_id: str | None = None
-
-    def record_task(self, record: TaskRecord) -> None:
-        self.tasks[record.task_id] = record
-
-
-
-@dataclass
-class ServerState:
-    url: str
-    agent_name: str
-    client: Any
-    contexts: dict[str, ContextState] = field(default_factory=dict)  # context_id -> ContextState
-    active_context_id: str | None = None
-    context_mode: ContextMode = ContextMode.PER_TURN
-
-    def active_context(self) -> ContextState | None:
-        return self.contexts.get(self.active_context_id) if self.active_context_id else None
-
-    def apply_response(
-        self,
-        task_id: str,
-        context_id: str,
-        needs_input: bool,
-        final_state: str,
-    ) -> None:
-        """Update context/task records after a server response."""
-        if context_id not in self.contexts:
-            self.contexts[context_id] = ContextState(context_id=context_id)
-        ctx = self.contexts[context_id]
-        self.active_context_id = context_id
-        ctx.record_task(TaskRecord(task_id=task_id, final_state=final_state))
-        ctx.active_task_id = task_id if needs_input else None
-
-    def build_message(self, user_text: str) -> Message:
-        """Build a Message correctly scoped to the active context and task."""
-        ctx = self.active_context()
-        return Message(
-            role='user',
-            parts=[Part(root=TextPart(text=user_text))],
-            message_id=uuid4().hex,
-            task_id=ctx.active_task_id if ctx else None,
-            context_id=self.active_context_id,
-        )
-
-    def maybe_reset_context(self) -> None:
-        """In PER_TURN mode, clear the active context after a completed turn.
-
-        Skipped when a task is still waiting for input — the context must stay
-        alive so the follow-up message reaches the same task.
-        """
-        if self.context_mode == ContextMode.PER_TURN:
-            ctx = self.active_context()
-            if ctx is None or ctx.active_task_id is None:
-                self.active_context_id = None
-
-    def debug_summary(self) -> str:
-        """Return a multi-line string showing all tracked contexts and tasks."""
-        lines = [f'ServerState({self.agent_name} @ {self.url})  mode={self.context_mode.value}']
-        if not self.contexts:
-            lines.append('  (no contexts yet)')
-            return '\n'.join(lines)
-        for cid, ctx in self.contexts.items():
-            active_marker = ' [ACTIVE]' if cid == self.active_context_id else ''
-            lines.append(f'  context {cid[:8]}{active_marker}  ({len(ctx.tasks)} task(s))')
-            for tid, rec in ctx.tasks.items():
-                task_marker = ' [active task]' if tid == ctx.active_task_id else ''
-                lines.append(
-                    f'    task {tid[:8]}{task_marker}  state={rec.final_state}'
-                    f'  created={rec.created_at.strftime("%H:%M:%S")}'
-                )
-        return '\n'.join(lines)
-
-
-def extract_text(parts) -> str | None:
-    """Extract text from a list of A2A message parts."""
-    for part in parts:
-        part_data = part.root if hasattr(part, 'root') else part
-        if hasattr(part_data, 'text'):
-            return part_data.text
-    return None
-
-
-async def send_and_process(server: ServerState, message: Message, logger: logging.Logger) -> str | None:
-    """Send a message to server.client, process response events, and update server state.
-
-    All context/task ID bookkeeping is handled via server.apply_response().
-    Returns the response text, or None if no text was received.
-    """
-    response_text = None
-    task_id = None
-    context_id = None
-    needs_input = False
-    final_state = 'unknown'
-
-    with logfire.span('A2A send_message', message_id=message.message_id):
-        async for event in server.client.send_message(message):
-            if isinstance(event, Message) and event.role == 'agent':
-                logfire.info('A2A received Message', role=event.role, parts=[str(p) for p in event.parts])
-                response_text = extract_text(event.parts)
-            elif isinstance(event, tuple):
-                task, update_event = event
-                task_id = task.id
-                context_id = task.context_id
-                if task.status:
-                    final_state = task.status.state.value if hasattr(task.status.state, 'value') else str(task.status.state)
-                logger.info(f'Task: {task.id}, status: {task.status.state if task.status else "unknown"}, update: {type(update_event).__name__}')
-                logfire.info('A2A received ClientEvent', task_id=task.id, status=str(task.status), update_type=type(update_event).__name__)
-
-                if task.status and task.status.state == TaskState.input_required:
-                    needs_input = True
-
-                # Extract text from status message
-                if task.status and task.status.message and task.status.message.parts:
-                    response_text = extract_text(task.status.message.parts)
-
-                # Fallback: check artifacts
-                if not response_text and task.artifacts:
-                    for artifact in task.artifacts:
-                        text = extract_text(artifact.parts)
-                        if text:
-                            response_text = text
-                            break
-
-    if task_id and context_id:
-        server.apply_response(task_id, context_id, needs_input, final_state)
-
-    return response_text
-
-
 @dataclass
 class OrchestratorDeps:
-    network_server: ServerState
-    topology_server: ServerState
-    syslog_server: ServerState
+    syslog_history: dict[str, list] = field(default_factory=dict)
 
 
-@dataclass
-class RemoteAgentResponse:
-    text: str
-    input_required: bool
+INSTRUCTIONS = (
+    'You are an orchestrator agent that coordinates between specialised sub-agents '
+    'to fulfil user requests.\n\n'
+    'Available sub-agents:\n'
+    '- call_network_agent (Network Agent): Read-only network monitoring agent for Nokia SR Linux '
+    'devices. Executes show commands, queries device state, and retrieves inventory information.\n'
+    '  Skills:\n'
+    '    - Show Network State: Execute read-only show commands on Nokia SR Linux devices. '
+    'Query interface status, routing tables, device info, and backup listings.\n\n'
+    '- call_topology_agent (Topology Discovery Agent): Returns a pre-built, cached network topology '
+    'discovered from ContainerLab devices via LLDP. Topology is refreshed every 60 seconds.\n'
+    '  Skills:\n'
+    '    - Discover Network Topology: Returns the latest cached network topology with a Mermaid '
+    'diagram and link/node details.\n\n'
+    '- call_syslog_agent (Syslog Incident Agent): Monitors Nokia SR Linux syslog via Loki. '
+    'Automatically opens incidents for error/critical/alert/emergency events and runs '
+    'LLM-driven investigation. Supports listing, inspecting, and continuing troubleshooting.\n'
+    '  Skills:\n'
+    '    - Syslog Incident Management: List active syslog incidents, get full investigation '
+    'details, or continue LLM-driven troubleshooting for a specific incident.\n\n'
+    'Delegate requests to the appropriate sub-agent.\n\n'
+    'When composing the `request` argument for any sub-agent call, write it as a '
+    'self-contained message — the sub-agent has no access to the conversation history '
+    'and depends entirely on what you include. Specifically:\n'
+    '- Include all relevant context from the user\'s messages: their goal, preferences, '
+    'constraints, or any details they mentioned that could help the sub-agent.\n'
+    '- Include relevant results or outputs from other sub-agents called earlier in '
+    'this conversation, if they inform the current task.'
+)
+
+orchestrator = Agent(llm, deps_type=OrchestratorDeps, instructions=INSTRUCTIONS)
 
 
-async def _call_network_agent(ctx: RunContext[OrchestratorDeps], request: str) -> RemoteAgentResponse:
-    """Delegate a read-only network query to the remote Network Agent."""
-    logger = logging.getLogger(__name__)
-    server = ctx.deps.network_server
-    message = server.build_message(request)
-    result = await send_and_process(server, message, logger)
-    ctx_state = server.active_context()
-    needs_input = ctx_state is not None and ctx_state.active_task_id is not None
-    return RemoteAgentResponse(
-        text=result or 'No response received from network agent.',
-        input_required=needs_input,
-    )
+@orchestrator.tool
+async def call_network_agent(ctx: RunContext[OrchestratorDeps], request: str) -> str:
+    """Delegate a read-only network query to the Network Agent."""
+    result = await network_agent.run(request)
+    return str(result.output)
 
 
-async def _call_topology_agent(ctx: RunContext[OrchestratorDeps], request: str) -> RemoteAgentResponse:
-    """Retrieve network topology from the dedicated Topology Agent."""
-    logger = logging.getLogger(__name__)
-    server = ctx.deps.topology_server
-    message = server.build_message(request)
-    result = await send_and_process(server, message, logger)
-    ctx_state = server.active_context()
-    needs_input = ctx_state is not None and ctx_state.active_task_id is not None
-    return RemoteAgentResponse(
-        text=result or 'No response received from topology agent.',
-        input_required=needs_input,
-    )
+@orchestrator.tool
+async def call_topology_agent(ctx: RunContext[OrchestratorDeps], request: str) -> str:
+    """Retrieve the cached network topology from the Topology Agent."""
+    response = get_topology_response()
+    if response is None:
+        return 'Topology cache is still warming up — please retry in a moment.'
+    return response
 
 
-async def _call_syslog_agent(ctx: RunContext[OrchestratorDeps], request: str) -> RemoteAgentResponse:
+@orchestrator.tool
+async def call_syslog_agent(ctx: RunContext[OrchestratorDeps], request: str) -> str:
     """Query the Syslog Incident Agent — list incidents, get details, or continue troubleshooting."""
-    logger = logging.getLogger(__name__)
-    server = ctx.deps.syslog_server
-    message = server.build_message(request)
-    result = await send_and_process(server, message, logger)
-    ctx_state = server.active_context()
-    needs_input = ctx_state is not None and ctx_state.active_task_id is not None
-    return RemoteAgentResponse(
-        text=result or 'No response received from syslog agent.',
-        input_required=needs_input,
-    )
+    history = ctx.deps.syslog_history.get('default', [])
+    text, new_history = await handle_syslog_request(request, history)
+    ctx.deps.syslog_history['default'] = new_history
+    return text
 
 
-def build_orchestrator(network_card, topology_card, syslog_card) -> Agent:
-    def _skill_lines(card) -> str:
-        return '\n'.join(f'    - {s.name}: {s.description}' for s in card.skills)
-
-    instructions = (
-        'You are an orchestrator agent that coordinates between specialised remote agents '
-        'to fulfil user requests.\n\n'
-        'Available remote agents:\n'
-        f'- call_network_agent ({network_card.name}): {network_card.description}\n'
-        f'  Skills:\n{_skill_lines(network_card)}\n\n'
-        f'- call_topology_agent ({topology_card.name}): {topology_card.description}\n'
-        f'  Skills:\n{_skill_lines(topology_card)}\n\n'
-        f'- call_syslog_agent ({syslog_card.name}): {syslog_card.description}\n'
-        f'  Skills:\n{_skill_lines(syslog_card)}\n\n'
-        'Delegate requests to the appropriate agent.\n\n'
-        'When composing the `request` argument for any remote agent call, write it as a '
-        'self-contained message — the remote agent has no access to the conversation history '
-        'and depends entirely on what you include. Specifically:\n'
-        '- Include all relevant context from the user\'s messages: their goal, preferences, '
-        'constraints, or any details they mentioned that could help the remote agent.\n'
-        '- Include relevant results or outputs from other remote agents called earlier in '
-        'this conversation, if they inform the current task.\n\n'
-        'IMPORTANT: When a tool returns input_required=True, the remote agent is waiting for '
-        'the user to answer a clarification question. You MUST output the text field verbatim '
-        'as your final response — do NOT answer the question yourself, do NOT call any tool again.'
-    )
-    agent = Agent(llm, deps_type=OrchestratorDeps, instructions=instructions)
-    agent.tool(_call_network_agent)
-    agent.tool(_call_topology_agent)
-    agent.tool(_call_syslog_agent)
-    return agent
+@asynccontextmanager
+async def main_lifespan():
+    """Compose all sub-agent lifespans: MCP servers, topology refresh, Loki poller."""
+    async with network_lifespan(), syslog_lifespan(), topology_lifespan():
+        yield
 
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
 
-    async with httpx.AsyncClient(timeout=60) as http_client:
-        network_client = await ClientFactory.connect(
-            agent='http://localhost:8001',
-            client_config=ClientConfig(httpx_client=http_client),
-        )
-        network_card = await network_client.get_card()
-        logger.info('Connected to agent: %s', network_card.name)
-
-        topology_client = await ClientFactory.connect(
-            agent='http://localhost:8002',
-            client_config=ClientConfig(httpx_client=http_client),
-        )
-        topology_card = await topology_client.get_card()
-        logger.info('Connected to agent: %s', topology_card.name)
-
-        syslog_client = await ClientFactory.connect(
-            agent='http://localhost:8003',
-            client_config=ClientConfig(httpx_client=http_client),
-        )
-        syslog_card = await syslog_client.get_card()
-        logger.info('Connected to agent: %s', syslog_card.name)
-
-        orchestrator = build_orchestrator(network_card, topology_card, syslog_card)
-
-        network_server = ServerState(
-            url='http://localhost:8001',
-            agent_name=network_card.name,
-            client=network_client,
-        )
-        topology_server = ServerState(
-            url='http://localhost:8002',
-            agent_name=topology_card.name,
-            client=topology_client,
-        )
-        syslog_server = ServerState(
-            url='http://localhost:8003',
-            agent_name=syslog_card.name,
-            client=syslog_client,
-        )
-
-        deps = OrchestratorDeps(
-            network_server=network_server,
-            topology_server=topology_server,
-            syslog_server=syslog_server,
-        )
+    async with main_lifespan():
+        deps = OrchestratorDeps()
         message_history = []
 
-        print('Type your message and press Enter. Press Ctrl+C or type "exit" to quit.')
-        print('Type "/state" to show tracked contexts and tasks.')
-        print('Type "/mode" to toggle between sticky and per-turn context modes.\n')
+        print('Type your message and press Enter. Press Ctrl+C or type "exit" to quit.\n')
 
         while True:
             try:
@@ -346,24 +130,10 @@ async def main():
             if user_text.lower() in ('exit', 'quit', '/exit', '/quit'):
                 print('Goodbye!')
                 break
-            if user_text == '/state':
-                print(network_server.debug_summary())
-                print(topology_server.debug_summary())
-                print(syslog_server.debug_summary())
-                continue
-            if user_text == '/mode':
-                new_mode = ContextMode.PER_TURN if network_server.context_mode == ContextMode.STICKY else ContextMode.STICKY
-                for server in [network_server, topology_server, syslog_server]:
-                    server.context_mode = new_mode
-                print(f'Context mode → {new_mode.value}')
-                continue
 
             result = await orchestrator.run(user_text, deps=deps, message_history=message_history)
             message_history = result.all_messages()
             print(f'\nOrchestrator: {result.output}\n')
-
-            for server in [network_server, topology_server, syslog_server]:
-                server.maybe_reset_context()
 
 
 if __name__ == '__main__':

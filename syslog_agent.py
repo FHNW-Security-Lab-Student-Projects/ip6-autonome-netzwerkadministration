@@ -4,7 +4,8 @@ Monitors Nokia SR Linux syslog via Loki. Automatically opens incidents for
 error/critical/alert/emergency events and runs background LLM investigation.
 Supports listing, inspecting, and continuing troubleshooting of incidents.
 
-Run with: uv run uvicorn syslog_agent:app --port 8003
+Import and use via agent delegation:
+    from syslog_agent import handle_syslog_request, syslog_lifespan
 """
 
 import asyncio
@@ -17,6 +18,8 @@ from enum import Enum
 from pathlib import Path
 from uuid import uuid4
 
+import os
+
 import httpx
 import logfire
 from dotenv import load_dotenv
@@ -26,17 +29,10 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
-from a2a.utils import new_agent_text_message
-
-from a2a_utils import BaseAgentExecutor, build_a2a_app, require_openrouter_key, setup_logfire
-
 load_dotenv(Path(__file__).parent / '.env')
-setup_logfire('Syslog Incident Agent')
-OPENROUTER_API_KEY = require_openrouter_key()
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+if not OPENROUTER_API_KEY:
+    raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
 knowledge_base_file = Path(__file__).parent / 'sr_linux_knowledge.txt'
 SR_LINUX_KNOWLEDGE = ''
@@ -80,7 +76,6 @@ class Incident:
 
 _incidents: dict[str, Incident] = {}
 _last_checked_ns: int = 0
-_http_client: httpx.AsyncClient | None = None
 
 # ---------------------------------------------------------------------------
 # LLM + MCP agent
@@ -94,8 +89,7 @@ llm = OpenAIChatModel(
 
 mcp_server = MCPServerStdio(
     command='uv',
-    args=['run', 'mcp_server.py'],
-    tool_prefix='network_',
+    args=['run', 'syslog_mcp_server.py'],
 )
 
 _KNOWLEDGE_SECTION = (
@@ -113,13 +107,13 @@ syslog_investigator = Agent(
         '- query_loki: Query Nokia SR Linux syslog from Loki around a specific point in time.\n'
         '              Use this to find related log entries on this device and neighboring devices.\n'
         '              Pass the triggering event timestamp (provided in the investigation prompt) as time_anchor.\n'
-        '- network_execute_show_command: Run a show/info command on a specific device\n'
-        '- network_get_device_info: Look up a device from the inventory\n'
-        '- network_list_all_devices: List all devices in the inventory\n\n'
+        '- execute_show_command: Run a show/info command on a specific device\n'
+        '- get_device_info: Look up a device from the inventory\n'
+        '- list_all_devices: List all devices in the inventory\n\n'
         'INVESTIGATION STRATEGY:\n'
         '1. Call query_loki for the triggering device first (±5 min around the event timestamp).\n'
         '2. Based on what you find, call query_loki on neighboring or related devices.\n'
-        '3. Use network_execute_show_command to check current live device state.\n'
+        '3. Use execute_show_command to check current live device state.\n'
         '4. Summarise root cause and recommend next steps.\n\n'
         'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
         'The syslog host label uses the full container name (clab-testlab-router1). '
@@ -127,84 +121,6 @@ syslog_investigator = Agent(
         + _KNOWLEDGE_SECTION
     ),
 )
-
-
-@syslog_investigator.tool_plain
-async def query_loki(
-    device: str,
-    time_anchor: str,
-    minutes_before: int = 5,
-    minutes_after: int = 2,
-    severities: str = 'error,critical,alert,emergency,warning,notice,informational',
-    text_filter: str = '',
-    limit: int = 100,
-) -> str:
-    """Query Nokia SR Linux syslog entries from Loki around a specific point in time.
-
-    Args:
-        device: Short device name ("router1", "switch1") or "all" for all devices.
-                Do NOT include the "clab-testlab-" prefix.
-        time_anchor: ISO 8601 datetime string marking the center of the time window.
-                     Use the triggering event timestamp provided in the investigation prompt.
-                     Example: "2026-04-14T14:30:00Z"
-        minutes_before: How many minutes before time_anchor to include (default 5).
-        minutes_after: How many minutes after time_anchor to include (default 2).
-        severities: Comma-separated list of severity levels to include.
-                    Available: emergency, alert, critical, error, warning, notice, informational, debug.
-                    Default includes all except debug.
-        text_filter: Optional substring — only return lines containing this string.
-        limit: Maximum number of log lines to return (default 100, max 500).
-    """
-    if _http_client is None:
-        return 'Loki client not available (server still starting up).'
-
-    # Build LogQL stream selector
-    severity_regex = '|'.join(s.strip() for s in severities.split(',') if s.strip())
-    if device == 'all':
-        stream = f'{{vendor="nokia_srlinux", severity=~"{severity_regex}"}}'
-    else:
-        host = f'clab-testlab-{device}'
-        stream = f'{{vendor="nokia_srlinux", host="{host}", severity=~"{severity_regex}"}}'
-    if text_filter:
-        stream += f' |= "{text_filter}"'
-
-    # Compute time range from anchor
-    anchor_dt = datetime.fromisoformat(time_anchor.replace('Z', '+00:00'))
-    start_ns = int((anchor_dt.timestamp() - minutes_before * 60) * 1e9)
-    end_ns = int((anchor_dt.timestamp() + minutes_after * 60) * 1e9)
-    limit = min(limit, 500)
-
-    try:
-        resp = await _http_client.get(
-            f'{LOKI_URL}/loki/api/v1/query_range',
-            params={
-                'query': stream,
-                'start': start_ns,
-                'end': end_ns,
-                'limit': limit,
-                'direction': 'forward',
-            },
-        )
-        resp.raise_for_status()
-    except Exception as exc:
-        return f'Loki query failed: {exc}'
-
-    lines = []
-    for stream_obj in resp.json()['data']['result']:
-        host_label = stream_obj['stream'].get('host', 'unknown')
-        sev_label = stream_obj['stream'].get('severity', '')
-        app_label = stream_obj['stream'].get('app', '')
-        for ts_str, line in stream_obj['values']:
-            ts_dt = datetime.fromtimestamp(int(ts_str) / 1e9, tz=timezone.utc)
-            ts_fmt = ts_dt.strftime('%H:%M:%S')
-            lines.append(f'[{ts_fmt}] [{host_label}] [{sev_label}] [{app_label}] {line}')
-
-    if not lines:
-        return (
-            f'No log entries found for query: {stream} '
-            f'in window {minutes_before}m before / {minutes_after}m after {time_anchor}.'
-        )
-    return '\n'.join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -403,136 +319,101 @@ def _format_incident_detail(inc: Incident) -> str:
 
 
 # ---------------------------------------------------------------------------
-# A2A Executor
+# Public API
 # ---------------------------------------------------------------------------
 
+async def handle_syslog_request(
+    user_text: str,
+    ctx_history: list,
+) -> tuple[str, list]:
+    """Handle a user request about syslog incidents via intent-based dispatch.
 
-class SyslogAgentExecutor(BaseAgentExecutor):
-    """Handles user requests about syslog incidents via intent-based dispatch."""
+    Args:
+        user_text: The user's message.
+        ctx_history: Pydantic AI message history for ad-hoc LLM queries
+                     (pass [] for a new session; updated list is returned).
 
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        user_text = (context.get_user_input() or '').strip()
-        user_lower = user_text.lower()
+    Returns:
+        (response_text, updated_ctx_history)
+    """
+    user_lower = user_text.lower()
 
-        with logfire.span('SyslogAgentExecutor.execute', user_text=user_text, task_id=context.task_id):
-            updater = TaskUpdater(
-                event_queue,
-                task_id=context.task_id or uuid4().hex,
-                context_id=context.context_id or uuid4().hex,
-            )
+    with logfire.span('handle_syslog_request', user_text=user_text):
+        # --- List incidents ---
+        if _intent_is_list(user_lower):
+            return _format_incident_list(), ctx_history
 
-            # --- List incidents ---
-            if _intent_is_list(user_lower):
-                await updater.complete(message=new_agent_text_message(_format_incident_list()))
-                return
+        # --- Details or continue: need an ID fragment ---
+        fragment = _extract_id_fragment(user_lower)
 
-            # --- Details or continue: need an ID fragment ---
-            fragment = _extract_id_fragment(user_lower)
-
-            if _intent_is_detail(user_lower) and fragment:
-                inc = _find_incident(fragment)
-                if inc is None:
-                    await updater.complete(message=new_agent_text_message(
-                        f'No incident found matching "{fragment}".\n\n' + _format_incident_list()
-                    ))
-                    return
-                await updater.complete(message=new_agent_text_message(_format_incident_detail(inc)))
-                return
-
-            if _intent_is_continue(user_lower) and fragment:
-                inc = _find_incident(fragment)
-                if inc is None:
-                    await updater.complete(message=new_agent_text_message(
-                        f'No incident found matching "{fragment}".\n\n' + _format_incident_list()
-                    ))
-                    return
-
-                # Race condition guard: background task still running
-                if inc.bg_task and not inc.bg_task.done():
-                    await updater.complete(message=new_agent_text_message(
-                        f'Incident `{inc.incident_id[:8]}` is still being investigated automatically.\n\n'
-                        f'**Current findings so far:**\n{inc.summary or "(none yet)"}'
-                    ))
-                    return
-
-                # Continue with stored message_history from background investigation
-                follow_up = _extract_follow_up_text(user_lower, fragment) or (
-                    'Please continue the investigation and provide updated findings.'
+        if _intent_is_detail(user_lower) and fragment:
+            inc = _find_incident(fragment)
+            if inc is None:
+                return (
+                    f'No incident found matching "{fragment}".\n\n' + _format_incident_list(),
+                    ctx_history,
                 )
-                inc.status = IncidentStatus.investigating
-                try:
-                    with logfire.span('incident_user_continuation', incident_id=inc.incident_id):
-                        result = await syslog_investigator.run(
-                            follow_up, message_history=inc.message_history
-                        )
-                    inc.investigation_log.append(('user_continuation', str(result.output)))
-                    inc.message_history = result.all_messages()
-                    inc.summary = str(result.output)
-                    inc.status = IncidentStatus.waiting
-                    await updater.complete(message=new_agent_text_message(str(result.output)))
-                except Exception as exc:
-                    inc.status = IncidentStatus.waiting
-                    logfire.error('User continuation failed', incident_id=inc.incident_id, error=str(exc))
-                    await updater.failed(message=new_agent_text_message(f'Continuation failed: {exc}'))
-                return
+            return _format_incident_detail(inc), ctx_history
 
-            # --- Fallback: ad-hoc investigation query via LLM ---
-            ctx_key = context.context_id or context.task_id
-            history = self._context_history.get(ctx_key, [])
+        if _intent_is_continue(user_lower) and fragment:
+            inc = _find_incident(fragment)
+            if inc is None:
+                return (
+                    f'No incident found matching "{fragment}".\n\n' + _format_incident_list(),
+                    ctx_history,
+                )
+
+            # Race condition guard: background task still running
+            if inc.bg_task and not inc.bg_task.done():
+                return (
+                    f'Incident `{inc.incident_id[:8]}` is still being investigated automatically.\n\n'
+                    f'**Current findings so far:**\n{inc.summary or "(none yet)"}',
+                    ctx_history,
+                )
+
+            # Continue with stored message_history from background investigation
+            follow_up = _extract_follow_up_text(user_lower, fragment) or (
+                'Please continue the investigation and provide updated findings.'
+            )
+            inc.status = IncidentStatus.investigating
             try:
-                with logfire.span('incident_adhoc_query', user_text=user_text):
-                    result = await syslog_investigator.run(user_text, message_history=history)
-                self._context_history[ctx_key] = result.all_messages()
-                await updater.complete(message=new_agent_text_message(str(result.output)))
+                with logfire.span('incident_user_continuation', incident_id=inc.incident_id):
+                    result = await syslog_investigator.run(
+                        follow_up, message_history=inc.message_history
+                    )
+                inc.investigation_log.append(('user_continuation', str(result.output)))
+                inc.message_history = result.all_messages()
+                inc.summary = str(result.output)
+                inc.status = IncidentStatus.waiting
+                return str(result.output), ctx_history
             except Exception as exc:
-                logfire.error('Ad-hoc query failed', error=str(exc))
-                await updater.failed(message=new_agent_text_message(f'Query failed: {exc}'))
+                inc.status = IncidentStatus.waiting
+                logfire.error('User continuation failed', incident_id=inc.incident_id, error=str(exc))
+                return f'Continuation failed: {exc}', ctx_history
+
+        # --- Fallback: ad-hoc investigation query via LLM ---
+        try:
+            with logfire.span('incident_adhoc_query', user_text=user_text):
+                result = await syslog_investigator.run(user_text, message_history=ctx_history)
+            return str(result.output), result.all_messages()
+        except Exception as exc:
+            logfire.error('Ad-hoc query failed', error=str(exc))
+            return f'Query failed: {exc}', ctx_history
 
 
 # ---------------------------------------------------------------------------
-# Agent card + lifespan + app
+# Lifespan
 # ---------------------------------------------------------------------------
-
-agent_card = AgentCard(
-    name='Syslog Incident Agent',
-    description=(
-        'Monitors Nokia SR Linux syslog via Loki. Automatically opens incidents for '
-        'error/critical/alert/emergency events and runs LLM-driven investigation. '
-        'Supports listing, inspecting, and continuing troubleshooting of incidents.'
-    ),
-    url='http://localhost:8003/',
-    version='1.0.0',
-    default_input_modes=['text'],
-    default_output_modes=['text'],
-    capabilities=AgentCapabilities(streaming=True, state_transition_history=True),
-    skills=[AgentSkill(
-        id='syslog_incidents',
-        name='Syslog Incident Management',
-        description=(
-            'List active syslog incidents, get full investigation details, '
-            'or continue LLM-driven troubleshooting for a specific incident.'
-        ),
-        tags=['syslog', 'incidents', 'network', 'nokia', 'monitoring'],
-        examples=[
-            'List all incidents',
-            'Show details for incident abc12345',
-            'Continue investigating incident abc12345 — what is the BGP status?',
-        ],
-    )],
-)
-
 
 @asynccontextmanager
-async def lifespan(_):
-    """Start the MCP subprocess and Loki poller alongside the A2A server."""
-    global _http_client
+async def syslog_lifespan():
+    """Start the MCP subprocess and Loki poller for the syslog agent."""
     print('Starting syslog agent background tasks...')
     async with syslog_investigator:
         async with httpx.AsyncClient(timeout=30) as http_client:
-            _http_client = http_client
             poll_task = asyncio.create_task(_loki_poll_loop(http_client))
             try:
-                print('MCP server running. Syslog Incident Agent ready on port 8003.')
+                print('Syslog agent MCP server running. Loki poller active.')
                 yield
             finally:
                 poll_task.cancel()
@@ -540,8 +421,4 @@ async def lifespan(_):
                     await poll_task
                 except asyncio.CancelledError:
                     pass
-                _http_client = None
     print('Syslog agent stopped.')
-
-
-app = build_a2a_app(agent_card, SyslogAgentExecutor(), lifespan=lifespan)

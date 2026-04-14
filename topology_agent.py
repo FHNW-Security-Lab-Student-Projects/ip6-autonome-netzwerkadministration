@@ -1,19 +1,20 @@
-"""Topology Discovery Agent (A2A Server)
+"""Topology Discovery Agent
 
 Discovers network topology from ContainerLab environments by SSHing directly
 into each network device and querying LLDP neighbors.
 
 Architecture:
-  topology_agent.py (A2A server — no LLM in the request path)
+  topology_agent.py (no LLM in the request path)
       └── background refresh task
               ├── parse testlab.clab.yml
               └── SSH into each device in parallel (netmiko)
 
 At startup and every REFRESH_INTERVAL seconds, topology discovery runs in the
-background and the result is cached. The A2A execute() method simply returns
-the cached result immediately — no SSH connections on the critical path.
+background and the result is cached. Callers use get_topology() or
+get_topology_response() to read the cache — no SSH on the hot path.
 
-Run with: uv run uvicorn topology_agent:app --port 8001
+Import and use via agent delegation:
+    from topology_agent import get_topology_response, topology_lifespan
 """
 
 import asyncio
@@ -23,7 +24,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
 import logfire
 import yaml
@@ -31,16 +31,7 @@ from dotenv import load_dotenv
 from netmiko import ConnectHandler
 from pydantic import BaseModel
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
-from a2a.utils import new_agent_text_message
-
-from a2a_utils import BaseAgentExecutor, build_a2a_app, setup_logfire
-
 load_dotenv(Path(__file__).parent / '.env')
-setup_logfire('Topology Agent', instrument_llm=False)
 
 
 # ---------------------------------------------------------------------------
@@ -385,30 +376,20 @@ async def _refresh_loop(interval: int = REFRESH_INTERVAL) -> None:
 
 
 # ---------------------------------------------------------------------------
-# A2A Executor
+# Public API
 # ---------------------------------------------------------------------------
 
-class TopologyAgentExecutor(BaseAgentExecutor):
-    """Returns the latest cached topology. No LLM or SSH on the request path."""
+def get_topology() -> TopologyResult | None:
+    """Return the cached TopologyResult, or None if the cache is still warming up."""
+    return _cache.result if _cache else None
 
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        updater = TaskUpdater(
-            event_queue,
-            task_id=context.task_id or uuid4().hex,
-            context_id=context.context_id or uuid4().hex,
-        )
 
-        if _cache is None:
-            await updater.complete(
-                message=new_agent_text_message(
-                    'Topology cache is still warming up — please retry in a moment.'
-                )
-            )
-            return
+def get_topology_response() -> str | None:
+    """Return a formatted topology response string, or None if cache is warming up."""
+    if _cache is None:
+        return None
+    return _format_response(_cache.result, _cache.collected_at)
 
-        with logfire.span('TopologyAgentExecutor.execute', task_id=context.task_id):
-            response = _format_response(_cache.result, _cache.collected_at)
-        await updater.complete(message=new_agent_text_message(response))
 
 def _format_response(topology: TopologyResult, collected_at: datetime) -> str:
     """Render topology as a readable markdown response with data freshness."""
@@ -439,42 +420,12 @@ def _format_response(topology: TopologyResult, collected_at: datetime) -> str:
 
 
 # ---------------------------------------------------------------------------
-# A2A server setup
+# Lifespan
 # ---------------------------------------------------------------------------
 
-skill = AgentSkill(
-    id='discover_topology',
-    name='Discover Network Topology',
-    description=(
-        'Returns the latest cached network topology discovered from ContainerLab '
-        'devices via LLDP. The topology is refreshed every 60 seconds in the '
-        'background — responses are always immediate.'
-    ),
-    tags=['network', 'topology', 'lldp', 'containerlab'],
-    examples=[
-        'Discover the network topology',
-        'Show me the topology from testlab.clab.yml',
-        'What is the current network topology?',
-    ],
-)
-
-agent_card = AgentCard(
-    name='Topology Discovery Agent',
-    description=(
-        'Returns a pre-built, cached network topology discovered from ContainerLab '
-        'devices via LLDP. Topology is refreshed every 60 seconds in the background.'
-    ),
-    url='http://localhost:8002/',
-    version='2.0.0',
-    default_input_modes=['text'],
-    default_output_modes=['text'],
-    capabilities=AgentCapabilities(streaming=True, state_transition_history=True),
-    skills=[skill],
-)
-
 @asynccontextmanager
-async def lifespan(_):
-    """Start the background refresh loop alongside the A2A server."""
+async def topology_lifespan():
+    """Start the background topology refresh loop."""
     print(f'Starting topology background refresh (interval={REFRESH_INTERVAL}s)...')
     refresh_task = asyncio.create_task(_refresh_loop())
     try:
@@ -486,6 +437,3 @@ async def lifespan(_):
         except asyncio.CancelledError:
             pass
         print('Topology refresh stopped.')
-
-
-app = build_a2a_app(agent_card, TopologyAgentExecutor(), lifespan=lifespan)
