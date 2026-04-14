@@ -195,6 +195,7 @@ async def send_and_process(server: ServerState, message: Message, logger: loggin
 class OrchestratorDeps:
     network_server: ServerState
     topology_server: ServerState
+    syslog_server: ServerState
 
 
 @dataclass
@@ -231,7 +232,21 @@ async def _call_topology_agent(ctx: RunContext[OrchestratorDeps], request: str) 
     )
 
 
-def build_orchestrator(network_card, topology_card) -> Agent:
+async def _call_syslog_agent(ctx: RunContext[OrchestratorDeps], request: str) -> RemoteAgentResponse:
+    """Query the Syslog Incident Agent — list incidents, get details, or continue troubleshooting."""
+    logger = logging.getLogger(__name__)
+    server = ctx.deps.syslog_server
+    message = server.build_message(request)
+    result = await send_and_process(server, message, logger)
+    ctx_state = server.active_context()
+    needs_input = ctx_state is not None and ctx_state.active_task_id is not None
+    return RemoteAgentResponse(
+        text=result or 'No response received from syslog agent.',
+        input_required=needs_input,
+    )
+
+
+def build_orchestrator(network_card, topology_card, syslog_card) -> Agent:
     def _skill_lines(card) -> str:
         return '\n'.join(f'    - {s.name}: {s.description}' for s in card.skills)
 
@@ -243,6 +258,8 @@ def build_orchestrator(network_card, topology_card) -> Agent:
         f'  Skills:\n{_skill_lines(network_card)}\n\n'
         f'- call_topology_agent ({topology_card.name}): {topology_card.description}\n'
         f'  Skills:\n{_skill_lines(topology_card)}\n\n'
+        f'- call_syslog_agent ({syslog_card.name}): {syslog_card.description}\n'
+        f'  Skills:\n{_skill_lines(syslog_card)}\n\n'
         'Delegate requests to the appropriate agent.\n\n'
         'When composing the `request` argument for any remote agent call, write it as a '
         'self-contained message — the remote agent has no access to the conversation history '
@@ -258,6 +275,7 @@ def build_orchestrator(network_card, topology_card) -> Agent:
     agent = Agent(llm, deps_type=OrchestratorDeps, instructions=instructions)
     agent.tool(_call_network_agent)
     agent.tool(_call_topology_agent)
+    agent.tool(_call_syslog_agent)
     return agent
 
 
@@ -280,7 +298,14 @@ async def main():
         topology_card = await topology_client.get_card()
         logger.info('Connected to agent: %s', topology_card.name)
 
-        orchestrator = build_orchestrator(network_card, topology_card)
+        syslog_client = await ClientFactory.connect(
+            agent='http://localhost:8003',
+            client_config=ClientConfig(httpx_client=http_client),
+        )
+        syslog_card = await syslog_client.get_card()
+        logger.info('Connected to agent: %s', syslog_card.name)
+
+        orchestrator = build_orchestrator(network_card, topology_card, syslog_card)
 
         network_server = ServerState(
             url='http://localhost:8001',
@@ -292,10 +317,16 @@ async def main():
             agent_name=topology_card.name,
             client=topology_client,
         )
+        syslog_server = ServerState(
+            url='http://localhost:8003',
+            agent_name=syslog_card.name,
+            client=syslog_client,
+        )
 
         deps = OrchestratorDeps(
             network_server=network_server,
             topology_server=topology_server,
+            syslog_server=syslog_server,
         )
         message_history = []
 
@@ -318,10 +349,11 @@ async def main():
             if user_text == '/state':
                 print(network_server.debug_summary())
                 print(topology_server.debug_summary())
+                print(syslog_server.debug_summary())
                 continue
             if user_text == '/mode':
                 new_mode = ContextMode.PER_TURN if network_server.context_mode == ContextMode.STICKY else ContextMode.STICKY
-                for server in [network_server, topology_server]:
+                for server in [network_server, topology_server, syslog_server]:
                     server.context_mode = new_mode
                 print(f'Context mode → {new_mode.value}')
                 continue
@@ -330,7 +362,7 @@ async def main():
             message_history = result.all_messages()
             print(f'\nOrchestrator: {result.output}\n')
 
-            for server in [network_server, topology_server]:
+            for server in [network_server, topology_server, syslog_server]:
                 server.maybe_reset_context()
 
 
