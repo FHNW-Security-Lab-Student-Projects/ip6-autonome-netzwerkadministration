@@ -13,7 +13,7 @@ import uvicorn
 from starlette.applications import Starlette
 from starlette.routing import Mount
 
-from client_agent import OrchestratorDeps, main_lifespan, orchestrator
+from client_agent import main_lifespan, orchestrator
 
 
 @asynccontextmanager
@@ -23,7 +23,7 @@ async def lifespan(app: Starlette):
 
 
 app = Starlette(
-    routes=[Mount('/', app=orchestrator.to_web(deps=OrchestratorDeps()))],
+    routes=[Mount('/', app=orchestrator.to_web())],
     lifespan=lifespan,
 )
 

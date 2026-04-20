@@ -9,7 +9,6 @@ Import and use via agent delegation:
 """
 
 import asyncio
-import re
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -23,6 +22,7 @@ import os
 import httpx
 import logfire
 from dotenv import load_dotenv
+from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -34,12 +34,12 @@ OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
-knowledge_base_file = Path(__file__).parent / 'sr_linux_knowledge.txt'
-SR_LINUX_KNOWLEDGE = ''
-if knowledge_base_file.exists():
-    SR_LINUX_KNOWLEDGE = knowledge_base_file.read_text()
-else:
-    print(f'Warning: sr_linux_knowledge.txt not found at {knowledge_base_file}')
+class SyslogAgentResult(BaseModel):
+    answer: str | None = None
+    needs_clarification: bool = False
+    clarifying_questions: list[str] = []
+
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -82,25 +82,25 @@ _last_checked_ns: int = 0
 # ---------------------------------------------------------------------------
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5',
+    'z-ai/glm-5.1',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
     settings=ModelSettings(parallel_tool_calls=True),
 )
 
-mcp_server = MCPServerStdio(
+network_mcp_server = MCPServerStdio(
+    command='uv',
+    args=['run', 'mcp_server.py'],
+)
+
+syslog_mcp_server = MCPServerStdio(
     command='uv',
     args=['run', 'syslog_mcp_server.py'],
 )
 
-_KNOWLEDGE_SECTION = (
-    f"\n{'-' * 80}\nNOKIA SR LINUX KNOWLEDGE BASE (for interpreting output):\n{'-' * 80}\n"
-    f"{SR_LINUX_KNOWLEDGE}\n{'-' * 80}\nEND OF KNOWLEDGE BASE\n{'-' * 80}\n"
-    if SR_LINUX_KNOWLEDGE else ''
-)
-
 syslog_investigator = Agent(
     model=llm,
-    toolsets=[mcp_server],
+    name='syslog_investigator',
+    toolsets=[network_mcp_server, syslog_mcp_server],
     instructions=(
         'You are an automated network incident investigator for Nokia SR Linux devices.\n\n'
         'AVAILABLE TOOLS:\n'
@@ -118,7 +118,6 @@ syslog_investigator = Agent(
         'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
         'The syslog host label uses the full container name (clab-testlab-router1). '
         'Strip the "clab-testlab-" prefix when calling tools.\n'
-        + _KNOWLEDGE_SECTION
     ),
 )
 
@@ -238,26 +237,8 @@ async def _run_troubleshooting(inc: Incident) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Intent detection helpers
+# Incident lookup and formatting helpers
 # ---------------------------------------------------------------------------
-
-
-def _intent_is_list(text: str) -> bool:
-    return any(kw in text for kw in ('list', 'incidents', 'active', 'show all', 'what incident'))
-
-
-def _intent_is_detail(text: str) -> bool:
-    return any(kw in text for kw in ('detail', 'info', 'show incident', 'get incident'))
-
-
-def _intent_is_continue(text: str) -> bool:
-    return any(kw in text for kw in ('continue', 'join', 'investigate', 'update', 'follow up', 'follow-up'))
-
-
-def _extract_id_fragment(text: str) -> str | None:
-    """Return first token that looks like a hex ID fragment (6+ hex chars)."""
-    m = re.search(r'\b([0-9a-f]{6,})\b', text)
-    return m.group(1) if m else None
 
 
 def _find_incident(fragment: str) -> Incident | None:
@@ -265,14 +246,6 @@ def _find_incident(fragment: str) -> Incident | None:
         if inc.incident_id.startswith(fragment):
             return inc
     return None
-
-
-def _extract_follow_up_text(text: str, fragment: str) -> str:
-    """Return the text that comes after the ID fragment, stripped."""
-    idx = text.find(fragment)
-    if idx == -1:
-        return ''
-    return text[idx + len(fragment):].strip()
 
 
 def _format_incident_list() -> str:
@@ -319,86 +292,107 @@ def _format_incident_detail(inc: Incident) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Syslog Dispatch Agent — LLM-driven user request handler
+# ---------------------------------------------------------------------------
+
+syslog_agent = Agent(
+    model=llm,
+    name='syslog_agent',
+    output_type=SyslogAgentResult,
+    instructions=(
+        'You are a syslog incident management assistant for Nokia SR Linux network devices. '
+        'Always use tools to answer — never guess incident IDs, statuses, or findings. '
+        'When the user mentions a partial ID, pass it as-is to the relevant tool.\n\n'
+        'OUTPUT FORMAT:\n'
+        'Always respond with a SyslogAgentResult:\n'
+        '- answer: your response or findings (null if needs_clarification is true)\n'
+        '- needs_clarification: true if required information is missing to fulfil the request\n'
+        '- clarifying_questions: specific questions to ask the user (empty if needs_clarification is false)'
+    ),
+)
+
+
+@syslog_agent.tool_plain
+def list_incidents() -> str:
+    """List all known syslog incidents.
+
+    Returns:
+        Markdown table with columns: ID (short 8-char hex), Device, Status,
+        Created (UTC time), and a truncated Summary. Returns a plain message
+        if no incidents have been recorded yet.
+    """
+    return _format_incident_list()
+
+
+@syslog_agent.tool_plain
+def get_incident_detail(incident_id: str) -> str:
+    """Get full details of a specific incident.
+
+    Args:
+        incident_id: Full incident ID or any unique hex prefix (e.g. "abc12345").
+                     Call list_incidents first if you don't know the ID.
+
+    Returns:
+        Markdown-formatted incident report including device, status, triggering
+        syslog event, full investigation log, and current summary.
+        If no match is found, returns an error message followed by the incident list.
+    """
+    inc = _find_incident(incident_id)
+    if inc is None:
+        return f'No incident found matching "{incident_id}".\n\n' + _format_incident_list()
+    return _format_incident_detail(inc)
+
+
+@syslog_agent.tool_plain
+async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
+    """Resume LLM-driven troubleshooting for an existing incident.
+
+    Args:
+        incident_id: Full incident ID or any unique hex prefix.
+        follow_up: Optional instruction or question for the investigator
+                   (e.g. "check neighboring devices" or "focus on BGP").
+                   Defaults to a generic continue-and-summarise prompt.
+
+    Returns:
+        Updated investigation findings from the LLM investigator.
+        If the background auto-investigation is still running, returns the
+        current partial findings without launching a new run.
+        Changes the incident status to 'investigating' while running,
+        then back to 'waiting' when done.
+    """
+    inc = _find_incident(incident_id)
+    if inc is None:
+        return f'No incident found matching "{incident_id}".\n\n' + _format_incident_list()
+    if inc.bg_task and not inc.bg_task.done():
+        return (
+            f'Incident `{inc.incident_id[:8]}` is still being investigated automatically.\n\n'
+            f'**Current findings so far:**\n{inc.summary or "(none yet)"}'
+        )
+    follow_up_text = follow_up or 'Please continue the investigation and provide updated findings.'
+    inc.status = IncidentStatus.investigating
+    try:
+        with logfire.span('incident_user_continuation', incident_id=inc.incident_id):
+            result = await syslog_investigator.run(follow_up_text, message_history=inc.message_history)
+        inc.investigation_log.append(('user_continuation', str(result.output)))
+        inc.message_history = result.all_messages()
+        inc.summary = str(result.output)
+        inc.status = IncidentStatus.waiting
+        return str(result.output)
+    except Exception as exc:
+        inc.status = IncidentStatus.waiting
+        logfire.error('User continuation failed', incident_id=inc.incident_id, error=str(exc))
+        return f'Continuation failed: {exc}'
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-async def handle_syslog_request(
-    user_text: str,
-    ctx_history: list,
-) -> tuple[str, list]:
-    """Handle a user request about syslog incidents via intent-based dispatch.
-
-    Args:
-        user_text: The user's message.
-        ctx_history: Pydantic AI message history for ad-hoc LLM queries
-                     (pass [] for a new session; updated list is returned).
-
-    Returns:
-        (response_text, updated_ctx_history)
-    """
-    user_lower = user_text.lower()
-
+async def handle_syslog_request(user_text: str) -> SyslogAgentResult:
+    """Handle a user request about syslog incidents via the syslog_agent LLM."""
     with logfire.span('handle_syslog_request', user_text=user_text):
-        # --- List incidents ---
-        if _intent_is_list(user_lower):
-            return _format_incident_list(), ctx_history
-
-        # --- Details or continue: need an ID fragment ---
-        fragment = _extract_id_fragment(user_lower)
-
-        if _intent_is_detail(user_lower) and fragment:
-            inc = _find_incident(fragment)
-            if inc is None:
-                return (
-                    f'No incident found matching "{fragment}".\n\n' + _format_incident_list(),
-                    ctx_history,
-                )
-            return _format_incident_detail(inc), ctx_history
-
-        if _intent_is_continue(user_lower) and fragment:
-            inc = _find_incident(fragment)
-            if inc is None:
-                return (
-                    f'No incident found matching "{fragment}".\n\n' + _format_incident_list(),
-                    ctx_history,
-                )
-
-            # Race condition guard: background task still running
-            if inc.bg_task and not inc.bg_task.done():
-                return (
-                    f'Incident `{inc.incident_id[:8]}` is still being investigated automatically.\n\n'
-                    f'**Current findings so far:**\n{inc.summary or "(none yet)"}',
-                    ctx_history,
-                )
-
-            # Continue with stored message_history from background investigation
-            follow_up = _extract_follow_up_text(user_lower, fragment) or (
-                'Please continue the investigation and provide updated findings.'
-            )
-            inc.status = IncidentStatus.investigating
-            try:
-                with logfire.span('incident_user_continuation', incident_id=inc.incident_id):
-                    result = await syslog_investigator.run(
-                        follow_up, message_history=inc.message_history
-                    )
-                inc.investigation_log.append(('user_continuation', str(result.output)))
-                inc.message_history = result.all_messages()
-                inc.summary = str(result.output)
-                inc.status = IncidentStatus.waiting
-                return str(result.output), ctx_history
-            except Exception as exc:
-                inc.status = IncidentStatus.waiting
-                logfire.error('User continuation failed', incident_id=inc.incident_id, error=str(exc))
-                return f'Continuation failed: {exc}', ctx_history
-
-        # --- Fallback: ad-hoc investigation query via LLM ---
-        try:
-            with logfire.span('incident_adhoc_query', user_text=user_text):
-                result = await syslog_investigator.run(user_text, message_history=ctx_history)
-            return str(result.output), result.all_messages()
-        except Exception as exc:
-            logfire.error('Ad-hoc query failed', error=str(exc))
-            return f'Query failed: {exc}', ctx_history
+        result = await syslog_agent.run(user_text)
+    return result.output
 
 
 # ---------------------------------------------------------------------------

@@ -2,18 +2,17 @@ import asyncio
 import os
 import logging
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import logfire
 from dotenv import load_dotenv
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from network_agent import NetworkAgentResult, network_agent, network_lifespan
 from topology_agent import get_topology_response, topology_lifespan
-from syslog_agent import handle_syslog_request, syslog_lifespan
+from syslog_agent import SyslogAgentResult, handle_syslog_request, syslog_lifespan
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -34,14 +33,9 @@ if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5',
+    'z-ai/glm-5.1',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
 )
-
-
-@dataclass
-class OrchestratorDeps:
-    syslog_history: dict[str, list] = field(default_factory=dict)
 
 
 INSTRUCTIONS = (
@@ -65,7 +59,9 @@ INSTRUCTIONS = (
     'LLM-driven investigation. Supports listing, inspecting, and continuing troubleshooting.\n'
     '  Skills:\n'
     '    - Syslog Incident Management: List active syslog incidents, get full investigation '
-    'details, or continue LLM-driven troubleshooting for a specific incident.\n\n'
+    'details, or continue LLM-driven troubleshooting for a specific incident.\n'
+    '  Return type: SyslogAgentResult. If needs_clarification is true, ask the user the '
+    'clarifying_questions before calling again with the complete information.\n\n'
     'Delegate requests to the appropriate sub-agent.\n\n'
     'When composing the `request` argument for any sub-agent call, write it as a '
     'self-contained message — the sub-agent has no access to the conversation history '
@@ -76,18 +72,18 @@ INSTRUCTIONS = (
     'this conversation, if they inform the current task.'
 )
 
-orchestrator = Agent(llm, deps_type=OrchestratorDeps, instructions=INSTRUCTIONS)
+orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
 
 
-@orchestrator.tool
-async def call_network_agent(ctx: RunContext[OrchestratorDeps], request: str) -> NetworkAgentResult:
+@orchestrator.tool_plain
+async def call_network_agent(request: str) -> NetworkAgentResult:
     """Delegate a read-only network query to the Network Agent."""
     result = await network_agent.run(request)
     return result.output
 
 
-@orchestrator.tool
-async def call_topology_agent(ctx: RunContext[OrchestratorDeps], request: str) -> str:
+@orchestrator.tool_plain
+async def call_topology_agent() -> str:
     """Retrieve the cached network topology from the Topology Agent."""
     response = get_topology_response()
     if response is None:
@@ -95,13 +91,13 @@ async def call_topology_agent(ctx: RunContext[OrchestratorDeps], request: str) -
     return response
 
 
-@orchestrator.tool
-async def call_syslog_agent(ctx: RunContext[OrchestratorDeps], request: str) -> str:
-    """Query the Syslog Incident Agent — list incidents, get details, or continue troubleshooting."""
-    history = ctx.deps.syslog_history.get('default', [])
-    text, new_history = await handle_syslog_request(request, history)
-    ctx.deps.syslog_history['default'] = new_history
-    return text
+@orchestrator.tool_plain
+async def call_syslog_agent(request: str) -> SyslogAgentResult:
+    """Query the Syslog Incident Agent — list incidents, get details, or continue troubleshooting.
+    Return type: SyslogAgentResult. If needs_clarification is true, ask the user the
+    clarifying_questions before calling again with the complete information.
+    """
+    return await handle_syslog_request(request)
 
 
 @asynccontextmanager
@@ -115,7 +111,6 @@ async def main():
     logging.basicConfig(level=logging.INFO)
 
     async with main_lifespan():
-        deps = OrchestratorDeps()
         message_history = []
 
         print('Type your message and press Enter. Press Ctrl+C or type "exit" to quit.\n')
@@ -133,7 +128,7 @@ async def main():
                 print('Goodbye!')
                 break
 
-            result = await orchestrator.run(user_text, deps=deps, message_history=message_history)
+            result = await orchestrator.run(user_text, message_history=message_history)
             message_history = result.all_messages()
             print(f'\nOrchestrator: {result.output}\n')
 

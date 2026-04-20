@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """Syslog MCP Server
 
-Provides all tools needed by the Syslog Incident Agent:
+Provides Loki-specific tools for the Syslog Incident Agent:
 - query_loki: Query Nokia SR Linux syslog from Loki around a point in time
-- execute_show_command: Run a read-only show command on a device
-- get_device_info: Look up a device from the inventory
-- list_all_devices: List all devices in the inventory
+
+Network tools (execute_show_command, get_device_info, list_all_devices)
+are provided by mcp_server.py.
 """
 
 import os
-import yaml
 from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 import logfire
 from dotenv import load_dotenv
-from netmiko import ConnectHandler
 from fastmcp import FastMCP
 
 env_file = Path(__file__).parent / '.env'
@@ -33,28 +31,6 @@ else:
 mcp = FastMCP('Syslog MCP Server')
 
 LOKI_URL = 'http://172.20.20.101:3100'
-INVENTORY_DIR = Path(__file__).parent / 'inventory'
-
-
-def _load_inventory():
-    with open(INVENTORY_DIR / 'hosts.yaml') as f:
-        hosts = yaml.safe_load(f)
-    with open(INVENTORY_DIR / 'defaults.yaml') as f:
-        defaults = yaml.safe_load(f)
-    return hosts, defaults
-
-
-def _connect_to_device(device_name: str):
-    hosts, defaults = _load_inventory()
-    if device_name not in hosts:
-        raise ValueError(f"Device '{device_name}' not found. Available: {list(hosts.keys())}")
-    info = hosts[device_name]
-    return ConnectHandler(
-        device_type=info['platform'],
-        host=info['hostname'],
-        username=defaults['username'],
-        password=defaults['password'],
-    )
 
 
 @mcp.tool()
@@ -129,51 +105,6 @@ async def query_loki(
         )
     return '\n'.join(lines)
 
-
-@mcp.tool()
-def execute_show_command(device_name: str, command: str) -> str:
-    """Execute a read-only show command on a Nokia SR Linux device.
-
-    Args:
-        device_name: Device name from inventory (e.g., 'router1', 'switch1').
-        command: CLI command to execute (e.g., 'show version', 'show interface brief').
-    """
-    try:
-        with _connect_to_device(device_name) as conn:
-            output = conn.send_command(command)
-            return f'Command: {command}\nDevice: {device_name}\n\n{output}'
-    except Exception as e:
-        return f'Error executing command on {device_name}: {str(e)}'
-
-
-@mcp.tool()
-def get_device_info(device_name: str) -> str:
-    """Get information about a network device from the inventory.
-
-    Args:
-        device_name: Device name from inventory (e.g., 'router1', 'switch1').
-    """
-    try:
-        hosts, _ = _load_inventory()
-        if device_name not in hosts:
-            return f"Device '{device_name}' not found. Available: {', '.join(hosts.keys())}"
-        device = hosts[device_name]
-        return f"Device: {device_name}\nHostname: {device['hostname']}\nPlatform: {device['platform']}"
-    except Exception as e:
-        return f'Error getting device info: {str(e)}'
-
-
-@mcp.tool()
-def list_all_devices() -> str:
-    """List all available network devices from the inventory."""
-    try:
-        hosts, _ = _load_inventory()
-        lines = ['Network Device Inventory:\n']
-        for name, info in hosts.items():
-            lines.append(f"- {name}: {info['platform']} ({info['hostname']})")
-        return '\n'.join(lines)
-    except Exception as e:
-        return f'Error loading inventory: {str(e)}'
 
 
 if __name__ == '__main__':

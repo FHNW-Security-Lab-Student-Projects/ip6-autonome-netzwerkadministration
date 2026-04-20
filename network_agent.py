@@ -31,15 +31,8 @@ OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
-knowledge_base_file = Path(__file__).parent / 'sr_linux_knowledge.txt'
-SR_LINUX_KNOWLEDGE = ''
-if knowledge_base_file.exists():
-    SR_LINUX_KNOWLEDGE = knowledge_base_file.read_text()
-else:
-    print(f'Warning: sr_linux_knowledge.txt not found at {knowledge_base_file}')
-
 llm = OpenAIChatModel(
-    'z-ai/glm-5',
+    'z-ai/glm-5.1',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
     settings=ModelSettings(parallel_tool_calls=True),
 )
@@ -52,6 +45,7 @@ mcp_server = MCPServerStdio(
 
 network_agent = Agent(
     model=llm,
+    name='network_agent',
     toolsets=[mcp_server],
     output_type=NetworkAgentResult,
     instructions=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.
@@ -74,13 +68,6 @@ Always respond with a NetworkAgentResult:
 - needs_clarification: true if required information is missing
 - clarifying_questions: specific questions to ask the user (empty if needs_clarification is false)
 
-{'-' * 80}
-NOKIA SR LINUX KNOWLEDGE BASE (for interpreting output):
-{'-' * 80}
-{SR_LINUX_KNOWLEDGE}
-{'-' * 80}
-END OF KNOWLEDGE BASE
-{'-' * 80}
 """,
 )
 
