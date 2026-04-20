@@ -559,7 +559,7 @@ dependencies = [
     { name = "httpx" },
     { name = "logfire", extra = ["httpx"] },
     { name = "netmiko" },
-    { name = "pydantic-ai-slim", extra = ["logfire", "mcp", "openai"] },
+    { name = "pydantic-ai-slim", extra = ["logfire", "mcp", "openai", "web"] },
     { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
@@ -570,7 +570,7 @@ requires-dist = [
     { name = "httpx" },
     { name = "logfire", extras = ["httpx"], specifier = ">=4.29.0" },
     { name = "netmiko" },
-    { name = "pydantic-ai-slim", extras = ["openai", "logfire", "mcp"] },
+    { name = "pydantic-ai-slim", extras = ["openai", "logfire", "mcp", "web"] },
     { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
@@ -1145,6 +1145,11 @@ mcp = [
 openai = [
     { name = "openai" },
     { name = "tiktoken" },
+]
+web = [
+    { name = "httpx" },
+    { name = "starlette" },
+    { name = "uvicorn" },
 ]
 
 [[package]]

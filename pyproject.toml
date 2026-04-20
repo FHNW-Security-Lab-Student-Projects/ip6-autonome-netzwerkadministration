@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "Multi-agent network administration with Pydantic AI agent delegation"
 requires-python = ">=3.13"
 dependencies = [
-    "pydantic-ai-slim[openai,logfire,mcp]",
+    "pydantic-ai-slim[openai,logfire,mcp,web]",
     "python-dotenv",
     "httpx",
     "logfire[httpx]>=4.29.0",

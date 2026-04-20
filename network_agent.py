@@ -13,11 +13,18 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
+
+
+class NetworkAgentResult(BaseModel):
+    answer: str | None = None
+    needs_clarification: bool = False
+    clarifying_questions: list[str] = []
 
 load_dotenv(Path(__file__).parent / '.env')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
@@ -46,6 +53,7 @@ mcp_server = MCPServerStdio(
 network_agent = Agent(
     model=llm,
     toolsets=[mcp_server],
+    output_type=NetworkAgentResult,
     instructions=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.
 
 AVAILABLE TOOLS:
@@ -57,6 +65,14 @@ WORKFLOW:
 - For device queries or show commands: use the appropriate tool and report the result clearly.
 - For greetings or capability questions: respond directly without using tools.
 - Always format output in a readable way (use lists or tables where appropriate).
+- If the request is missing required information (e.g. which device to query), do NOT guess.
+  Set needs_clarification=true and list the specific questions in clarifying_questions.
+
+OUTPUT FORMAT:
+Always respond with a NetworkAgentResult:
+- answer: your response or findings (null if needs_clarification is true)
+- needs_clarification: true if required information is missing
+- clarifying_questions: specific questions to ask the user (empty if needs_clarification is false)
 
 {'-' * 80}
 NOKIA SR LINUX KNOWLEDGE BASE (for interpreting output):

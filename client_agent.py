@@ -11,7 +11,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
-from network_agent import network_agent, network_lifespan
+from network_agent import NetworkAgentResult, network_agent, network_lifespan
 from topology_agent import get_topology_response, topology_lifespan
 from syslog_agent import handle_syslog_request, syslog_lifespan
 
@@ -52,7 +52,9 @@ INSTRUCTIONS = (
     'devices. Executes show commands, queries device state, and retrieves inventory information.\n'
     '  Skills:\n'
     '    - Show Network State: Execute read-only show commands on Nokia SR Linux devices. '
-    'Query interface status, routing tables, device info, and backup listings.\n\n'
+    'Query interface status, routing tables, device info, and backup listings.\n'
+    '  Return type: NetworkAgentResult. If needs_clarification is true, ask the user the '
+    'clarifying_questions before calling again with the complete information.\n\n'
     '- call_topology_agent (Topology Discovery Agent): Returns a pre-built, cached network topology '
     'discovered from ContainerLab devices via LLDP. Topology is refreshed every 60 seconds.\n'
     '  Skills:\n'
@@ -78,10 +80,10 @@ orchestrator = Agent(llm, deps_type=OrchestratorDeps, instructions=INSTRUCTIONS)
 
 
 @orchestrator.tool
-async def call_network_agent(ctx: RunContext[OrchestratorDeps], request: str) -> str:
+async def call_network_agent(ctx: RunContext[OrchestratorDeps], request: str) -> NetworkAgentResult:
     """Delegate a read-only network query to the Network Agent."""
     result = await network_agent.run(request)
-    return str(result.output)
+    return result.output
 
 
 @orchestrator.tool
