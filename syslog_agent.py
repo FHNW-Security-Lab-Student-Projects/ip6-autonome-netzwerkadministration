@@ -146,14 +146,34 @@ syslog_mcp_server = MCPServerStdio(
     args=['run', 'syslog_mcp_server.py'],
 )
 
-INVESTIGATOR_INSTRUCTIONS_FULL = (
-    'You are an automated network incident investigator for Nokia SR Linux devices.\n\n'
+INVESTIGATOR_INSTRUCTIONS_CONTINUATION = (
+    'You are a network incident investigator for Nokia SR Linux devices performing a deep-dive '
+    'continuation of a prior triage. The conversation history contains initial findings — '
+    'do NOT repeat queries or commands already executed.\n\n'
     'INVESTIGATION STRATEGY:\n'
-    '1. Call query_loki for the triggering device first (±5 min around the event timestamp).\n'
-    '2. Based on what you find, call query_loki on neighboring or related devices.\n'
-    '3. Use execute_show_command to check current live device state '
+    '1. Review the prior findings in the conversation history.\n'
+    '2. Expand log coverage: query_loki on neighboring/related devices and widen the time window if needed.\n'
+    '3. Run execute_show_command to verify live device state for any suspected component '
     '(call get_command_reference first to verify correct SR Linux syntax).\n'
-    '4. Summarise root cause and recommend next steps.\n\n'
+    '4. Correlate log evidence with live state to identify the root cause.\n'
+    '5. Provide a definitive conclusion: confirmed root cause, affected scope, and concrete remediation steps.\n\n'
+    'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
+    'The syslog host label uses the full container name (clab-testlab-router1). '
+    'Strip the "clab-testlab-" prefix when calling tools.\n'
+)
+
+INVESTIGATOR_INSTRUCTIONS_USER_INITIATED = (
+    'You are a network incident investigator for Nokia SR Linux devices. '
+    'A user has reported a problem — there is no prior triage context.\n\n'
+    'INVESTIGATION STRATEGY:\n'
+    '1. Infer the relevant device(s) and approximate timeframe from the user description. '
+    'If the device is ambiguous, call list_all_devices and query the most likely candidates.\n'
+    '2. Call query_loki for the relevant device(s) covering the suspected timeframe '
+    '(default to the last 30 minutes if no timeframe is given).\n'
+    '3. Run execute_show_command to verify current live device state for any suspected component '
+    '(call get_command_reference first to verify correct SR Linux syntax).\n'
+    '4. Correlate log evidence with live state to identify the root cause.\n'
+    '5. Provide a definitive conclusion: confirmed root cause, affected scope, and concrete remediation steps.\n\n'
     'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
     'The syslog host label uses the full container name (clab-testlab-router1). '
     'Strip the "clab-testlab-" prefix when calling tools.\n'
@@ -162,7 +182,7 @@ INVESTIGATOR_INSTRUCTIONS_FULL = (
 INVESTIGATOR_INSTRUCTIONS_TRIAGE = (
     'You are an automated network incident triager for Nokia SR Linux devices. '
     'Your job is a QUICK initial assessment only — DO NOT try to do a full root-cause analysis.\n\n'
-    'TRIAGE STRATEGY (just do a quick initial assessment there is a HARD STOP implemented after 60 seconds):\n'
+    'TRIAGE STRATEGY (just do a quick initial assessment there is a HARD STOP implemented after 90 seconds):\n'
     '1. Call query_loki once for the triggering device (±5 min around the event timestamp).\n'
     '2. Optionally run one execute_show_command if the log context clearly points to a live state check '
     '(call get_command_reference first to verify correct SR Linux syntax).\n'
@@ -179,6 +199,12 @@ syslog_investigator = Agent(
     name='syslog_investigator',
     toolsets=[network_mcp_server, syslog_mcp_server],
     instructions=INVESTIGATOR_INSTRUCTIONS_TRIAGE,
+)
+
+syslog_deep_investigator = Agent(
+    model=llm,
+    name='syslog_deep_investigator',
+    toolsets=[network_mcp_server, syslog_mcp_server],
 )
 
 
@@ -294,7 +320,7 @@ async def _run_troubleshooting(inc: Incident) -> None:
         logfire.info('Incident investigation complete', incident_id=inc.incident_id)
         print(f'[syslog-agent] Incident {inc.incident_id[:8]} investigation complete.', flush=True)
     except TimeoutError:
-        inc.investigation_log.append(('error', 'Auto-investigation timed out after 60 s'))
+        inc.investigation_log.append(('error', 'Auto-investigation timed out after 90 s'))
         inc.summary = 'Triage timed out — trigger a manual continuation for deeper analysis.'
         inc.status = IncidentStatus.waiting
         _persist_incidents()
@@ -446,7 +472,11 @@ async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
     inc.status = IncidentStatus.investigating
     try:
         with logfire.span('incident_user_continuation', incident_id=inc.incident_id):
-            result = await syslog_investigator.run(follow_up_text, message_history=inc.message_history)
+            result = await syslog_deep_investigator.run(
+                follow_up_text,
+                message_history=inc.message_history,
+                instructions=INVESTIGATOR_INSTRUCTIONS_CONTINUATION,
+            )
         inc.investigation_log.append(('user_continuation', str(result.output)))
         inc.message_history = result.all_messages()
         inc.summary = str(result.output)
@@ -458,6 +488,53 @@ async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
         _persist_incidents()
         logfire.error('User continuation failed', incident_id=inc.incident_id, error=str(exc))
         return f'Continuation failed: {exc}'
+
+
+@syslog_agent.tool_plain
+async def open_manual_incident(description: str, device: str = '') -> str:
+    """Open a new incident from a user-reported problem and investigate it immediately.
+
+    Use this when the user describes a problem rather than referencing an existing incident.
+    The investigation runs to completion before returning results.
+
+    Args:
+        description: User's description of the problem (e.g. "BGP session to router2 keeps flapping").
+        device: Optional device name hint (short name, e.g. "router1"). Leave empty if unknown
+                or if multiple devices may be involved — the investigator will infer from context.
+
+    Returns:
+        Full investigation findings including root cause and remediation steps.
+        Also creates a persistent incident record that can be listed and continued later.
+    """
+    prompt = description if not device else f'Device hint: {device}\n\nProblem: {description}'
+    inc = Incident(
+        incident_id=uuid4().hex,
+        created_at=datetime.now(timezone.utc),
+        device=device or 'user-reported',
+        triggering_event=description,
+        triggering_timestamp_ns=time.time_ns(),
+        status=IncidentStatus.investigating,
+    )
+    _incidents[inc.incident_id] = inc
+    _persist_incidents()
+    logfire.info('Opening manual incident', incident_id=inc.incident_id, device=inc.device)
+    try:
+        with logfire.span('incident_manual_investigation', incident_id=inc.incident_id):
+            result = await syslog_deep_investigator.run(
+                prompt,
+                instructions=INVESTIGATOR_INSTRUCTIONS_USER_INITIATED,
+            )
+        inc.investigation_log.append(('user_initiated', str(result.output)))
+        inc.message_history = result.all_messages()
+        inc.summary = str(result.output)
+        inc.status = IncidentStatus.waiting
+        _persist_incidents()
+        return f'**Incident `{inc.incident_id[:8]}` opened.**\n\n{result.output}'
+    except Exception as exc:
+        inc.status = IncidentStatus.waiting
+        _persist_incidents()
+        logfire.error('Manual investigation failed', incident_id=inc.incident_id, error=str(exc))
+        return f'Investigation failed: {exc}'
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +556,7 @@ async def handle_syslog_request(user_text: str) -> SyslogAgentResult:
 async def syslog_lifespan():
     """Start the MCP subprocess and Loki poller for the syslog agent."""
     print('Starting syslog agent background tasks...')
-    async with syslog_investigator:
+    async with syslog_investigator, syslog_deep_investigator:
         async with httpx.AsyncClient(timeout=30) as http_client:
             poll_task = asyncio.create_task(_loki_poll_loop(http_client))
             try:
