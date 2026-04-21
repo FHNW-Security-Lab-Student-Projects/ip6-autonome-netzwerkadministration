@@ -117,7 +117,8 @@ async def main():
 
         while True:
             try:
-                user_text = input('You: ').strip()
+                loop = asyncio.get_event_loop()
+                user_text = (await loop.run_in_executor(None, input, 'You: ')).strip()
             except (KeyboardInterrupt, EOFError):
                 print('\nGoodbye!')
                 break
