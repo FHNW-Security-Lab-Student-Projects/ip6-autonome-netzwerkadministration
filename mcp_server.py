@@ -28,6 +28,7 @@ else:
 mcp = FastMCP("MCP Server")
 
 INVENTORY_DIR = Path(__file__).parent / "inventory"
+COMMAND_REFERENCE_PATH = Path(__file__).parent / "command-references" / "srlinux-24.10.1-agent-context.txt"
 # BACKUP_DIR = Path(__file__).parent / "config_backups"
 
 
@@ -65,6 +66,15 @@ def connect_to_device(device_name: str):
     }
 
     return ConnectHandler(**connection_params)
+
+
+@mcp.tool()
+def get_command_reference() -> str:
+    """
+    Return the SR Linux read-only command reference.
+    Call this before constructing any SR Linux CLI command to ensure correct syntax.
+    """
+    return COMMAND_REFERENCE_PATH.read_text()
 
 
 @mcp.tool()

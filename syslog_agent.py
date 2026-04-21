@@ -9,6 +9,7 @@ Import and use via agent delegation:
 """
 
 import asyncio
+import re
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -75,14 +76,26 @@ class Incident:
 
 
 _incidents: dict[str, Incident] = {}
+_incident_key_map: dict[tuple[str, str], str] = {}  # (device, normalized_msg) -> incident_id
 _last_checked_ns: int = 0
+
+_DYNAMIC_RE = re.compile(
+    r'\b(?:\d{1,3}\.){3}\d{1,3}\b'   # IPv4 addresses
+    r'|\b[0-9a-f]{8,}\b'              # hex IDs / MACs
+    r'|\b\d+\b'                        # standalone numbers
+    r'|T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?'  # ISO timestamps
+)
+
+
+def _normalize(msg: str) -> str:
+    return _DYNAMIC_RE.sub('*', msg).strip()
 
 # ---------------------------------------------------------------------------
 # LLM + MCP agent
 # ---------------------------------------------------------------------------
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5.1',
+    'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
     settings=ModelSettings(parallel_tool_calls=True),
 )
@@ -97,28 +110,39 @@ syslog_mcp_server = MCPServerStdio(
     args=['run', 'syslog_mcp_server.py'],
 )
 
+INVESTIGATOR_INSTRUCTIONS_FULL = (
+    'You are an automated network incident investigator for Nokia SR Linux devices.\n\n'
+    'INVESTIGATION STRATEGY:\n'
+    '1. Call query_loki for the triggering device first (±5 min around the event timestamp).\n'
+    '2. Based on what you find, call query_loki on neighboring or related devices.\n'
+    '3. Use execute_show_command to check current live device state '
+    '(call get_command_reference first to verify correct SR Linux syntax).\n'
+    '4. Summarise root cause and recommend next steps.\n\n'
+    'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
+    'The syslog host label uses the full container name (clab-testlab-router1). '
+    'Strip the "clab-testlab-" prefix when calling tools.\n'
+)
+
+INVESTIGATOR_INSTRUCTIONS_TRIAGE = (
+    'You are an automated network incident triager for Nokia SR Linux devices. '
+    'Your job is a QUICK initial assessment only — DO NOT try to do a full root-cause analysis.\n\n'
+    'TRIAGE STRATEGY (just do a quick initial assessment there is a HARD STOP implemented after 60 seconds):\n'
+    '1. Call query_loki once for the triggering device (±5 min around the event timestamp).\n'
+    '2. Optionally run one execute_show_command if the log context clearly points to a live state check '
+    '(call get_command_reference first to verify correct SR Linux syntax).\n'
+    '3. Write a 2-3 sentence summary: what happened, likely cause, suggested next step.\n'
+    'Do NOT query neighboring devices or run multiple show commands. '
+    'A human can trigger a deeper investigation if needed.\n\n'
+    'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
+    'The syslog host label uses the full container name (clab-testlab-router1). '
+    'Strip the "clab-testlab-" prefix when calling tools.\n'
+)
+
 syslog_investigator = Agent(
     model=llm,
     name='syslog_investigator',
     toolsets=[network_mcp_server, syslog_mcp_server],
-    instructions=(
-        'You are an automated network incident investigator for Nokia SR Linux devices.\n\n'
-        'AVAILABLE TOOLS:\n'
-        '- query_loki: Query Nokia SR Linux syslog from Loki around a specific point in time.\n'
-        '              Use this to find related log entries on this device and neighboring devices.\n'
-        '              Pass the triggering event timestamp (provided in the investigation prompt) as time_anchor.\n'
-        '- execute_show_command: Run a show/info command on a specific device\n'
-        '- get_device_info: Look up a device from the inventory\n'
-        '- list_all_devices: List all devices in the inventory\n\n'
-        'INVESTIGATION STRATEGY:\n'
-        '1. Call query_loki for the triggering device first (±5 min around the event timestamp).\n'
-        '2. Based on what you find, call query_loki on neighboring or related devices.\n'
-        '3. Use execute_show_command to check current live device state.\n'
-        '4. Summarise root cause and recommend next steps.\n\n'
-        'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
-        'The syslog host label uses the full container name (clab-testlab-router1). '
-        'Strip the "clab-testlab-" prefix when calling tools.\n'
-    ),
+    instructions=INVESTIGATOR_INSTRUCTIONS_TRIAGE,
 )
 
 
@@ -160,12 +184,17 @@ async def _poll_loki(client: httpx.AsyncClient) -> list[dict]:
 
 
 def _maybe_open_incident(event: dict) -> None:
-    """Open a new incident for the event if not already investigating this device."""
+    """Open a new incident unless a non-resolved incident for the same device+message exists."""
     device = event['host']
-    for inc in _incidents.values():
-        if inc.device == device and inc.status == IncidentStatus.investigating:
-            logfire.info('Skipping duplicate incident', device=device)
+    key = (device, _normalize(event['line']))
+
+    existing_id = _incident_key_map.get(key)
+    if existing_id is not None:
+        existing = _incidents.get(existing_id)
+        if existing is not None and existing.status != IncidentStatus.resolved:
+            logfire.info('Skipping duplicate incident', device=device, incident_id=existing_id)
             return
+        del _incident_key_map[key]
 
     inc = Incident(
         incident_id=uuid4().hex,
@@ -175,6 +204,7 @@ def _maybe_open_incident(event: dict) -> None:
         triggering_timestamp_ns=event['timestamp_ns'],
     )
     _incidents[inc.incident_id] = inc
+    _incident_key_map[key] = inc.incident_id
     logfire.info('Opening incident', incident_id=inc.incident_id, device=device, severity=event['severity'])
     print(
         f'[syslog-agent] New incident {inc.incident_id[:8]} on {device}: {event["line"][:80]}',
@@ -221,13 +251,20 @@ async def _run_troubleshooting(inc: Incident) -> None:
     )
     try:
         with logfire.span('incident_investigation', incident_id=inc.incident_id, device=inc.device):
-            result = await syslog_investigator.run(prompt, message_history=inc.message_history)
+            async with asyncio.timeout(60):
+                result = await syslog_investigator.run(prompt, message_history=inc.message_history)
         inc.investigation_log.append(('auto_investigation', str(result.output)))
         inc.message_history = result.all_messages()
         inc.summary = str(result.output)
         inc.status = IncidentStatus.waiting
         logfire.info('Incident investigation complete', incident_id=inc.incident_id)
         print(f'[syslog-agent] Incident {inc.incident_id[:8]} investigation complete.', flush=True)
+    except TimeoutError:
+        inc.investigation_log.append(('error', 'Auto-investigation timed out after 60 s'))
+        inc.summary = 'Triage timed out — trigger a manual continuation for deeper analysis.'
+        inc.status = IncidentStatus.waiting
+        logfire.warning('Incident investigation timed out', incident_id=inc.incident_id)
+        print(f'[syslog-agent] Incident {inc.incident_id[:8]} triage timed out.', flush=True)
     except Exception as exc:
         inc.investigation_log.append(('error', str(exc)))
         inc.summary = f'Investigation failed: {exc}'
@@ -298,6 +335,7 @@ def _format_incident_detail(inc: Incident) -> str:
 syslog_agent = Agent(
     model=llm,
     name='syslog_agent',
+    toolsets=[network_mcp_server, syslog_mcp_server],
     output_type=SyslogAgentResult,
     instructions=(
         'You are a syslog incident management assistant for Nokia SR Linux network devices. '

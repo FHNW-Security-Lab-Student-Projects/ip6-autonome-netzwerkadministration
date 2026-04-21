@@ -1,0 +1,317 @@
+SR LINUX v24.10.1 READ-ONLY COMMAND REFERENCE
+Nokia 7220 IXR / 7250 IXR / 7730 SXR
+All commands are read-only (show / info / ping / traceroute). No config or tools commands.
+
+================================================================================
+OUTPUT MODIFIERS (append to any command)
+================================================================================
+| as json          output as JSON
+| as yaml          output as YAML
+| grep <pattern>   filter lines
+| head <N>         first N lines
+| tail <N>         last N lines
+| count            count lines
+| no-more          disable pager
+
+================================================================================
+DATASTORES
+================================================================================
+show <x>                  formatted operational view
+info /path                raw running config at YANG path
+info from state /path     raw operational state at YANG path
+info detail /path         config including all defaults
+
+================================================================================
+WILDCARDS AND RANGES (24.3+)
+================================================================================
+show interface ethernet-1/{1..5}         range of ports 1 to 5
+show interface ethernet-1/{1,3,5}        specific ports 1, 3, 5
+show interface ethernet-1/*              all ports
+info from state /interface[name=ethernet-1/*]/oper-state
+
+================================================================================
+INTERFACE NAMING
+================================================================================
+ethernet-1/<port>           data port          e.g. ethernet-1/1
+ethernet-1/<port>/<bkout>   breakout port      e.g. ethernet-1/3/1
+mgmt0                       management port
+lo<N>                       loopback           e.g. lo0
+lag<N>                      link aggregation   e.g. lag1
+irb<N>                      integrated routing/bridging  e.g. irb0
+
+================================================================================
+SYSTEM & PLATFORM
+================================================================================
+show version
+show platform chassis
+show platform linecard
+show platform environment
+show platform environment fan-tray
+show platform environment power-supply
+show platform environment temperature
+show system information
+show system cpu
+show system memory
+show system processes
+show system uptime
+show system application               all running daemons/apps
+show system application <name>        specific app
+show system configuration checkpoint  saved checkpoints
+show system rollback                  available rollback points
+show system grpc-server               gRPC server status
+show system grpc-server mgmt
+show system ntp
+show system ntp status
+show system ntp server
+show system clock
+show system lldp
+show system lldp neighbor
+show system lldp neighbor interface <intf>
+show system lldp statistics
+show system aaa
+show system aaa authentication
+show system aaa authorization
+show system aaa accounting
+show system aaa server-group tacacs <name>
+show system aaa server-group radius <name>
+show logging
+show logging last <N>
+show logging subsystem <name>
+show logging buffer messages
+
+STATE PATHS — SYSTEM
+/system/information
+/platform/chassis
+/platform/control[slot=A]/cpu[index=all]/total/instant
+/platform/control[slot=A]/memory/utilized
+/system/lldp/interface[name=<N>]/neighbor
+/system/ntp/server
+
+================================================================================
+INTERFACES
+================================================================================
+show interface                        all UP interfaces
+show interface brief                  tabular all interfaces
+show interface all                    all interfaces including down (shows reason)
+show interface <intf>                 e.g. show interface ethernet-1/1
+show interface <intf> detail
+show interface <intf> statistics      in/out bytes, packets, errors, drops
+show interface <intf>.<idx>           specific subinterface e.g. ethernet-1/1.0
+show interface <intf> transceiver     optics / SFP info
+show lag <intf> lacp-state            LACP member state
+show system network-instance ethernet-segments
+show system network-instance ethernet-segments <es-name>
+
+STATE PATHS — INTERFACES
+/interface[name=<N>]/oper-state
+/interface[name=<N>]/ethernet/hw-mac-address
+/interface[name=<N>]/statistics/in-octets
+/interface[name=<N>]/statistics/out-octets
+/interface[name=<N>]/statistics/in-error-frames
+/interface[name=<N>]/statistics/out-error-frames
+/interface[name=<N>]/statistics/in-discarded-frames
+/interface[name=<N>]/subinterface[index=<I>]/oper-state
+/interface[name=<N>]/subinterface[index=<I>]/ipv4/address
+/interface[name=<N>]/subinterface[index=<I>]/ipv6/address
+/interface[name=<N>]/lag/lacp/member[interface=*]
+/system/network-instance/ethernet-segments
+
+================================================================================
+ARP / NEIGHBOR DISCOVERY
+================================================================================
+show arpnd arp-entries
+show arpnd arp-entries interface <intf> subinterface <idx>
+show arpnd neighbor-entries
+show arpnd neighbor-entries interface <intf> subinterface <idx>
+
+STATE PATHS — ARP / ND
+/arpnd/arp-entries/arp-entry
+/arpnd/neighbor-entries/neighbor-entry
+
+================================================================================
+NETWORK INSTANCES
+================================================================================
+show network-instance                              all NIs and types
+show network-instance <ni>                         specific NI
+show network-instance <ni> interface               attached interfaces
+show network-instance <ni> arp-nd                  ARP/ND cache in this NI
+
+ROUTE TABLE
+show network-instance <ni> route-table                          full RIB
+show network-instance <ni> route-table ipv4-unicast             IPv4 RIB
+show network-instance <ni> route-table ipv4-unicast summary     protocol summary
+show network-instance <ni> route-table ipv4-unicast prefix <prefix/len>
+show network-instance <ni> route-table ipv4-unicast route <prefix/len>
+show network-instance <ni> route-table ipv4-unicast route <prefix/len> include-inactive
+show network-instance <ni> route-table ipv6-unicast
+
+NI TYPES: default (ip-vrf), mgmt, <custom ip-vrf>, <custom mac-vrf>
+
+STATE PATHS — NETWORK INSTANCES
+/network-instance[name=<N>]/oper-state
+/network-instance[name=<N>]/interface
+/network-instance[name=<N>]/route-table/ipv4-unicast
+/network-instance[name=<N>]/route-table/ipv6-unicast
+
+================================================================================
+OSPF
+================================================================================
+PREFIX: show network-instance <ni> protocols ospf instance <inst>
+
+  neighbor             all OSPF neighbors and state
+  database             LSDB full
+  database summary     LSDB counts by type
+  route-table          OSPF computed routes
+  interface            OSPF-enabled interfaces and hello/dead timers
+  statistics           PDU counters
+
+STATE PATHS — OSPF
+/network-instance[name=<N>]/protocols/ospf/instance[name=<I>]/neighbor
+/network-instance[name=<N>]/protocols/ospf/instance[name=<I>]/area[area-id=<A>]/interface[interface-name=<IF>]/neighbor
+/network-instance[name=<N>]/protocols/ospf/instance[name=<I>]/statistics
+
+================================================================================
+IS-IS
+================================================================================
+PREFIX: show network-instance <ni> protocols isis instance <inst>
+
+  adjacency            all IS-IS adjacencies and state
+  database             IS-IS LSDB
+  route-table          IS-IS computed routes
+  interface            IS-IS-enabled interfaces
+  statistics           PDU counters
+
+STATE PATHS — IS-IS
+/network-instance[name=<N>]/protocols/isis/instance[name=<I>]/adjacency
+/network-instance[name=<N>]/protocols/isis/instance[name=<I>]/interface[interface-name=<IF>]/adjacency
+/network-instance[name=<N>]/protocols/isis/instance[name=<I>]/statistics
+
+================================================================================
+BGP
+================================================================================
+PREFIX: show network-instance <ni> protocols bgp
+
+  (no args)                         overall BGP instance state
+  summary                           neighbor table with Rx/Active/Tx counts
+  statistics                        BGP PDU and update counters
+  group <group-name>                peer group config and state
+
+PREFIX: show network-instance <ni> protocols bgp neighbor
+
+  (no args)                         all neighbors with state and uptime
+  <peer-ip>                         single neighbor detail
+  <peer-ip> received-routes ipv4    IPv4 prefixes received from peer
+  <peer-ip> advertised-routes ipv4  IPv4 prefixes advertised to peer
+  <peer-ip> received-routes evpn    EVPN routes received from peer
+  <peer-ip> advertised-routes evpn  EVPN routes advertised to peer
+
+PREFIX: show network-instance <ni> protocols bgp rib
+
+  ipv4-unicast                      full IPv4 local RIB
+  ipv4-unicast prefix <prefix/len>  single prefix detail
+  ipv6-unicast                      full IPv6 local RIB
+  evpn route-type 1                 EVPN Ethernet Auto-Discovery routes
+  evpn route-type 2                 EVPN MAC/IP routes
+  evpn route-type 2 mac <mac>       specific MAC
+  evpn route-type 3                 EVPN Inclusive Multicast routes
+  evpn route-type 5                 EVPN IP Prefix routes
+  evpn route-type 5 ip-prefix <p>   specific IP prefix
+
+NEIGHBOR STATE FLAGS: S=static D=dynamic L=LLDP B=BFD-enabled -=disabled *=slow
+
+STATE PATHS — BGP
+/network-instance[name=<N>]/protocols/bgp/neighbor[peer-address=<IP>]/session-state
+/network-instance[name=<N>]/protocols/bgp/neighbor[peer-address=<IP>]/last-established
+/network-instance[name=<N>]/protocols/bgp/neighbor[peer-address=<IP>]/afi-safi[afi-safi-name=ipv4-unicast]/received-routes
+/network-instance[name=<N>]/protocols/bgp/neighbor[peer-address=<IP>]/afi-safi[afi-safi-name=ipv4-unicast]/active-routes
+/network-instance[name=<N>]/bgp-rib/ipv4-unicast/local-rib/routes
+
+================================================================================
+EVPN & VXLAN
+================================================================================
+show network-instance <mac-vrf> bridge-table mac-table
+show network-instance <mac-vrf> bridge-table mac-table all
+show network-instance <mac-vrf> bridge-table unicast-table
+show network-instance <mac-vrf> protocols bgp-evpn
+show network-instance <mac-vrf> protocols bgp-evpn esi
+show network-instance <ip-vrf>  protocols bgp-evpn
+show tunnel vxlan-tunnel all
+show tunnel-interface vxlan1 vxlan-interface <idx>
+show system network-instance ethernet-segments
+show system network-instance ethernet-segments <es-name>
+
+STATE PATHS — EVPN / VXLAN
+/network-instance[name=<N>]/bridge-table/mac-table
+/network-instance[name=<N>]/protocols/bgp-evpn
+/tunnel-interface[name=vxlan1]/vxlan-interface
+
+================================================================================
+MPLS & LDP
+================================================================================
+show network-instance default protocols ldp
+show network-instance default protocols ldp neighbor
+show network-instance default protocols ldp fib
+show network-instance default mpls fib
+
+STATE PATHS — MPLS
+/network-instance[name=default]/mpls/fib
+/network-instance[name=default]/protocols/ldp
+
+================================================================================
+BFD
+================================================================================
+show bfd session
+show bfd session all
+show bfd session neighbor <ip>
+show bfd summary
+
+STATE PATHS — BFD
+/bfd/subinterface[id=<N>]
+/bfd/subinterface[id=*]/oper-state
+
+================================================================================
+ACL
+================================================================================
+show acl
+show acl ipv4-filter <name>
+show acl ipv4-filter <name> statistics
+show acl ipv6-filter <name>
+show acl ipv6-filter <name> statistics
+show acl mac-filter <name>
+show acl interface <intf> subinterface <idx>
+show acl cpm-filter
+show acl cpm-filter ipv4-filter entry <id> statistics
+show acl cpm-filter ipv6-filter entry <id> statistics
+
+================================================================================
+QoS
+================================================================================
+show qos interface <intf>
+show qos interface <intf> output queue
+show qos interface <intf> output statistics
+show qos output-profile <name>
+show qos dscp-policy <name>
+
+================================================================================
+DHCP RELAY
+================================================================================
+show network-instance <ni> dhcp-relay
+show network-instance <ni> dhcp-relay statistics
+show network-instance <ni> dhcpv6-relay
+show network-instance <ni> dhcpv6-relay statistics
+
+================================================================================
+MIRRORING
+================================================================================
+show mirroring mirror-instance
+show mirroring mirror-instance <name>
+
+================================================================================
+CONNECTIVITY TESTS (read-only, no state change)
+================================================================================
+ping <dst-ip>
+ping <dst-ip> network-instance <ni>
+ping <dst-ip> count <N> size <bytes> interval <sec>
+traceroute <dst-ip>
+traceroute <dst-ip> network-instance <ni>
+tcptraceroute <dst-ip>

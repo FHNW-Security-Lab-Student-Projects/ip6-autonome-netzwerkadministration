@@ -32,7 +32,7 @@ if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5.1',
+    'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
     settings=ModelSettings(parallel_tool_calls=True),
 )
@@ -51,6 +51,7 @@ network_agent = Agent(
     instructions=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.
 
 AVAILABLE TOOLS:
+- network_get_command_reference: SR Linux CLI syntax reference — call this before constructing any show/info command
 - network_execute_show_command: Run a show/info command on a specific device
 - network_get_device_info: Look up a device's hostname and platform from the inventory
 - network_list_all_devices: List all devices in the inventory
