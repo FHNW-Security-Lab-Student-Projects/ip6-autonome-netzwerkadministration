@@ -251,7 +251,7 @@ async def _run_troubleshooting(inc: Incident) -> None:
     )
     try:
         with logfire.span('incident_investigation', incident_id=inc.incident_id, device=inc.device):
-            async with asyncio.timeout(60):
+            async with asyncio.timeout(90):
                 result = await syslog_investigator.run(prompt, message_history=inc.message_history)
         inc.investigation_log.append(('auto_investigation', str(result.output)))
         inc.message_history = result.all_messages()
