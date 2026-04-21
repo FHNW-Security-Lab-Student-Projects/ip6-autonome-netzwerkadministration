@@ -9,6 +9,7 @@ Import and use via agent delegation:
 """
 
 import asyncio
+import json
 import re
 import time
 from contextlib import asynccontextmanager
@@ -24,7 +25,7 @@ import httpx
 import logfire
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ModelMessagesTypeAdapter
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
@@ -55,10 +56,45 @@ LOKI_POLL_INTERVAL = 30  # seconds
 # ---------------------------------------------------------------------------
 
 
+INCIDENTS_FILE = Path(__file__).parent / 'incidents.json'
+
+
 class IncidentStatus(str, Enum):
     investigating = 'investigating'
     waiting = 'waiting'    # auto-investigation done, awaiting user
     resolved = 'resolved'
+
+
+class IncidentRecord(BaseModel):
+    incident_id: str
+    created_at: datetime
+    device: str
+    triggering_event: str
+    triggering_timestamp_ns: int
+    status: IncidentStatus
+    investigation_log: list[tuple[str, str]]
+    summary: str
+    message_history: list = []
+
+
+def _persist_incidents() -> None:
+    records = {
+        iid: IncidentRecord(
+            incident_id=inc.incident_id,
+            created_at=inc.created_at,
+            device=inc.device,
+            triggering_event=inc.triggering_event,
+            triggering_timestamp_ns=inc.triggering_timestamp_ns,
+            status=inc.status,
+            investigation_log=inc.investigation_log,
+            summary=inc.summary,
+            message_history=ModelMessagesTypeAdapter.dump_python(
+                inc.message_history, mode='json'
+            ) if inc.message_history else [],
+        ).model_dump(mode='json')
+        for iid, inc in _incidents.items()
+    }
+    INCIDENTS_FILE.write_text(json.dumps(records, indent=2))
 
 
 @dataclass
@@ -205,6 +241,7 @@ def _maybe_open_incident(event: dict) -> None:
     )
     _incidents[inc.incident_id] = inc
     _incident_key_map[key] = inc.incident_id
+    _persist_incidents()
     logfire.info('Opening incident', incident_id=inc.incident_id, device=device, severity=event['severity'])
     print(
         f'[syslog-agent] New incident {inc.incident_id[:8]} on {device}: {event["line"][:80]}',
@@ -241,13 +278,9 @@ async def _run_troubleshooting(inc: Incident) -> None:
     ).strftime('%Y-%m-%dT%H:%M:%SZ')
     short_device = inc.device.removeprefix('clab-testlab-')
     prompt = (
-        f"A syslog incident has been triggered on device '{inc.device}'.\n"
-        f"Triggering event timestamp: {anchor_iso}\n"
-        f"Triggering syslog event: {inc.triggering_event}\n\n"
-        f"Please investigate this incident using the available tools.\n"
-        f"Start by calling query_loki with device='{short_device}' and time_anchor='{anchor_iso}' "
-        f"to see surrounding log context, then check neighboring devices and run show commands "
-        f"to confirm the issue and identify the root cause."
+        f"Device: {inc.device} (short name: {short_device})\n"
+        f"Event timestamp: {anchor_iso}\n"
+        f"Syslog event: {inc.triggering_event}"
     )
     try:
         with logfire.span('incident_investigation', incident_id=inc.incident_id, device=inc.device):
@@ -257,18 +290,21 @@ async def _run_troubleshooting(inc: Incident) -> None:
         inc.message_history = result.all_messages()
         inc.summary = str(result.output)
         inc.status = IncidentStatus.waiting
+        _persist_incidents()
         logfire.info('Incident investigation complete', incident_id=inc.incident_id)
         print(f'[syslog-agent] Incident {inc.incident_id[:8]} investigation complete.', flush=True)
     except TimeoutError:
         inc.investigation_log.append(('error', 'Auto-investigation timed out after 60 s'))
         inc.summary = 'Triage timed out — trigger a manual continuation for deeper analysis.'
         inc.status = IncidentStatus.waiting
+        _persist_incidents()
         logfire.warning('Incident investigation timed out', incident_id=inc.incident_id)
         print(f'[syslog-agent] Incident {inc.incident_id[:8]} triage timed out.', flush=True)
     except Exception as exc:
         inc.investigation_log.append(('error', str(exc)))
         inc.summary = f'Investigation failed: {exc}'
         inc.status = IncidentStatus.waiting
+        _persist_incidents()
         logfire.error('Incident investigation failed', incident_id=inc.incident_id, error=str(exc))
         print(f'[syslog-agent] Incident {inc.incident_id[:8]} investigation failed: {exc}', flush=True)
 
@@ -415,9 +451,11 @@ async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
         inc.message_history = result.all_messages()
         inc.summary = str(result.output)
         inc.status = IncidentStatus.waiting
+        _persist_incidents()
         return str(result.output)
     except Exception as exc:
         inc.status = IncidentStatus.waiting
+        _persist_incidents()
         logfire.error('User continuation failed', incident_id=inc.incident_id, error=str(exc))
         return f'Continuation failed: {exc}'
 
