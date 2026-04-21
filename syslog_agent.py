@@ -46,7 +46,7 @@ class SyslogAgentResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 LOKI_URL = 'http://172.20.20.101:3100'
-LOKI_QUERY = '{vendor="nokia_srlinux", severity=~"error|critical|alert|emergency"}'
+LOKI_QUERY = '{job="network-syslog", severity=~"error|critical|alert|emergency"}'
 LOKI_POLL_INTERVAL = 30  # seconds
 
 # ---------------------------------------------------------------------------

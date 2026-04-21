@@ -65,11 +65,18 @@ class TopologyLink(BaseModel):
     port_b: str
 
 
+class TopologyDiff(BaseModel):
+    missing_links: list[TopologyLink]   # in YAML but not seen via LLDP
+    unexpected_links: list[TopologyLink]  # seen via LLDP but not in YAML
+    missing_nodes: list[str]            # defined in YAML but LLDP query failed
+
+
 class TopologyResult(BaseModel):
     nodes: dict[str, TopologyNode]
     links: list[TopologyLink]
     mermaid: str
     summary: str
+    diff: TopologyDiff
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +257,50 @@ async def _query_node(node_name: str, node_info: dict) -> dict:
     return {'node': node_name, 'neighbors': [], 'error': f'Unsupported kind: {kind}'}
 
 
+def _normalize_port(port: str) -> str:
+    """Convert ContainerLab shorthand (e1-1) to SR Linux CLI format (ethernet-1/1)."""
+    return re.sub(r'^e(\d+)-(\d+)$', r'ethernet-\1/\2', port)
+
+
+def _parse_desired_links(clab_data: dict, network_nodes: set[str]) -> list[TopologyLink]:
+    """Extract links from ContainerLab YAML, keeping only SR Linux ↔ SR Linux links."""
+    desired: list[TopologyLink] = []
+    for entry in clab_data.get('topology', {}).get('links', []):
+        endpoints = entry.get('endpoints', [])
+        if len(endpoints) != 2:
+            continue
+        node_a, port_a = endpoints[0].split(':', 1)
+        node_b, port_b = endpoints[1].split(':', 1)
+        if node_a not in network_nodes or node_b not in network_nodes:
+            continue
+        desired.append(TopologyLink(
+            node_a=node_a,
+            port_a=_normalize_port(port_a),
+            node_b=node_b,
+            port_b=_normalize_port(port_b),
+        ))
+    return desired
+
+
+def _compute_diff(
+    desired: list[TopologyLink],
+    actual: list[TopologyLink],
+    unreachable_nodes: list[str],
+) -> TopologyDiff:
+    """Compare desired (YAML) vs actual (LLDP) links using unordered endpoint pairs."""
+    def link_key(link: TopologyLink) -> frozenset:
+        return frozenset({(link.node_a, link.port_a), (link.node_b, link.port_b)})
+
+    desired_keys = {link_key(l): l for l in desired}
+    actual_keys = {link_key(l): l for l in actual}
+
+    return TopologyDiff(
+        missing_links=[desired_keys[k] for k in desired_keys if k not in actual_keys],
+        unexpected_links=[actual_keys[k] for k in actual_keys if k not in desired_keys],
+        missing_nodes=unreachable_nodes,
+    )
+
+
 async def _discover_topology(clab_file: str = DEFAULT_CLAB_FILE) -> TopologyResult:
     """Discover network topology directly via SSH — no LLM involved.
 
@@ -330,7 +381,7 @@ async def _discover_topology(clab_file: str = DEFAULT_CLAB_FILE) -> TopologyResu
         labeled.update({link.node_a, link.node_b})
         mermaid_lines.append(f'  {a} --- {b}')
 
-    # 6. Build summary
+    # 6. Build summary + drift
     unreachable = [
         r['node'] for r in lldp_results
         if not isinstance(r, Exception) and 'error' in r
@@ -339,11 +390,15 @@ async def _discover_topology(clab_file: str = DEFAULT_CLAB_FILE) -> TopologyResu
     if unreachable:
         summary += f' Unreachable: {", ".join(unreachable)}.'
 
+    desired_links = _parse_desired_links(clab_data, set(nodes.keys()))
+    diff = _compute_diff(desired_links, links, unreachable)
+
     return TopologyResult(
         nodes=nodes,
         links=links,
         mermaid='\n'.join(mermaid_lines),
         summary=summary,
+        diff=diff,
     )
 
 
@@ -415,6 +470,25 @@ def _format_response(topology: TopologyResult, collected_at: datetime) -> str:
         lines.append(f'- {link.node_a}:{link.port_a} ↔ {link.node_b}:{link.port_b}')
 
     lines.append(f'\n### Mermaid Diagram\n```mermaid\n{topology.mermaid}\n```')
+
+    diff = topology.diff
+    has_drift = diff.missing_links or diff.unexpected_links or diff.missing_nodes
+    lines.append('\n### Topology Drift (desired vs actual)')
+    if not has_drift:
+        lines.append('No drift detected — topology matches the ContainerLab definition.')
+    else:
+        if diff.missing_nodes:
+            lines.append(f'\n**Unreachable nodes** ({len(diff.missing_nodes)}):')
+            for node in diff.missing_nodes:
+                lines.append(f'- {node}')
+        if diff.missing_links:
+            lines.append(f'\n**Missing links** — expected but not seen via LLDP ({len(diff.missing_links)}):')
+            for link in diff.missing_links:
+                lines.append(f'- {link.node_a}:{link.port_a} ↔ {link.node_b}:{link.port_b}')
+        if diff.unexpected_links:
+            lines.append(f'\n**Unexpected links** — seen via LLDP but not in topology definition ({len(diff.unexpected_links)}):')
+            for link in diff.unexpected_links:
+                lines.append(f'- {link.node_a}:{link.port_a} ↔ {link.node_b}:{link.port_b}')
 
     return '\n'.join(lines)
 
