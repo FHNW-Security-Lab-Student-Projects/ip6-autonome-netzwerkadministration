@@ -480,6 +480,30 @@ def get_incident_detail(incident_id: str) -> str:
     return _format_incident_detail(inc)
 
 
+async def _run_manual_investigation(inc: Incident, prompt: str) -> None:
+    """LLM-driven manual investigation launched as a background asyncio task."""
+    try:
+        with logfire.span('incident_manual_investigation', incident_id=inc.incident_id):
+            result = await syslog_deep_investigator.run(
+                prompt,
+                instructions=INVESTIGATOR_INSTRUCTIONS_USER_INITIATED,
+            )
+        inc.investigation_log.append(('user_initiated', str(result.output)))
+        inc.message_history = result.all_messages()
+        inc.summary = str(result.output)
+        inc.status = IncidentStatus.waiting
+        _persist_incidents()
+        logfire.info('Manual investigation complete', incident_id=inc.incident_id)
+        print(f'[syslog-agent] Incident {inc.incident_id[:8]} manual investigation complete.', flush=True)
+    except Exception as exc:
+        inc.investigation_log.append(('error', str(exc)))
+        inc.summary = f'Investigation failed: {exc}'
+        inc.status = IncidentStatus.waiting
+        _persist_incidents()
+        logfire.error('Manual investigation failed', incident_id=inc.incident_id, error=str(exc))
+        print(f'[syslog-agent] Incident {inc.incident_id[:8]} manual investigation failed: {exc}', flush=True)
+
+
 async def _run_continuation(inc: Incident, follow_up_text: str) -> None:
     """LLM-driven continuation launched as a background asyncio task."""
     try:
@@ -542,10 +566,10 @@ async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
 
 @syslog_agent.tool_plain
 async def open_manual_incident(description: str, device: str = '') -> str:
-    """Open a new incident from a user-reported problem and investigate it immediately.
+    """Open a new incident from a user-reported problem and start investigating in the background.
 
     Use this when the user describes a problem rather than referencing an existing incident.
-    The investigation runs to completion before returning results.
+    The investigation runs in the background — use get_incident_detail once complete.
 
     Args:
         description: User's description of the problem (e.g. "BGP session to router2 keeps flapping").
@@ -553,8 +577,8 @@ async def open_manual_incident(description: str, device: str = '') -> str:
                 or if multiple devices may be involved — the investigator will infer from context.
 
     Returns:
-        Full investigation findings including root cause and remediation steps.
-        Also creates a persistent incident record that can be listed and continued later.
+        Confirmation that the incident was opened and investigation has started.
+        Use get_incident_detail in ~60s to retrieve the findings.
     """
     prompt = description if not device else f'Device hint: {device}\n\nProblem: {description}'
     inc = Incident(
@@ -568,23 +592,14 @@ async def open_manual_incident(description: str, device: str = '') -> str:
     _incidents[inc.incident_id] = inc
     _persist_incidents()
     logfire.info('Opening manual incident', incident_id=inc.incident_id, device=inc.device)
-    try:
-        with logfire.span('incident_manual_investigation', incident_id=inc.incident_id):
-            result = await syslog_deep_investigator.run(
-                prompt,
-                instructions=INVESTIGATOR_INSTRUCTIONS_USER_INITIATED,
-            )
-        inc.investigation_log.append(('user_initiated', str(result.output)))
-        inc.message_history = result.all_messages()
-        inc.summary = str(result.output)
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        return f'**Incident `{inc.incident_id[:8]}` opened.**\n\n{result.output}'
-    except Exception as exc:
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        logfire.error('Manual investigation failed', incident_id=inc.incident_id, error=str(exc))
-        return f'Investigation failed: {exc}'
+    inc.bg_task = asyncio.create_task(
+        _run_manual_investigation(inc, prompt),
+        name=f'manual-{inc.incident_id[:8]}',
+    )
+    return (
+        f'Incident `{inc.incident_id[:8]}` opened and investigation started. '
+        f'Use `get_incident_detail` in ~60s to see the findings.'
+    )
 
 
 # ---------------------------------------------------------------------------
