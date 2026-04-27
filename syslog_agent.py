@@ -23,7 +23,7 @@ import os
 
 import httpx
 import logfire
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelMessagesTypeAdapter
 from pydantic_ai.mcp import MCPServerStdio
@@ -125,6 +125,37 @@ _DYNAMIC_RE = re.compile(
 
 def _normalize(msg: str) -> str:
     return _DYNAMIC_RE.sub('*', msg).strip()
+
+
+def _load_incidents() -> None:
+    if not INCIDENTS_FILE.exists():
+        return
+    try:
+        raw = json.loads(INCIDENTS_FILE.read_text())
+    except Exception as exc:
+        logfire.warning('Failed to load incidents from disk', error=str(exc))
+        return
+    for iid, data in raw.items():
+        try:
+            record = IncidentRecord.model_validate(data)
+            inc = Incident(
+                incident_id=record.incident_id,
+                created_at=record.created_at,
+                device=record.device,
+                triggering_event=record.triggering_event,
+                triggering_timestamp_ns=record.triggering_timestamp_ns,
+                status=record.status,
+                investigation_log=record.investigation_log,
+                summary=record.summary,
+                message_history=ModelMessagesTypeAdapter.validate_python(record.message_history) if record.message_history else [],
+            )
+            _incidents[iid] = inc
+            _incident_key_map[(inc.device, _normalize(inc.triggering_event))] = iid
+        except Exception as exc:
+            logfire.warning('Skipping corrupt incident record', incident_id=iid, error=str(exc))
+
+
+_load_incidents()
 
 # ---------------------------------------------------------------------------
 # LLM + MCP agent
@@ -245,8 +276,14 @@ async def _poll_loki(client: httpx.AsyncClient) -> list[dict]:
     return events
 
 
+_ENV_FILE = Path(__file__).parent / '.env'
+
+
 def _maybe_open_incident(event: dict) -> None:
     """Open a new incident unless a non-resolved incident for the same device+message exists."""
+    if dotenv_values(_ENV_FILE).get('AUTO_INCIDENTS_ENABLED', 'true').lower() == 'false':
+        logfire.info('Auto-incident creation disabled via .env — skipping event')
+        return
     device = event['host']
     key = (device, _normalize(event['line']))
 
@@ -443,33 +480,8 @@ def get_incident_detail(incident_id: str) -> str:
     return _format_incident_detail(inc)
 
 
-@syslog_agent.tool_plain
-async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
-    """Resume LLM-driven troubleshooting for an existing incident.
-
-    Args:
-        incident_id: Full incident ID or any unique hex prefix.
-        follow_up: Optional instruction or question for the investigator
-                   (e.g. "check neighboring devices" or "focus on BGP").
-                   Defaults to a generic continue-and-summarise prompt.
-
-    Returns:
-        Updated investigation findings from the LLM investigator.
-        If the background auto-investigation is still running, returns the
-        current partial findings without launching a new run.
-        Changes the incident status to 'investigating' while running,
-        then back to 'waiting' when done.
-    """
-    inc = _find_incident(incident_id)
-    if inc is None:
-        return f'No incident found matching "{incident_id}".\n\n' + _format_incident_list()
-    if inc.bg_task and not inc.bg_task.done():
-        return (
-            f'Incident `{inc.incident_id[:8]}` is still being investigated automatically.\n\n'
-            f'**Current findings so far:**\n{inc.summary or "(none yet)"}'
-        )
-    follow_up_text = follow_up or 'Please continue the investigation and provide updated findings.'
-    inc.status = IncidentStatus.investigating
+async def _run_continuation(inc: Incident, follow_up_text: str) -> None:
+    """LLM-driven continuation launched as a background asyncio task."""
     try:
         with logfire.span('incident_user_continuation', incident_id=inc.incident_id):
             result = await syslog_deep_investigator.run(
@@ -482,12 +494,50 @@ async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
         inc.summary = str(result.output)
         inc.status = IncidentStatus.waiting
         _persist_incidents()
-        return str(result.output)
+        logfire.info('User continuation complete', incident_id=inc.incident_id)
+        print(f'[syslog-agent] Incident {inc.incident_id[:8]} continuation complete.', flush=True)
     except Exception as exc:
+        inc.investigation_log.append(('error', str(exc)))
+        inc.summary = f'Continuation failed: {exc}'
         inc.status = IncidentStatus.waiting
         _persist_incidents()
         logfire.error('User continuation failed', incident_id=inc.incident_id, error=str(exc))
-        return f'Continuation failed: {exc}'
+        print(f'[syslog-agent] Incident {inc.incident_id[:8]} continuation failed: {exc}', flush=True)
+
+
+@syslog_agent.tool_plain
+async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
+    """Resume LLM-driven troubleshooting for an existing incident.
+
+    Args:
+        incident_id: Full incident ID or any unique hex prefix.
+        follow_up: Optional instruction or question for the investigator
+                   (e.g. "check neighboring devices" or "focus on BGP").
+                   Defaults to a generic continue-and-summarise prompt.
+
+    Returns:
+        Confirmation that the continuation has started. Results are saved to
+        the incident and can be retrieved via get_incident_detail once complete.
+        If an investigation is already running, returns the current findings.
+    """
+    inc = _find_incident(incident_id)
+    if inc is None:
+        return f'No incident found matching "{incident_id}".\n\n' + _format_incident_list()
+    if inc.bg_task and not inc.bg_task.done():
+        return (
+            f'Incident `{inc.incident_id[:8]}` is still being investigated.\n\n'
+            f'**Current findings so far:**\n{inc.summary or "(none yet)"}'
+        )
+    follow_up_text = follow_up or 'Please continue the investigation and provide updated findings.'
+    inc.status = IncidentStatus.investigating
+    inc.bg_task = asyncio.create_task(
+        _run_continuation(inc, follow_up_text),
+        name=f'continuation-{inc.incident_id[:8]}',
+    )
+    return (
+        f'Continuation started for incident `{inc.incident_id[:8]}`. '
+        f'The investigation is running in the background — use `get_incident_detail` in ~60s to see the results.'
+    )
 
 
 @syslog_agent.tool_plain
@@ -568,4 +618,20 @@ async def syslog_lifespan():
                     await poll_task
                 except asyncio.CancelledError:
                     pass
+                running = [
+                    inc.bg_task for inc in _incidents.values()
+                    if inc.bg_task and not inc.bg_task.done()
+                ]
+                if running:
+                    print(
+                        f'[syslog-agent] Waiting for {len(running)} investigation(s) to finish...'
+                        ' (Ctrl+C again to force quit)',
+                        flush=True,
+                    )
+                    try:
+                        await asyncio.gather(*running, return_exceptions=True)
+                    except asyncio.CancelledError:
+                        for t in running:
+                            t.cancel()
+                        print('[syslog-agent] Force shutdown — investigations cancelled.', flush=True)
     print('Syslog agent stopped.')
