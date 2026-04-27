@@ -17,16 +17,16 @@ topology:
         - monitoring/loki/config.yml:/etc/loki/config.yml:ro
       cmd: -config.file=/etc/loki/config.yml
 
-    promtail:
+    alloy:
       kind: linux
-      image: grafana/promtail:3.0.0
+      image: grafana/alloy:latest
       mgmt-ipv4: 172.20.20.100
       ports:
-        - 9080:9080    # Promtail web UI
+        - 12345:12345  # Alloy web UI
         - 1514:1514    # Syslog TCP receiver
       binds:
-        - monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
-      cmd: -config.file=/etc/promtail/config.yml
+        - monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      cmd: run /etc/alloy/config.alloy
 
     grafana:
       kind: linux

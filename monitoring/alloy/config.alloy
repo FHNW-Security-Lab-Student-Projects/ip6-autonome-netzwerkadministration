@@ -1,0 +1,87 @@
+// ── Syslog receiver ──────────────────────────────────────────────────────────
+loki.source.syslog "network_syslog" {
+  listener {
+    address               = "0.0.0.0:1514"
+    protocol              = "udp"
+    idle_timeout          = "60s"
+    label_structured_data = true
+    labels                = { job = "network-syslog" }
+  }
+  // relabel_rules is a top-level argument, not inside listener
+  relabel_rules = loki.relabel.syslog_meta.rules
+  forward_to    = [loki.process.vendor_detection.receiver]
+}
+
+// ── Extract labels from RFC 5424 syslog header fields ────────────────────────
+loki.relabel "syslog_meta" {
+  rule {
+    source_labels = ["__syslog_message_hostname"]
+    target_label  = "host"
+  }
+  rule {
+    source_labels = ["__syslog_message_app_name"]
+    target_label  = "app"
+  }
+  rule {
+    source_labels = ["__syslog_message_severity"]
+    target_label  = "severity"
+  }
+  rule {
+    source_labels = ["__syslog_message_facility"]
+    target_label  = "facility"
+  }
+  forward_to = []
+}
+
+// ── Per-vendor label and parse stages ────────────────────────────────────────
+loki.process "vendor_detection" {
+  // Nokia SR Linux — nodes named clab-testlab-switch* or clab-testlab-router*
+  stage.match {
+    selector = "{host=~\"clab-testlab-(switch|router)[0-9]+\"}"
+    stage.static_labels {
+      values = { vendor = "nokia_srlinux" }
+    }
+  }
+
+  // Arista cEOS — nodes whose name contains eos, arista, leaf, spine
+  stage.match {
+    selector = "{host=~\"clab-testlab-.*(eos|arista|leaf|spine).*\"}"
+    stage.static_labels {
+      values = { vendor = "arista_eos" }
+    }
+    stage.regex {
+      expression = "%(?P<facility_code>[A-Z0-9_]+-[A-Z0-9]+-[A-Z0-9_]+): (?P<log_message>.*)"
+    }
+  }
+
+  // Cisco IOS-XR / XRd — nodes whose name contains xrd, cisco, pe, ce
+  stage.match {
+    selector = "{host=~\"clab-testlab-.*(xrd|cisco|pe[0-9]|ce[0-9]).*\"}"
+    stage.static_labels {
+      values = { vendor = "cisco_xrd" }
+    }
+    stage.regex {
+      expression = "%(?P<facility>[A-Z0-9_]+)-(?P<severity_code>[A-Z0-9]+)-(?P<mnemonic>[A-Z0-9_]+) : (?P<log_message>.*)"
+    }
+  }
+
+  // Cisco IOS-XE — nodes whose name contains iosxe, csr, cat
+  stage.match {
+    selector = "{host=~\"clab-testlab-.*(iosxe|csr|cat)[0-9]*.*\"}"
+    stage.static_labels {
+      values = { vendor = "cisco_iosxe" }
+    }
+    stage.regex {
+      expression = "%(?P<facility>[A-Z0-9_]+)-[0-9]-(?P<mnemonic>[A-Z0-9_]+): (?P<log_message>.*)"
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// ── Push to Loki ──────────────────────────────────────────────────────────────
+loki.write "default" {
+  endpoint {
+    url = "http://172.20.20.101:3100/loki/api/v1/push"
+  }
+}

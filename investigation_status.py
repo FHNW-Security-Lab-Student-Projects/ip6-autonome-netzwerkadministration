@@ -1,7 +1,7 @@
-"""Incident status overview server — reads incidents.json and serves a live table.
+"""Investigation status overview server — reads investigations.json and serves a live table.
 
 Run independently (no import of syslog_agent):
-    uv run python incident_status.py
+    uv run python investigation_status.py
 
 Then open http://127.0.0.1:7933
 """
@@ -16,13 +16,13 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.routing import Route
 
-INCIDENTS_FILE = Path(__file__).parent / 'incidents.json'
+INVESTIGATIONS_FILE = Path(__file__).parent / 'investigations.json'
 
 _HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Incident Status</title>
+  <title>Investigation Status</title>
   <style>
     body { font-family: monospace; background: #0d1117; color: #c9d1d9; margin: 2rem; }
     h1 { color: #f0f6fc; margin-bottom: 0.25rem; }
@@ -65,7 +65,7 @@ _HTML = """<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <h1>Incident Status</h1>
+  <h1>Investigation Status</h1>
   <div class="meta" id="meta">Loading…</div>
   <div id="content"></div>
 
@@ -96,7 +96,7 @@ _HTML = """<!DOCTYPE html>
   <div class="copied" id="toast">Copied!</div>
 
   <script>
-    let _allIncidents = {};
+    let _allInvestigations = {};
     let _selectedId = null;
     let _historyExpanded = false;
 
@@ -121,33 +121,33 @@ _HTML = """<!DOCTYPE html>
     function openDetail(id) {
       if (id !== _selectedId) _historyExpanded = false;
       _selectedId = id;
-      const inc = _allIncidents[id];
-      if (!inc) return;
+      const inv = _allInvestigations[id];
+      if (!inv) return;
       document.querySelectorAll('tr.clickable').forEach(r => r.classList.remove('selected'));
-      const row = document.getElementById('row-' + inc.incident_id.slice(0, 8));
+      const row = document.getElementById('row-' + inv.investigation_id.slice(0, 8));
       if (row) row.classList.add('selected');
 
-      const short = inc.incident_id.slice(0, 8);
+      const short = inv.investigation_id.slice(0, 8);
       document.getElementById('d-title').innerHTML =
-        `Incident ${short} <button class="copy-id-btn" onclick="copyText('${inc.incident_id}')">copy full ID</button>`;
+        `Investigation ${short} <button class="copy-id-btn" onclick="copyText('${inv.investigation_id}')">copy full ID</button>`;
       document.getElementById('d-meta').innerHTML =
-        `Device: <strong>${esc(inc.device)}</strong> &nbsp;|&nbsp; ` +
-        `Status: ${badge(inc.status)} &nbsp;|&nbsp; ` +
-        `Created: ${new Date(inc.created_at).toLocaleString()}`;
-      document.getElementById('d-trigger').textContent = inc.triggering_event;
-      document.getElementById('d-summary').textContent = inc.summary || '(investigation in progress…)';
+        `Device: <strong>${esc(inv.device)}</strong> &nbsp;|&nbsp; ` +
+        `Status: ${badge(inv.status)} &nbsp;|&nbsp; ` +
+        `Created: ${new Date(inv.created_at).toLocaleString()}`;
+      document.getElementById('d-trigger').textContent = inv.triggering_event;
+      document.getElementById('d-summary').textContent = inv.summary || '(investigation in progress…)';
 
       const logDiv = document.getElementById('d-log');
-      if (!inc.investigation_log || inc.investigation_log.length === 0) {
+      if (!inv.investigation_log || inv.investigation_log.length === 0) {
         logDiv.innerHTML = '<span style="color:#8b949e">(no steps recorded yet)</span>';
       } else {
-        logDiv.innerHTML = inc.investigation_log.map(([step, result]) => `
+        logDiv.innerHTML = inv.investigation_log.map(([step, result]) => `
           <div class="log-entry">
             <div class="log-step">${esc(step)}</div>
             <pre>${esc(result)}</pre>
           </div>`).join('');
       }
-      const history = inc.message_history || [];
+      const history = inv.message_history || [];
       document.getElementById('d-history').textContent =
         JSON.stringify(history, null, 2);
       document.getElementById('d-history').style.display = _historyExpanded ? 'block' : 'none';
@@ -169,24 +169,24 @@ _HTML = """<!DOCTYPE html>
     }
 
     function render(data) {
-      _allIncidents = data;
+      _allInvestigations = data;
       const entries = Object.values(data).sort((a, b) =>
         new Date(b.created_at) - new Date(a.created_at)
       );
       if (entries.length === 0) {
-        document.getElementById('content').innerHTML = '<p class="empty">No incidents recorded yet.</p>';
+        document.getElementById('content').innerHTML = '<p class="empty">No investigations recorded yet.</p>';
         closeDetail();
         return;
       }
-      let rows = entries.map(inc => {
-        const short = inc.incident_id.slice(0, 8);
-        const ts = new Date(inc.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-        const summary = trunc(inc.summary || '(investigating…)', 100);
-        const sel = inc.incident_id === _selectedId ? ' selected' : '';
-        return `<tr class="clickable${sel}" id="row-${short}" onclick="openDetail('${inc.incident_id}')">
+      let rows = entries.map(inv => {
+        const short = inv.investigation_id.slice(0, 8);
+        const ts = new Date(inv.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        const summary = trunc(inv.summary || '(investigating…)', 100);
+        const sel = inv.investigation_id === _selectedId ? ' selected' : '';
+        return `<tr class="clickable${sel}" id="row-${short}" onclick="openDetail('${inv.investigation_id}')">
           <td class="id">${short}</td>
-          <td>${esc(inc.device)}</td>
-          <td>${badge(inc.status)}</td>
+          <td>${esc(inv.device)}</td>
+          <td>${badge(inv.status)}</td>
           <td>${ts}</td>
           <td class="summary-cell">${esc(summary)}</td>
         </tr>`;
@@ -198,17 +198,17 @@ _HTML = """<!DOCTYPE html>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
-      if (_selectedId && _allIncidents[_selectedId]) openDetail(_selectedId);
+      if (_selectedId && _allInvestigations[_selectedId]) openDetail(_selectedId);
     }
 
     async function refresh() {
       try {
-        const resp = await fetch('/incidents');
+        const resp = await fetch('/investigations');
         if (resp.ok) {
           const data = await resp.json();
           render(data);
           document.getElementById('meta').textContent =
-            `${Object.keys(data).length} incident(s) — last updated ${new Date().toLocaleTimeString()} (auto-refreshes every 5 s) · click a row for details`;
+            `${Object.keys(data).length} investigation(s) — last updated ${new Date().toLocaleTimeString()} (auto-refreshes every 5 s) · click a row for details`;
         } else {
           const body = await resp.text();
           document.getElementById('meta').textContent = `Server error ${resp.status}: ${body}`;
@@ -224,14 +224,14 @@ _HTML = """<!DOCTYPE html>
 </html>"""
 
 
-async def get_incidents(request: Request) -> JSONResponse:
-    if not INCIDENTS_FILE.exists():
+async def get_investigations(request: Request) -> JSONResponse:
+    if not INVESTIGATIONS_FILE.exists():
         return JSONResponse({})
     try:
-        text = INCIDENTS_FILE.read_text().strip()
+        text = INVESTIGATIONS_FILE.read_text().strip()
         return JSONResponse(json.loads(text) if text else {})
     except Exception as exc:
-        logging.exception('Failed to read incidents.json')
+        logging.exception('Failed to read investigations.json')
         return JSONResponse({'error': str(exc)}, status_code=500)
 
 
@@ -241,7 +241,7 @@ async def get_index(request: Request) -> HTMLResponse:
 
 app = Starlette(routes=[
     Route('/', get_index),
-    Route('/incidents', get_incidents),
+    Route('/investigations', get_investigations),
 ])
 
 if __name__ == '__main__':

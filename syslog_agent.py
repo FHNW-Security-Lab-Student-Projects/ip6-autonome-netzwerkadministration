@@ -1,8 +1,8 @@
-"""Syslog Incident Agent
+"""Syslog Investigation Agent
 
-Monitors Nokia SR Linux syslog via Loki. Automatically opens incidents for
+Monitors Nokia SR Linux syslog via Loki. Automatically opens investigations for
 error/critical/alert/emergency events and runs background LLM investigation.
-Supports listing, inspecting, and continuing troubleshooting of incidents.
+Supports listing, inspecting, and continuing troubleshooting of investigations.
 
 Import and use via agent delegation:
     from syslog_agent import handle_syslog_request, syslog_lifespan
@@ -56,63 +56,63 @@ LOKI_POLL_INTERVAL = 30  # seconds
 # ---------------------------------------------------------------------------
 
 
-INCIDENTS_FILE = Path(__file__).parent / 'incidents.json'
+INVESTIGATIONS_FILE = Path(__file__).parent / 'investigations.json'
 
 
-class IncidentStatus(str, Enum):
+class InvestigationStatus(str, Enum):
     investigating = 'investigating'
     waiting = 'waiting'    # auto-investigation done, awaiting user
     resolved = 'resolved'
 
 
-class IncidentRecord(BaseModel):
-    incident_id: str
+class InvestigationRecord(BaseModel):
+    investigation_id: str
     created_at: datetime
     device: str
     triggering_event: str
     triggering_timestamp_ns: int
-    status: IncidentStatus
+    status: InvestigationStatus
     investigation_log: list[tuple[str, str]]
     summary: str
     message_history: list = []
 
 
-def _persist_incidents() -> None:
+def _persist_investigations() -> None:
     records = {
-        iid: IncidentRecord(
-            incident_id=inc.incident_id,
-            created_at=inc.created_at,
-            device=inc.device,
-            triggering_event=inc.triggering_event,
-            triggering_timestamp_ns=inc.triggering_timestamp_ns,
-            status=inc.status,
-            investigation_log=inc.investigation_log,
-            summary=inc.summary,
+        iid: InvestigationRecord(
+            investigation_id=inv.investigation_id,
+            created_at=inv.created_at,
+            device=inv.device,
+            triggering_event=inv.triggering_event,
+            triggering_timestamp_ns=inv.triggering_timestamp_ns,
+            status=inv.status,
+            investigation_log=inv.investigation_log,
+            summary=inv.summary,
             message_history=ModelMessagesTypeAdapter.dump_python(
-                inc.message_history, mode='json'
-            ) if inc.message_history else [],
+                inv.message_history, mode='json'
+            ) if inv.message_history else [],
         ).model_dump(mode='json')
-        for iid, inc in _incidents.items()
+        for iid, inv in _investigations.items()
     }
-    INCIDENTS_FILE.write_text(json.dumps(records, indent=2))
+    INVESTIGATIONS_FILE.write_text(json.dumps(records, indent=2))
 
 
 @dataclass
-class Incident:
-    incident_id: str
+class Investigation:
+    investigation_id: str
     created_at: datetime
     device: str                       # e.g. "clab-testlab-router1"
     triggering_event: str             # raw log line from Loki
     triggering_timestamp_ns: int = 0  # unix nanoseconds from Loki — anchor for query_loki calls
-    status: IncidentStatus = IncidentStatus.investigating
+    status: InvestigationStatus = InvestigationStatus.investigating
     investigation_log: list[tuple[str, str]] = field(default_factory=list)
     message_history: list = field(default_factory=list)  # Pydantic AI native messages
     summary: str = ''
     bg_task: asyncio.Task | None = field(default=None, repr=False)
 
 
-_incidents: dict[str, Incident] = {}
-_incident_key_map: dict[tuple[str, str], str] = {}  # (device, normalized_msg) -> incident_id
+_investigations: dict[str, Investigation] = {}
+_investigation_key_map: dict[tuple[str, str], str] = {}  # (device, normalized_msg) -> investigation_id
 _last_checked_ns: int = 0
 
 _DYNAMIC_RE = re.compile(
@@ -127,19 +127,19 @@ def _normalize(msg: str) -> str:
     return _DYNAMIC_RE.sub('*', msg).strip()
 
 
-def _load_incidents() -> None:
-    if not INCIDENTS_FILE.exists():
+def _load_investigations() -> None:
+    if not INVESTIGATIONS_FILE.exists():
         return
     try:
-        raw = json.loads(INCIDENTS_FILE.read_text())
+        raw = json.loads(INVESTIGATIONS_FILE.read_text())
     except Exception as exc:
-        logfire.warning('Failed to load incidents from disk', error=str(exc))
+        logfire.warning('Failed to load investigations from disk', error=str(exc))
         return
     for iid, data in raw.items():
         try:
-            record = IncidentRecord.model_validate(data)
-            inc = Incident(
-                incident_id=record.incident_id,
+            record = InvestigationRecord.model_validate(data)
+            inv = Investigation(
+                investigation_id=record.investigation_id,
                 created_at=record.created_at,
                 device=record.device,
                 triggering_event=record.triggering_event,
@@ -149,13 +149,13 @@ def _load_incidents() -> None:
                 summary=record.summary,
                 message_history=ModelMessagesTypeAdapter.validate_python(record.message_history) if record.message_history else [],
             )
-            _incidents[iid] = inc
-            _incident_key_map[(inc.device, _normalize(inc.triggering_event))] = iid
+            _investigations[iid] = inv
+            _investigation_key_map[(inv.device, _normalize(inv.triggering_event))] = iid
         except Exception as exc:
-            logfire.warning('Skipping corrupt incident record', incident_id=iid, error=str(exc))
+            logfire.warning('Skipping corrupt investigation record', investigation_id=iid, error=str(exc))
 
 
-_load_incidents()
+_load_investigations()
 
 # ---------------------------------------------------------------------------
 # LLM + MCP agent
@@ -178,7 +178,7 @@ syslog_mcp_server = MCPServerStdio(
 )
 
 INVESTIGATOR_INSTRUCTIONS_CONTINUATION = (
-    'You are a network incident investigator for Nokia SR Linux devices performing a deep-dive '
+    'You are a network investigator for Nokia SR Linux devices performing a deep-dive '
     'continuation of a prior triage. The conversation history contains initial findings — '
     'do NOT repeat queries or commands already executed.\n\n'
     'INVESTIGATION STRATEGY:\n'
@@ -194,7 +194,7 @@ INVESTIGATOR_INSTRUCTIONS_CONTINUATION = (
 )
 
 INVESTIGATOR_INSTRUCTIONS_USER_INITIATED = (
-    'You are a network incident investigator for Nokia SR Linux devices. '
+    'You are a network investigator for Nokia SR Linux devices. '
     'A user has reported a problem — there is no prior triage context.\n\n'
     'INVESTIGATION STRATEGY:\n'
     '1. Infer the relevant device(s) and approximate timeframe from the user description. '
@@ -211,7 +211,7 @@ INVESTIGATOR_INSTRUCTIONS_USER_INITIATED = (
 )
 
 INVESTIGATOR_INSTRUCTIONS_TRIAGE = (
-    'You are an automated network incident triager for Nokia SR Linux devices. '
+    'You are an automated network triager for Nokia SR Linux devices. '
     'Your job is a QUICK initial assessment only — DO NOT try to do a full root-cause analysis.\n\n'
     'TRIAGE STRATEGY (just do a quick initial assessment there is a HARD STOP implemented after 90 seconds):\n'
     '1. Call query_loki once for the triggering device (±5 min around the event timestamp).\n'
@@ -279,40 +279,40 @@ async def _poll_loki(client: httpx.AsyncClient) -> list[dict]:
 _ENV_FILE = Path(__file__).parent / '.env'
 
 
-def _maybe_open_incident(event: dict) -> None:
-    """Open a new incident unless a non-resolved incident for the same device+message exists."""
-    if dotenv_values(_ENV_FILE).get('AUTO_INCIDENTS_ENABLED', 'true').lower() == 'false':
-        logfire.info('Auto-incident creation disabled via .env — skipping event')
+def _maybe_open_investigation(event: dict) -> None:
+    """Open a new investigation unless a non-resolved investigation for the same device+message exists."""
+    if dotenv_values(_ENV_FILE).get('AUTO_INVESTIGATIONS_ENABLED', 'true').lower() == 'false':
+        logfire.info('Auto-investigation creation disabled via .env — skipping event')
         return
     device = event['host']
     key = (device, _normalize(event['line']))
 
-    existing_id = _incident_key_map.get(key)
+    existing_id = _investigation_key_map.get(key)
     if existing_id is not None:
-        existing = _incidents.get(existing_id)
-        if existing is not None and existing.status != IncidentStatus.resolved:
-            logfire.info('Skipping duplicate incident', device=device, incident_id=existing_id)
+        existing = _investigations.get(existing_id)
+        if existing is not None and existing.status != InvestigationStatus.resolved:
+            logfire.info('Skipping duplicate investigation', device=device, investigation_id=existing_id)
             return
-        del _incident_key_map[key]
+        del _investigation_key_map[key]
 
-    inc = Incident(
-        incident_id=uuid4().hex,
+    inv = Investigation(
+        investigation_id=uuid4().hex,
         created_at=datetime.now(timezone.utc),
         device=device,
         triggering_event=event['line'],
         triggering_timestamp_ns=event['timestamp_ns'],
     )
-    _incidents[inc.incident_id] = inc
-    _incident_key_map[key] = inc.incident_id
-    _persist_incidents()
-    logfire.info('Opening incident', incident_id=inc.incident_id, device=device, severity=event['severity'])
+    _investigations[inv.investigation_id] = inv
+    _investigation_key_map[key] = inv.investigation_id
+    _persist_investigations()
+    logfire.info('Opening investigation', investigation_id=inv.investigation_id, device=device, severity=event['severity'])
     print(
-        f'[syslog-agent] New incident {inc.incident_id[:8]} on {device}: {event["line"][:80]}',
+        f'[syslog-agent] New investigation {inv.investigation_id[:8]} on {device}: {event["line"][:80]}',
         flush=True,
     )
-    inc.bg_task = asyncio.create_task(
-        _run_troubleshooting(inc),
-        name=f'troubleshoot-{inc.incident_id[:8]}',
+    inv.bg_task = asyncio.create_task(
+        _run_troubleshooting(inv),
+        name=f'troubleshoot-{inv.investigation_id[:8]}',
     )
 
 
@@ -322,7 +322,7 @@ async def _loki_poll_loop(client: httpx.AsyncClient) -> None:
         try:
             events = await _poll_loki(client)
             for event in events:
-                _maybe_open_incident(event)
+                _maybe_open_investigation(event)
         except Exception as exc:
             logfire.error('Loki poll failed', error=str(exc))
             print(f'[syslog-agent] Loki poll error: {exc}', flush=True)
@@ -334,86 +334,86 @@ async def _loki_poll_loop(client: httpx.AsyncClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _run_troubleshooting(inc: Incident) -> None:
+async def _run_troubleshooting(inv: Investigation) -> None:
     """LLM-driven investigation launched as a background asyncio task."""
     anchor_iso = datetime.fromtimestamp(
-        inc.triggering_timestamp_ns / 1e9, tz=timezone.utc
+        inv.triggering_timestamp_ns / 1e9, tz=timezone.utc
     ).strftime('%Y-%m-%dT%H:%M:%SZ')
-    short_device = inc.device.removeprefix('clab-testlab-')
+    short_device = inv.device.removeprefix('clab-testlab-')
     prompt = (
-        f"Device: {inc.device} (short name: {short_device})\n"
+        f"Device: {inv.device} (short name: {short_device})\n"
         f"Event timestamp: {anchor_iso}\n"
-        f"Syslog event: {inc.triggering_event}"
+        f"Syslog event: {inv.triggering_event}"
     )
     try:
-        with logfire.span('incident_investigation', incident_id=inc.incident_id, device=inc.device):
+        with logfire.span('investigation', investigation_id=inv.investigation_id, device=inv.device):
             async with asyncio.timeout(90):
-                result = await syslog_investigator.run(prompt, message_history=inc.message_history)
-        inc.investigation_log.append(('auto_investigation', str(result.output)))
-        inc.message_history = result.all_messages()
-        inc.summary = str(result.output)
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        logfire.info('Incident investigation complete', incident_id=inc.incident_id)
-        print(f'[syslog-agent] Incident {inc.incident_id[:8]} investigation complete.', flush=True)
+                result = await syslog_investigator.run(prompt, message_history=inv.message_history)
+        inv.investigation_log.append(('auto_investigation', str(result.output)))
+        inv.message_history = result.all_messages()
+        inv.summary = str(result.output)
+        inv.status = InvestigationStatus.waiting
+        _persist_investigations()
+        logfire.info('Investigation complete', investigation_id=inv.investigation_id)
+        print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} complete.', flush=True)
     except TimeoutError:
-        inc.investigation_log.append(('error', 'Auto-investigation timed out after 90 s'))
-        inc.summary = 'Triage timed out — trigger a manual continuation for deeper analysis.'
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        logfire.warning('Incident investigation timed out', incident_id=inc.incident_id)
-        print(f'[syslog-agent] Incident {inc.incident_id[:8]} triage timed out.', flush=True)
+        inv.investigation_log.append(('error', 'Auto-investigation timed out after 90 s'))
+        inv.summary = 'Triage timed out — trigger a manual continuation for deeper analysis.'
+        inv.status = InvestigationStatus.waiting
+        _persist_investigations()
+        logfire.warning('Investigation timed out', investigation_id=inv.investigation_id)
+        print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} triage timed out.', flush=True)
     except Exception as exc:
-        inc.investigation_log.append(('error', str(exc)))
-        inc.summary = f'Investigation failed: {exc}'
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        logfire.error('Incident investigation failed', incident_id=inc.incident_id, error=str(exc))
-        print(f'[syslog-agent] Incident {inc.incident_id[:8]} investigation failed: {exc}', flush=True)
+        inv.investigation_log.append(('error', str(exc)))
+        inv.summary = f'Investigation failed: {exc}'
+        inv.status = InvestigationStatus.waiting
+        _persist_investigations()
+        logfire.error('Investigation failed', investigation_id=inv.investigation_id, error=str(exc))
+        print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} failed: {exc}', flush=True)
 
 
 # ---------------------------------------------------------------------------
-# Incident lookup and formatting helpers
+# Investigation lookup and formatting helpers
 # ---------------------------------------------------------------------------
 
 
-def _find_incident(fragment: str) -> Incident | None:
-    for inc in _incidents.values():
-        if inc.incident_id.startswith(fragment):
-            return inc
+def _find_investigation(fragment: str) -> Investigation | None:
+    for inv in _investigations.values():
+        if inv.investigation_id.startswith(fragment):
+            return inv
     return None
 
 
-def _format_incident_list() -> str:
-    if not _incidents:
-        return 'No incidents recorded yet.'
+def _format_investigation_list() -> str:
+    if not _investigations:
+        return 'No investigations recorded yet.'
     lines = [
         '| ID (short) | Device | Status | Created | Summary |',
         '|---|---|---|---|---|',
     ]
-    for inc in sorted(_incidents.values(), key=lambda i: i.created_at, reverse=True):
-        ts = inc.created_at.strftime('%H:%M:%S UTC')
-        summary_raw = inc.summary or '(investigating...)'
+    for inv in sorted(_investigations.values(), key=lambda i: i.created_at, reverse=True):
+        ts = inv.created_at.strftime('%H:%M:%S UTC')
+        summary_raw = inv.summary or '(investigating...)'
         summary = (summary_raw[:60] + '...') if len(summary_raw) > 60 else summary_raw
-        lines.append(f'| {inc.incident_id[:8]} | {inc.device} | {inc.status.value} | {ts} | {summary} |')
+        lines.append(f'| {inv.investigation_id[:8]} | {inv.device} | {inv.status.value} | {ts} | {summary} |')
     return '\n'.join(lines)
 
 
-def _format_incident_detail(inc: Incident) -> str:
+def _format_investigation_detail(inv: Investigation) -> str:
     lines = [
-        f'## Incident {inc.incident_id[:8]}',
-        f'**Device:** {inc.device}',
-        f'**Status:** {inc.status.value}',
-        f'**Created:** {inc.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")}',
-        f'**Full ID:** `{inc.incident_id}`',
+        f'## Investigation {inv.investigation_id[:8]}',
+        f'**Device:** {inv.device}',
+        f'**Status:** {inv.status.value}',
+        f'**Created:** {inv.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")}',
+        f'**Full ID:** `{inv.investigation_id}`',
         '',
         '### Triggering Event',
-        f'```\n{inc.triggering_event}\n```',
+        f'```\n{inv.triggering_event}\n```',
         '',
         '### Investigation Log',
     ]
-    if inc.investigation_log:
-        for step, result in inc.investigation_log:
+    if inv.investigation_log:
+        for step, result in inv.investigation_log:
             lines.append(f'**{step}:**')
             lines.append(result)
             lines.append('')
@@ -422,7 +422,7 @@ def _format_incident_detail(inc: Incident) -> str:
     lines.extend([
         '',
         '### Current Summary',
-        inc.summary or '*(investigation in progress...)*',
+        inv.summary or '*(investigation in progress...)*',
     ])
     return '\n'.join(lines)
 
@@ -437,8 +437,8 @@ syslog_agent = Agent(
     toolsets=[network_mcp_server, syslog_mcp_server],
     output_type=SyslogAgentResult,
     instructions=(
-        'You are a syslog incident management assistant for Nokia SR Linux network devices. '
-        'Always use tools to answer — never guess incident IDs, statuses, or findings. '
+        'You are a syslog investigation management assistant for Nokia SR Linux network devices. '
+        'Always use tools to answer — never guess investigation IDs, statuses, or findings. '
         'When the user mentions a partial ID, pass it as-is to the relevant tool.\n\n'
         'OUTPUT FORMAT:\n'
         'Always respond with a SyslogAgentResult:\n'
@@ -450,126 +450,126 @@ syslog_agent = Agent(
 
 
 @syslog_agent.tool_plain
-def list_incidents() -> str:
-    """List all known syslog incidents.
+def list_investigations() -> str:
+    """List all known syslog investigations.
 
     Returns:
         Markdown table with columns: ID (short 8-char hex), Device, Status,
         Created (UTC time), and a truncated Summary. Returns a plain message
-        if no incidents have been recorded yet.
+        if no investigations have been recorded yet.
     """
-    return _format_incident_list()
+    return _format_investigation_list()
 
 
 @syslog_agent.tool_plain
-def get_incident_detail(incident_id: str) -> str:
-    """Get full details of a specific incident.
+def get_investigation_detail(investigation_id: str) -> str:
+    """Get full details of a specific investigation.
 
     Args:
-        incident_id: Full incident ID or any unique hex prefix (e.g. "abc12345").
-                     Call list_incidents first if you don't know the ID.
+        investigation_id: Full investigation ID or any unique hex prefix (e.g. "abc12345").
+                          Call list_investigations first if you don't know the ID.
 
     Returns:
-        Markdown-formatted incident report including device, status, triggering
+        Markdown-formatted investigation report including device, status, triggering
         syslog event, full investigation log, and current summary.
-        If no match is found, returns an error message followed by the incident list.
+        If no match is found, returns an error message followed by the investigation list.
     """
-    inc = _find_incident(incident_id)
-    if inc is None:
-        return f'No incident found matching "{incident_id}".\n\n' + _format_incident_list()
-    return _format_incident_detail(inc)
+    inv = _find_investigation(investigation_id)
+    if inv is None:
+        return f'No investigation found matching "{investigation_id}".\n\n' + _format_investigation_list()
+    return _format_investigation_detail(inv)
 
 
-async def _run_manual_investigation(inc: Incident, prompt: str) -> None:
+async def _run_manual_investigation(inv: Investigation, prompt: str) -> None:
     """LLM-driven manual investigation launched as a background asyncio task."""
     try:
-        with logfire.span('incident_manual_investigation', incident_id=inc.incident_id):
+        with logfire.span('manual_investigation', investigation_id=inv.investigation_id):
             result = await syslog_deep_investigator.run(
                 prompt,
                 instructions=INVESTIGATOR_INSTRUCTIONS_USER_INITIATED,
             )
-        inc.investigation_log.append(('user_initiated', str(result.output)))
-        inc.message_history = result.all_messages()
-        inc.summary = str(result.output)
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        logfire.info('Manual investigation complete', incident_id=inc.incident_id)
-        print(f'[syslog-agent] Incident {inc.incident_id[:8]} manual investigation complete.', flush=True)
+        inv.investigation_log.append(('user_initiated', str(result.output)))
+        inv.message_history = result.all_messages()
+        inv.summary = str(result.output)
+        inv.status = InvestigationStatus.waiting
+        _persist_investigations()
+        logfire.info('Manual investigation complete', investigation_id=inv.investigation_id)
+        print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} manual investigation complete.', flush=True)
     except Exception as exc:
-        inc.investigation_log.append(('error', str(exc)))
-        inc.summary = f'Investigation failed: {exc}'
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        logfire.error('Manual investigation failed', incident_id=inc.incident_id, error=str(exc))
-        print(f'[syslog-agent] Incident {inc.incident_id[:8]} manual investigation failed: {exc}', flush=True)
+        inv.investigation_log.append(('error', str(exc)))
+        inv.summary = f'Investigation failed: {exc}'
+        inv.status = InvestigationStatus.waiting
+        _persist_investigations()
+        logfire.error('Manual investigation failed', investigation_id=inv.investigation_id, error=str(exc))
+        print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} manual investigation failed: {exc}', flush=True)
 
 
-async def _run_continuation(inc: Incident, follow_up_text: str) -> None:
+async def _run_continuation(inv: Investigation, follow_up_text: str) -> None:
     """LLM-driven continuation launched as a background asyncio task."""
     try:
-        with logfire.span('incident_user_continuation', incident_id=inc.incident_id):
+        with logfire.span('investigation_user_continuation', investigation_id=inv.investigation_id):
             result = await syslog_deep_investigator.run(
                 follow_up_text,
-                message_history=inc.message_history,
+                message_history=inv.message_history,
                 instructions=INVESTIGATOR_INSTRUCTIONS_CONTINUATION,
             )
-        inc.investigation_log.append(('user_continuation', str(result.output)))
-        inc.message_history = result.all_messages()
-        inc.summary = str(result.output)
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        logfire.info('User continuation complete', incident_id=inc.incident_id)
-        print(f'[syslog-agent] Incident {inc.incident_id[:8]} continuation complete.', flush=True)
+        inv.investigation_log.append(('user_continuation', str(result.output)))
+        inv.message_history = result.all_messages()
+        inv.summary = str(result.output)
+        inv.status = InvestigationStatus.waiting
+        _persist_investigations()
+        logfire.info('User continuation complete', investigation_id=inv.investigation_id)
+        print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} continuation complete.', flush=True)
     except Exception as exc:
-        inc.investigation_log.append(('error', str(exc)))
-        inc.summary = f'Continuation failed: {exc}'
-        inc.status = IncidentStatus.waiting
-        _persist_incidents()
-        logfire.error('User continuation failed', incident_id=inc.incident_id, error=str(exc))
-        print(f'[syslog-agent] Incident {inc.incident_id[:8]} continuation failed: {exc}', flush=True)
+        inv.investigation_log.append(('error', str(exc)))
+        inv.summary = f'Continuation failed: {exc}'
+        inv.status = InvestigationStatus.waiting
+        _persist_investigations()
+        logfire.error('User continuation failed', investigation_id=inv.investigation_id, error=str(exc))
+        print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} continuation failed: {exc}', flush=True)
 
 
 @syslog_agent.tool_plain
-async def continue_investigation(incident_id: str, follow_up: str = '') -> str:
-    """Resume LLM-driven troubleshooting for an existing incident.
+async def continue_investigation(investigation_id: str, follow_up: str = '') -> str:
+    """Resume LLM-driven troubleshooting for an existing investigation.
 
     Args:
-        incident_id: Full incident ID or any unique hex prefix.
+        investigation_id: Full investigation ID or any unique hex prefix.
         follow_up: Optional instruction or question for the investigator
                    (e.g. "check neighboring devices" or "focus on BGP").
                    Defaults to a generic continue-and-summarise prompt.
 
     Returns:
         Confirmation that the continuation has started. Results are saved to
-        the incident and can be retrieved via get_incident_detail once complete.
+        the investigation and can be retrieved via get_investigation_detail once complete.
         If an investigation is already running, returns the current findings.
     """
-    inc = _find_incident(incident_id)
-    if inc is None:
-        return f'No incident found matching "{incident_id}".\n\n' + _format_incident_list()
-    if inc.bg_task and not inc.bg_task.done():
+    inv = _find_investigation(investigation_id)
+    if inv is None:
+        return f'No investigation found matching "{investigation_id}".\n\n' + _format_investigation_list()
+    if inv.bg_task and not inv.bg_task.done():
         return (
-            f'Incident `{inc.incident_id[:8]}` is still being investigated.\n\n'
-            f'**Current findings so far:**\n{inc.summary or "(none yet)"}'
+            f'Investigation `{inv.investigation_id[:8]}` is still running.\n\n'
+            f'**Current findings so far:**\n{inv.summary or "(none yet)"}'
         )
     follow_up_text = follow_up or 'Please continue the investigation and provide updated findings.'
-    inc.status = IncidentStatus.investigating
-    inc.bg_task = asyncio.create_task(
-        _run_continuation(inc, follow_up_text),
-        name=f'continuation-{inc.incident_id[:8]}',
+    inv.status = InvestigationStatus.investigating
+    inv.bg_task = asyncio.create_task(
+        _run_continuation(inv, follow_up_text),
+        name=f'continuation-{inv.investigation_id[:8]}',
     )
     return (
-        f'Continuation started for incident `{inc.incident_id[:8]}`. '
-        f'The investigation is running in the background — use `get_incident_detail` in ~60s to see the results.'
+        f'Continuation started for investigation `{inv.investigation_id[:8]}`. '
+        f'The investigation is running in the background — use `get_investigation_detail` in ~60s to see the results.'
     )
 
 
 @syslog_agent.tool_plain
-async def open_manual_incident(description: str, device: str = '') -> str:
-    """Open a new incident from a user-reported problem and start investigating in the background.
+async def open_manual_investigation(description: str, device: str = '') -> str:
+    """Open a new investigation from a user-reported problem and start investigating in the background.
 
-    Use this when the user describes a problem rather than referencing an existing incident.
-    The investigation runs in the background — use get_incident_detail once complete.
+    Use this when the user describes a problem rather than referencing an existing investigation.
+    The investigation runs in the background — use get_investigation_detail once complete.
 
     Args:
         description: User's description of the problem (e.g. "BGP session to router2 keeps flapping").
@@ -577,28 +577,28 @@ async def open_manual_incident(description: str, device: str = '') -> str:
                 or if multiple devices may be involved — the investigator will infer from context.
 
     Returns:
-        Confirmation that the incident was opened and investigation has started.
-        Use get_incident_detail in ~60s to retrieve the findings.
+        Confirmation that the investigation was opened and has started.
+        Use get_investigation_detail in ~60s to retrieve the findings.
     """
     prompt = description if not device else f'Device hint: {device}\n\nProblem: {description}'
-    inc = Incident(
-        incident_id=uuid4().hex,
+    inv = Investigation(
+        investigation_id=uuid4().hex,
         created_at=datetime.now(timezone.utc),
         device=device or 'user-reported',
         triggering_event=description,
         triggering_timestamp_ns=time.time_ns(),
-        status=IncidentStatus.investigating,
+        status=InvestigationStatus.investigating,
     )
-    _incidents[inc.incident_id] = inc
-    _persist_incidents()
-    logfire.info('Opening manual incident', incident_id=inc.incident_id, device=inc.device)
-    inc.bg_task = asyncio.create_task(
-        _run_manual_investigation(inc, prompt),
-        name=f'manual-{inc.incident_id[:8]}',
+    _investigations[inv.investigation_id] = inv
+    _persist_investigations()
+    logfire.info('Opening manual investigation', investigation_id=inv.investigation_id, device=inv.device)
+    inv.bg_task = asyncio.create_task(
+        _run_manual_investigation(inv, prompt),
+        name=f'manual-{inv.investigation_id[:8]}',
     )
     return (
-        f'Incident `{inc.incident_id[:8]}` opened and investigation started. '
-        f'Use `get_incident_detail` in ~60s to see the findings.'
+        f'Investigation `{inv.investigation_id[:8]}` opened and started. '
+        f'Use `get_investigation_detail` in ~60s to see the findings.'
     )
 
 
@@ -607,7 +607,7 @@ async def open_manual_incident(description: str, device: str = '') -> str:
 # ---------------------------------------------------------------------------
 
 async def handle_syslog_request(user_text: str) -> SyslogAgentResult:
-    """Handle a user request about syslog incidents via the syslog_agent LLM."""
+    """Handle a user request about syslog investigations via the syslog_agent LLM."""
     with logfire.span('handle_syslog_request', user_text=user_text):
         result = await syslog_agent.run(user_text)
     return result.output
@@ -634,8 +634,8 @@ async def syslog_lifespan():
                 except asyncio.CancelledError:
                     pass
                 running = [
-                    inc.bg_task for inc in _incidents.values()
-                    if inc.bg_task and not inc.bg_task.done()
+                    inv.bg_task for inv in _investigations.values()
+                    if inv.bg_task and not inv.bg_task.done()
                 ]
                 if running:
                     print(

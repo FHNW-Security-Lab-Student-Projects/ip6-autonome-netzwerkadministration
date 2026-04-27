@@ -6,7 +6,7 @@ Every network node in the lab (SR Linux switches and routers, and any future Ari
 
 | Component | Image | Role |
 |---|---|---|
-| **Promtail** | `grafana/promtail:3.0.0` | Syslog TCP receiver; labels and ships log lines |
+| **Grafana Alloy** | `grafana/alloy:latest` | Syslog TCP receiver; labels and ships log lines |
 | **Loki** | `grafana/loki:3.0.0` | Log storage and query engine |
 | **Grafana** | `grafana/grafana:11.0.0` | Visualization UI; Loki datasource is auto-provisioned |
 
@@ -14,7 +14,7 @@ All three containers are declared as `linux` nodes in `testlab.clab.yml` with fi
 
 | Container | Fixed IP | Exposed port |
 |---|---|---|
-| promtail | `172.20.20.100` | `9080` (web UI), `1514` (syslog receiver) |
+| alloy | `172.20.20.100` | `12345` (web UI), `1514` (syslog receiver) |
 | loki | `172.20.20.101` | `3100` (HTTP API) |
 | grafana | `172.20.20.102` | `3000` (UI) |
 
@@ -26,7 +26,7 @@ All three containers are declared as `linux` nodes in `testlab.clab.yml` with fi
 ┌─────────────────────── 172.20.20.0/24 (clab-mgmt) ──────────────────────────┐
 │                                                                               │
 │  switch1 (.x)  ──syslog TCP──►                                                │
-│  switch2 (.x)  ──syslog TCP──►  promtail (.100:1514)                          │
+│  switch2 (.x)  ──syslog TCP──►  alloy (.100:1514)                             │
 │  router1 (.x)  ──syslog TCP──►       │ push                                   │
 │  router2 (.x)  ──syslog TCP──►       ▼                                        │
 │                                  loki (.101:3100)                              │
@@ -38,25 +38,27 @@ All three containers are declared as `linux` nodes in `testlab.clab.yml` with fi
 ```
 
 Every syslog message travels:
-1. **Network node → Promtail** over TCP on port `1514`
-2. **Promtail → Loki** via HTTP push to `172.20.20.101:3100`
+1. **Network node → Alloy** over TCP on port `1514`
+2. **Alloy → Loki** via HTTP push to `172.20.20.101:3100`
 3. **Loki → Grafana** via the pre-provisioned Loki datasource when you run a query
 
 ---
 
 ## How Each Component Is Configured
 
-### Promtail — `monitoring/promtail/config.yml`
+### Grafana Alloy — `monitoring/alloy/config.alloy`
 
-Promtail opens a TCP syslog listener on `0.0.0.0:1514`. For each incoming message it:
+Alloy uses its own River-based config language (`.alloy` files). The pipeline is wired as three components:
 
-1. **Extracts labels** from the RFC 5424 syslog header using `relabel_configs`:
-   - `host` — the hostname field from the syslog message (e.g. `clab-testlab-router1`)
-   - `app` — the app-name field (process that generated the log)
-   - `severity` — syslog severity level
-   - `facility` — syslog facility
+**`loki.source.syslog "network_syslog"`** — opens a TCP syslog listener on `0.0.0.0:1514`. For each incoming message it applies `relabel_rules` from `loki.relabel.syslog_meta` before forwarding to the process stage.
 
-2. **Applies per-vendor pipeline stages** using `match` selectors on the `host` label. Each stage adds a `vendor` label and optionally parses the message body with a regex. This means all logs from different vendors land in the same Loki stream but are fully distinguishable by label.
+**`loki.relabel "syslog_meta"`** — extracts labels from the RFC 5424 syslog header:
+- `host` — the hostname field (e.g. `clab-testlab-router1`)
+- `app` — the app-name field (process that generated the log)
+- `severity` — syslog severity level
+- `facility` — syslog facility
+
+**`loki.process "vendor_detection"`** — applies per-vendor `stage.match` blocks that add a `vendor` label and optionally parse the message body with a regex. All logs from different vendors land in the same Loki stream but are fully distinguishable by label.
 
 Example: after processing a log from `clab-testlab-router1`, the resulting label set looks like:
 
@@ -101,13 +103,13 @@ set / system logging remote-server 172.20.20.100 port 1514
 set / system logging remote-server 172.20.20.100 subsystem all severity informational
 ```
 
-This configures a remote syslog destination at `172.20.20.100:1514` (the Promtail container). All subsystems at severity `informational` and above are forwarded. SR Linux management-plane traffic (including syslog) automatically uses the `mgmt` network instance, so no explicit network-instance binding is needed here.
+This configures a remote syslog destination at `172.20.20.100:1514` (the Alloy container). All subsystems at severity `informational` and above are forwarded. SR Linux management-plane traffic (including syslog) automatically uses the `mgmt` network instance, so no explicit network-instance binding is needed here.
 
 ---
 
 ## Adding a New Vendor
 
-The steps are the same regardless of vendor. Promtail already has pipeline stages for Arista EOS, Cisco IOS-XR, and Cisco IOS-XE in `monitoring/promtail/config.yml`.
+The steps are the same regardless of vendor. Alloy already has pipeline stages for Arista EOS, Cisco IOS-XR, and Cisco IOS-XE in `monitoring/alloy/config.alloy`.
 
 ### Step 1 — Add the node to the topology
 
@@ -123,7 +125,7 @@ leaf1:
 
 ### Step 2 — Configure syslog forwarding on the device
 
-Each vendor has its own command to point syslog at the Promtail receiver (`172.20.20.100:1514`):
+Each vendor has its own command to point syslog at the Alloy receiver (`172.20.20.100:1514`):
 
 | Vendor | Command |
 |---|---|
@@ -149,28 +151,29 @@ logging on
 !
 ```
 
-### Step 3 — Adjust the vendor detection regex in Promtail (if needed)
+### Step 3 — Adjust the vendor detection regex in Alloy (if needed)
 
-Open `monitoring/promtail/config.yml` and find the `match` block for your vendor. The selector matches on the `host` label, which is the hostname that appears in the syslog message — by default the container name assigned by containerlab (`clab-<lab>-<node-name>`).
+Open `monitoring/alloy/config.alloy` and find the `stage.match` block for your vendor. The selector matches on the `host` label, which is the hostname that appears in the syslog message — by default the container name assigned by containerlab (`clab-<lab>-<node-name>`).
 
 For example, if you named your Arista node `leaf1` the container will be `clab-testlab-leaf1`. The existing Arista selector already covers this:
 
-```yaml
-- match:
-    selector: '{host=~"clab-testlab-.*(eos|arista|leaf|spine).*"}'
+```alloy
+stage.match {
+  selector = "{host=~\"clab-testlab-.*(eos|arista|leaf|spine).*\"}"
+  ...
+}
 ```
 
-If your node name doesn't match any existing pattern, add a new `match` block:
+If your node name doesn't match any existing pattern, add a new `stage.match` block:
 
-```yaml
-- match:
-    selector: '{host="clab-testlab-leaf1"}'
-    stages:
-      - static_labels:
-          vendor: arista_eos
+```alloy
+stage.match {
+  selector = "{host=\"clab-testlab-leaf1\"}"
+  stage.static_labels {
+    values = { vendor = "arista_eos" }
+  }
+}
 ```
-
-No restart of any component is needed — Promtail hot-reloads its config.
 
 ---
 
@@ -218,7 +221,7 @@ testlab.clab.yml                            ← mgmt network + monitoring nodes 
 configs/
   srl-syslog.cfg                            ← SR Linux: sets remote-server 172.20.20.100:1514
 monitoring/
-  promtail/config.yml                       ← syslog receiver + per-vendor pipeline stages
+  alloy/config.alloy                        ← syslog receiver + per-vendor pipeline stages
   loki/config.yml                           ← storage config (filesystem, single-node)
   grafana/
     provisioning/datasources/loki.yml       ← auto-provisions Loki datasource in Grafana

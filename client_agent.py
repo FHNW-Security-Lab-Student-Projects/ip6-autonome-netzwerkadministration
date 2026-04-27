@@ -54,12 +54,12 @@ INSTRUCTIONS = (
     '  Skills:\n'
     '    - Discover Network Topology: Returns the latest cached network topology with a Mermaid '
     'diagram and link/node details.\n\n'
-    '- call_syslog_agent (Syslog Incident Agent): Monitors Nokia SR Linux syslog via Loki. '
-    'Automatically opens incidents for error/critical/alert/emergency events and runs '
+    '- call_syslog_agent (Syslog Investigation Agent): Monitors Nokia SR Linux syslog via Loki. '
+    'Automatically opens investigations for error/critical/alert/emergency events and runs '
     'LLM-driven investigation. Supports listing, inspecting, and continuing troubleshooting.\n'
     '  Skills:\n'
-    '    - Syslog Incident Management: List active syslog incidents, get full investigation '
-    'details, or continue LLM-driven troubleshooting for a specific incident.\n'
+    '    - Syslog Investigation Management: List active syslog investigations, get full investigation '
+    'details, or continue LLM-driven troubleshooting for a specific investigation.\n'
     '  Return type: SyslogAgentResult. If needs_clarification is true, ask the user the '
     'clarifying_questions before calling again with the complete information.\n\n'
     'Delegate requests to the appropriate sub-agent.\n\n'
@@ -93,7 +93,7 @@ async def call_topology_agent() -> str:
 
 @orchestrator.tool_plain
 async def call_syslog_agent(request: str) -> SyslogAgentResult:
-    """Query the Syslog Incident Agent — list incidents, get details, or continue troubleshooting.
+    """Query the Syslog Investigation Agent — list investigations, get details, or continue troubleshooting.
     Return type: SyslogAgentResult. If needs_clarification is true, ask the user the
     clarifying_questions before calling again with the complete information.
     """

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Syslog MCP Server
 
-Provides Loki-specific tools for the Syslog Incident Agent:
+Provides Loki-specific tools for the Syslog Investigation Agent:
 - query_loki: Query Nokia SR Linux syslog from Loki around a point in time
 
 Network tools (execute_show_command, get_device_info, list_all_devices)
