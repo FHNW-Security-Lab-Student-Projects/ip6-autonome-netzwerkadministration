@@ -5,6 +5,7 @@ __pycache__/
 CLAUDE.md
 .mcp.json
 .mypy_cache/
+incidents.json
 
 # Containerlab runtime output (auto-generated on clab deploy)
 clab-testlab/
