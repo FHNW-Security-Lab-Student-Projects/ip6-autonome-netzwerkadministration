@@ -209,9 +209,12 @@ _HTML = """<!DOCTYPE html>
           render(data);
           document.getElementById('meta').textContent =
             `${Object.keys(data).length} incident(s) — last updated ${new Date().toLocaleTimeString()} (auto-refreshes every 5 s) · click a row for details`;
+        } else {
+          const body = await resp.text();
+          document.getElementById('meta').textContent = `Server error ${resp.status}: ${body}`;
         }
       } catch (e) {
-        document.getElementById('meta').textContent = 'Could not load incidents.json';
+        document.getElementById('meta').textContent = `Could not reach server: ${e}`;
       }
     }
     refresh();
@@ -224,8 +227,12 @@ _HTML = """<!DOCTYPE html>
 async def get_incidents(request: Request) -> JSONResponse:
     if not INCIDENTS_FILE.exists():
         return JSONResponse({})
-    text = INCIDENTS_FILE.read_text().strip()
-    return JSONResponse(json.loads(text) if text else {})
+    try:
+        text = INCIDENTS_FILE.read_text().strip()
+        return JSONResponse(json.loads(text) if text else {})
+    except Exception as exc:
+        logging.exception('Failed to read incidents.json')
+        return JSONResponse({'error': str(exc)}, status_code=500)
 
 
 async def get_index(request: Request) -> HTMLResponse:
