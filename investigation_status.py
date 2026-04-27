@@ -8,6 +8,7 @@ Then open http://127.0.0.1:7933
 
 import json
 import logging
+import os
 from pathlib import Path
 
 import uvicorn
@@ -97,7 +98,7 @@ _HTML = """<!DOCTYPE html>
 
   <script>
     let _allInvestigations = {};
-    let _selectedId = null;
+    let _selectedId = new URLSearchParams(window.location.search).get('id');
     let _historyExpanded = false;
 
     function badge(status) {
@@ -246,4 +247,5 @@ app = Starlette(routes=[
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    uvicorn.run(app, host='127.0.0.1', port=7933)
+    port = int(os.getenv('INVESTIGATION_STATUS_PORT', '7933'))
+    uvicorn.run(app, host='127.0.0.1', port=port)

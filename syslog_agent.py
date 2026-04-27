@@ -57,6 +57,7 @@ LOKI_POLL_INTERVAL = 30  # seconds
 
 
 INVESTIGATIONS_FILE = Path(__file__).parent / 'investigations.json'
+INVESTIGATION_STATUS_URL = f"http://127.0.0.1:{os.getenv('INVESTIGATION_STATUS_PORT', '7933')}"
 
 
 class InvestigationStatus(str, Enum):
@@ -440,6 +441,12 @@ syslog_agent = Agent(
         'You are a syslog investigation management assistant for Nokia SR Linux network devices. '
         'Always use tools to answer — never guess investigation IDs, statuses, or findings. '
         'When the user mentions a partial ID, pass it as-is to the relevant tool.\n\n'
+        'BACKGROUND TASKS — IMPORTANT:\n'
+        'When you call continue_investigation or open_manual_investigation, the investigation runs '
+        'asynchronously in the background. After the tool confirms the task has started, respond '
+        'immediately with a confirmation and tell the user to check investigation_status.py for '
+        'live progress. Do NOT call get_investigation_detail afterwards — results are not yet '
+        'available and repeated calls waste tokens without producing new information.\n\n'
         'OUTPUT FORMAT:\n'
         'Always respond with a SyslogAgentResult:\n'
         '- answer: your response or findings (null if needs_clarification is true)\n'
@@ -560,7 +567,10 @@ async def continue_investigation(investigation_id: str, follow_up: str = '') -> 
     )
     return (
         f'Continuation started for investigation `{inv.investigation_id[:8]}`. '
-        f'The investigation is running in the background — use `get_investigation_detail` in ~60s to see the results.'
+        f'The investigation is running in the background. '
+        f'The user can follow progress at: {INVESTIGATION_STATUS_URL}/?id={inv.investigation_id} '
+        f'— tell them to open that URL in a browser (requires investigation_status.py to be running; '
+        f'if it is not, they can start it and visit the link then).'
     )
 
 
@@ -598,7 +608,10 @@ async def open_manual_investigation(description: str, device: str = '') -> str:
     )
     return (
         f'Investigation `{inv.investigation_id[:8]}` opened and started. '
-        f'Use `get_investigation_detail` in ~60s to see the findings.'
+        f'The investigation is running in the background. '
+        f'The user can follow progress at: {INVESTIGATION_STATUS_URL}/?id={inv.investigation_id} '
+        f'— tell them to open that URL in a browser (requires investigation_status.py to be running; '
+        f'if it is not, they can start it and visit the link then).'
     )
 
 
