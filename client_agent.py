@@ -33,7 +33,7 @@ if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5',
+    'z-ai/glm-5.1',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
 )
 
@@ -89,6 +89,13 @@ async def call_topology_agent() -> str:
     if response is None:
         return 'Topology cache is still warming up — please retry in a moment.'
     return response
+
+
+@orchestrator.tool_plain
+async def sleep_test(seconds: int) -> str:
+    """Sleep for the given number of seconds and return a confirmation. Used to test timeout behaviour."""
+    await asyncio.sleep(seconds)
+    return f'Slept {seconds}s successfully.'
 
 
 @orchestrator.tool_plain

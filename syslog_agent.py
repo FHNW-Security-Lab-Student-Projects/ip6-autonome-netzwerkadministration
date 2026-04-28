@@ -169,7 +169,7 @@ _load_investigations()
 # ---------------------------------------------------------------------------
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5',
+    'z-ai/glm-5.1',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
     settings=ModelSettings(parallel_tool_calls=True),
 )
@@ -458,12 +458,17 @@ syslog_agent = Agent(
         'You are a syslog investigation management assistant for Nokia SR Linux network devices. '
         'Never guess investigation IDs, statuses, or findings. '
         'When the user mentions a partial ID, pass it as-is to the relevant tool.\n\n'
-        'BACKGROUND TASKS — IMPORTANT:\n'
-        'When you call continue_investigation or open_manual_investigation, the investigation runs '
-        'asynchronously in the background. After the tool confirms the task has started, respond '
-        'immediately with a confirmation and tell the user to check investigation_status.py for '
-        'live progress. Do NOT call get_investigation_detail afterwards — results are not yet '
-        'available and repeated calls waste tokens without producing new information.\n\n'
+        'INVESTIGATION CONTINUATIONS — SYNC VS ASYNC:\n'
+        'continue_investigation has a synchronous parameter.\n'
+        '- Use synchronous=True (default) to wait for the result inline — the tool blocks until '
+        'the investigation finishes and returns the full result directly. '
+        'Do NOT call get_investigation_detail afterwards.\n'
+        '- Use synchronous=False only when the user explicitly asks to run it in the background '
+        '(e.g. "run it in the background"'
+        'The task runs in the background; respond with a confirmation and the status UI URL.\n'
+        'open_manual_investigation always runs asynchronously. After it confirms the task has started, '
+        'respond immediately with a confirmation and tell the user to check investigation_status.py for '
+        'live progress. Do NOT call get_investigation_detail afterwards.\n\n'
         'OUTPUT FORMAT:\n'
         'Always respond with a SyslogAgentResult:\n'
         '- answer: your response or findings (null if needs_clarification is true)\n'
@@ -554,7 +559,11 @@ async def _run_continuation(inv: Investigation, follow_up_text: str) -> None:
 
 
 @syslog_agent.tool_plain
-async def continue_investigation(investigation_id: str, follow_up: str = '') -> str:
+async def continue_investigation(
+    investigation_id: str,
+    follow_up: str = '',
+    synchronous: bool = True,
+) -> str:
     """Resume LLM-driven troubleshooting for an existing investigation.
 
     Args:
@@ -562,10 +571,15 @@ async def continue_investigation(investigation_id: str, follow_up: str = '') -> 
         follow_up: Optional instruction or question for the investigator
                    (e.g. "check neighboring devices" or "focus on BGP").
                    Defaults to a generic continue-and-summarise prompt.
+        synchronous: If True (default), wait for the investigation to finish
+                     and return the full result directly. If False, start the
+                     continuation in the background and return immediately —
+                     use this only when the user explicitly asks to run in
+                     the background.
 
     Returns:
-        Confirmation that the continuation has started. Results are saved to
-        the investigation and can be retrieved via get_investigation_detail once complete.
+        If synchronous=False: confirmation that the continuation has started.
+        If synchronous=True: the full investigation result once complete.
         If an investigation is already running, returns the current findings.
     """
     inv = _find_investigation(investigation_id)
@@ -579,6 +593,12 @@ async def continue_investigation(investigation_id: str, follow_up: str = '') -> 
     follow_up_text = follow_up or 'Please continue the investigation and provide updated findings.'
     inv.status = InvestigationStatus.investigating
     _persist_investigations()
+    if synchronous:
+        await _run_continuation(inv, follow_up_text)
+        return (
+            f'## Investigation `{inv.investigation_id[:8]}` — continuation complete\n\n'
+            + _format_investigation_detail(inv)
+        )
     inv.bg_task = asyncio.create_task(
         _run_continuation(inv, follow_up_text),
         name=f'continuation-{inv.investigation_id[:8]}',
