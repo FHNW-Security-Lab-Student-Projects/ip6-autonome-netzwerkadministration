@@ -23,6 +23,7 @@ import os
 
 import httpx
 import logfire
+import uvicorn
 from dotenv import dotenv_values, load_dotenv
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelMessagesTypeAdapter
@@ -30,6 +31,10 @@ from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 load_dotenv(Path(__file__).parent / '.env')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
@@ -58,6 +63,7 @@ LOKI_POLL_INTERVAL = 30  # seconds
 
 INVESTIGATIONS_FILE = Path(__file__).parent / 'investigations.json'
 INVESTIGATION_STATUS_URL = f"http://127.0.0.1:{os.getenv('INVESTIGATION_STATUS_PORT', '7933')}"
+AGENT_API_PORT = int(os.getenv('AGENT_API_PORT', '7934'))
 
 
 class InvestigationStatus(str, Enum):
@@ -385,6 +391,24 @@ def _find_investigation(fragment: str) -> Investigation | None:
     return None
 
 
+async def _api_resolve_investigation(request: Request) -> JSONResponse:
+    inv_id = request.path_params['investigation_id']
+    inv = _find_investigation(inv_id)
+    if inv is None:
+        return JSONResponse({'error': f'No investigation matching "{inv_id}"'}, status_code=404)
+    if inv.bg_task and not inv.bg_task.done():
+        return JSONResponse({'error': 'Investigation is still running'}, status_code=409)
+    inv.status = InvestigationStatus.resolved
+    _persist_investigations()
+    logfire.info('Investigation resolved via UI', investigation_id=inv.investigation_id)
+    return JSONResponse({'ok': True})
+
+
+_agent_api = Starlette(routes=[
+    Route('/investigations/{investigation_id}/resolve', _api_resolve_investigation, methods=['POST']),
+])
+
+
 def _format_investigation_list() -> str:
     if not _investigations:
         return 'No investigations recorded yet.'
@@ -439,7 +463,7 @@ syslog_agent = Agent(
     output_type=SyslogAgentResult,
     instructions=(
         'You are a syslog investigation management assistant for Nokia SR Linux network devices. '
-        'Always use tools to answer — never guess investigation IDs, statuses, or findings. '
+        'Never guess investigation IDs, statuses, or findings. '
         'When the user mentions a partial ID, pass it as-is to the relevant tool.\n\n'
         'BACKGROUND TASKS — IMPORTANT:\n'
         'When you call continue_investigation or open_manual_investigation, the investigation runs '
@@ -561,6 +585,7 @@ async def continue_investigation(investigation_id: str, follow_up: str = '') -> 
         )
     follow_up_text = follow_up or 'Please continue the investigation and provide updated findings.'
     inv.status = InvestigationStatus.investigating
+    _persist_investigations()
     inv.bg_task = asyncio.create_task(
         _run_continuation(inv, follow_up_text),
         name=f'continuation-{inv.investigation_id[:8]}',
@@ -632,13 +657,17 @@ async def handle_syslog_request(user_text: str) -> SyslogAgentResult:
 
 @asynccontextmanager
 async def syslog_lifespan():
-    """Start the MCP subprocess and Loki poller for the syslog agent."""
+    """Start the MCP subprocess, Loki poller, and agent API server for the syslog agent."""
     print('Starting syslog agent background tasks...')
+    api_config = uvicorn.Config(_agent_api, host='127.0.0.1', port=AGENT_API_PORT, log_level='warning')
+    api_server = uvicorn.Server(api_config)
+    api_server.install_signal_handlers = lambda: None  # signal handling owned by the main process
     async with syslog_investigator, syslog_deep_investigator:
         async with httpx.AsyncClient(timeout=30) as http_client:
             poll_task = asyncio.create_task(_loki_poll_loop(http_client))
+            api_task = asyncio.create_task(api_server.serve())
             try:
-                print('Syslog agent MCP server running. Loki poller active.')
+                print(f'Syslog agent MCP server running. Loki poller active. Agent API on port {AGENT_API_PORT}.')
                 yield
             finally:
                 poll_task.cancel()
@@ -646,6 +675,8 @@ async def syslog_lifespan():
                     await poll_task
                 except asyncio.CancelledError:
                     pass
+                api_server.should_exit = True
+                await api_task
                 running = [
                     inv.bg_task for inv in _investigations.values()
                     if inv.bg_task and not inv.bg_task.done()

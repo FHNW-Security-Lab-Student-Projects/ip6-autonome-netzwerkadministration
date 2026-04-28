@@ -11,6 +11,7 @@ import logging
 import os
 from pathlib import Path
 
+import httpx
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -18,6 +19,7 @@ from starlette.responses import HTMLResponse, JSONResponse
 from starlette.routing import Route
 
 INVESTIGATIONS_FILE = Path(__file__).parent / 'investigations.json'
+AGENT_API_URL = f"http://127.0.0.1:{os.getenv('AGENT_API_PORT', '7934')}"
 
 _HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -35,7 +37,8 @@ _HTML = """<!DOCTYPE html>
     tr.selected td { background: #1c2128; }
     .id { font-weight: bold; color: #79c0ff; }
     .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 2rem; font-size: 0.75rem; font-weight: bold; }
-    .investigating { background: #1f3d5a; color: #58a6ff; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    .investigating { background: #1f3d5a; color: #58a6ff; animation: pulse 1.6s ease-in-out infinite; }
     .waiting      { background: #2d2009; color: #e3b341; }
     .resolved     { background: #122d22; color: #3fb950; }
     .summary-cell { color: #8b949e; max-width: 40rem; }
@@ -48,6 +51,10 @@ _HTML = """<!DOCTYPE html>
     #detail .close-btn { float: right; background: none; border: 1px solid #30363d; color: #8b949e;
                          padding: 0.2rem 0.6rem; border-radius: 0.3rem; cursor: pointer; font-family: monospace; }
     #detail .close-btn:hover { color: #c9d1d9; border-color: #8b949e; }
+    #detail .resolve-btn { float: right; margin-right: 0.5rem; background: none; border: 1px solid #238636;
+                           color: #3fb950; padding: 0.2rem 0.6rem; border-radius: 0.3rem; cursor: pointer; font-family: monospace; }
+    #detail .resolve-btn:hover { background: #122d22; }
+    #detail .resolve-btn:disabled { opacity: 0.4; cursor: default; }
     .detail-meta { color: #8b949e; font-size: 0.85rem; margin-bottom: 1rem; }
     .detail-section { margin-top: 1.25rem; }
     .detail-section h3 { color: #8b949e; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
@@ -72,6 +79,7 @@ _HTML = """<!DOCTYPE html>
 
   <div id="detail">
     <button class="close-btn" onclick="closeDetail()">✕ close</button>
+    <button class="resolve-btn" id="d-resolve-btn" onclick="resolveInvestigation()">✓ mark resolved</button>
     <h2 id="d-title"></h2>
     <div class="detail-meta" id="d-meta"></div>
     <div class="detail-section">
@@ -135,6 +143,10 @@ _HTML = """<!DOCTYPE html>
         `Device: <strong>${esc(inv.device)}</strong> &nbsp;|&nbsp; ` +
         `Status: ${badge(inv.status)} &nbsp;|&nbsp; ` +
         `Created: ${new Date(inv.created_at).toLocaleString()}`;
+      const resolveBtn = document.getElementById('d-resolve-btn');
+      resolveBtn.style.display = inv.status === 'resolved' ? 'none' : '';
+      resolveBtn.disabled = false;
+      resolveBtn.textContent = '✓ mark resolved';
       document.getElementById('d-trigger').textContent = inv.triggering_event;
       document.getElementById('d-summary').textContent = inv.summary || '(investigation in progress…)';
 
@@ -167,6 +179,28 @@ _HTML = """<!DOCTYPE html>
       _historyExpanded = false;
       document.getElementById('detail').classList.remove('open');
       document.querySelectorAll('tr.clickable').forEach(r => r.classList.remove('selected'));
+    }
+
+    async function resolveInvestigation() {
+      if (!_selectedId) return;
+      const btn = document.getElementById('d-resolve-btn');
+      btn.disabled = true;
+      btn.textContent = 'resolving…';
+      try {
+        const resp = await fetch(`/investigations/${_selectedId}/resolve`, { method: 'POST' });
+        if (resp.ok) {
+          await refresh();
+        } else {
+          const body = await resp.text();
+          toast(`Error: ${body}`);
+          btn.disabled = false;
+          btn.textContent = '✓ mark resolved';
+        }
+      } catch (e) {
+        toast(`Error: ${e}`);
+        btn.disabled = false;
+        btn.textContent = '✓ mark resolved';
+      }
     }
 
     function render(data) {
@@ -236,6 +270,24 @@ async def get_investigations(request: Request) -> JSONResponse:
         return JSONResponse({'error': str(exc)}, status_code=500)
 
 
+async def resolve_investigation(request: Request) -> JSONResponse:
+    inv_id = request.path_params['investigation_id']
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.post(f'{AGENT_API_URL}/investigations/{inv_id}/resolve')
+        if resp.status_code == 409:
+            return JSONResponse({'error': 'Investigation is still running'}, status_code=409)
+        return JSONResponse(resp.json(), status_code=resp.status_code)
+    except httpx.ConnectError:
+        return JSONResponse(
+            {'error': 'Agent is not running — start the agent first, then retry.'},
+            status_code=503,
+        )
+    except Exception:
+        logging.exception('Failed to contact agent API')
+        return JSONResponse({'error': 'Internal error'}, status_code=500)
+
+
 async def get_index(request: Request) -> HTMLResponse:
     return HTMLResponse(_HTML)
 
@@ -243,6 +295,7 @@ async def get_index(request: Request) -> HTMLResponse:
 app = Starlette(routes=[
     Route('/', get_index),
     Route('/investigations', get_investigations),
+    Route('/investigations/{investigation_id}/resolve', resolve_investigation, methods=['POST']),
 ])
 
 if __name__ == '__main__':
