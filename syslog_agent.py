@@ -185,8 +185,8 @@ syslog_mcp_server = MCPServerStdio(
 )
 
 INVESTIGATOR_INSTRUCTIONS_CONTINUATION = (
-    'You are a network investigator for Nokia SR Linux devices performing a deep-dive '
-    'continuation of a prior triage. The conversation history contains initial findings — '
+    'You are a network investigator for Nokia SR Linux devices performing a further '
+    'analysis of a prior triage. The conversation history contains initial findings — '
     'do NOT repeat queries or commands already executed.\n\n'
     'INVESTIGATION STRATEGY:\n'
     '1. Review the prior findings in the conversation history.\n'
@@ -235,13 +235,6 @@ INVESTIGATOR_INSTRUCTIONS_TRIAGE = (
 syslog_investigator = Agent(
     model=llm,
     name='syslog_investigator',
-    toolsets=[network_mcp_server, syslog_mcp_server],
-    instructions=INVESTIGATOR_INSTRUCTIONS_TRIAGE,
-)
-
-syslog_deep_investigator = Agent(
-    model=llm,
-    name='syslog_deep_investigator',
     toolsets=[network_mcp_server, syslog_mcp_server],
 )
 
@@ -355,7 +348,7 @@ async def _run_troubleshooting(inv: Investigation) -> None:
     try:
         with logfire.span('investigation', investigation_id=inv.investigation_id, device=inv.device):
             async with asyncio.timeout(90):
-                result = await syslog_investigator.run(prompt, message_history=inv.message_history)
+                result = await syslog_investigator.run(prompt, message_history=inv.message_history, instructions=INVESTIGATOR_INSTRUCTIONS_TRIAGE)
         inv.investigation_log.append(('auto_investigation', str(result.output)))
         inv.message_history = result.all_messages()
         inv.summary = str(result.output)
@@ -515,7 +508,7 @@ async def _run_manual_investigation(inv: Investigation, prompt: str) -> None:
     """LLM-driven manual investigation launched as a background asyncio task."""
     try:
         with logfire.span('manual_investigation', investigation_id=inv.investigation_id):
-            result = await syslog_deep_investigator.run(
+            result = await syslog_investigator.run(
                 prompt,
                 instructions=INVESTIGATOR_INSTRUCTIONS_USER_INITIATED,
             )
@@ -539,7 +532,7 @@ async def _run_continuation(inv: Investigation, follow_up_text: str) -> None:
     """LLM-driven continuation launched as a background asyncio task."""
     try:
         with logfire.span('investigation_user_continuation', investigation_id=inv.investigation_id):
-            result = await syslog_deep_investigator.run(
+            result = await syslog_investigator.run(
                 follow_up_text,
                 message_history=inv.message_history,
                 instructions=INVESTIGATOR_INSTRUCTIONS_CONTINUATION,
@@ -662,7 +655,7 @@ async def syslog_lifespan():
     api_config = uvicorn.Config(_agent_api, host='127.0.0.1', port=AGENT_API_PORT, log_level='warning')
     api_server = uvicorn.Server(api_config)
     api_server.install_signal_handlers = lambda: None  # signal handling owned by the main process
-    async with syslog_investigator, syslog_deep_investigator:
+    async with syslog_investigator:
         async with httpx.AsyncClient(timeout=30) as http_client:
             poll_task = asyncio.create_task(_loki_poll_loop(http_client))
             api_task = asyncio.create_task(api_server.serve())
