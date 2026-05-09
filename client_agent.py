@@ -12,7 +12,13 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from network_agent import NetworkAgentResult, network_agent, network_lifespan
 from topology_agent import get_topology_response, topology_lifespan
-from syslog_agent import SyslogAgentResult, handle_syslog_request, syslog_lifespan
+from syslog_investigations import (
+    syslog_lifespan,
+    list_investigations,
+    get_investigation_detail,
+    open_manual_investigation,
+    continue_investigation,
+)
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -54,14 +60,23 @@ INSTRUCTIONS = (
     '  Skills:\n'
     '    - Discover Network Topology: Returns the latest cached network topology with a Mermaid '
     'diagram and link/node details.\n\n'
-    '- call_syslog_agent (Syslog Investigation Agent): Monitors Nokia SR Linux syslog via Loki. '
-    'Automatically opens investigations for error/critical/alert/emergency events and runs '
-    'LLM-driven investigation. Supports listing, inspecting, and continuing troubleshooting.\n'
-    '  Skills:\n'
-    '    - Syslog Investigation Management: List active syslog investigations, get full investigation '
-    'details, or continue LLM-driven troubleshooting for a specific investigation.\n'
-    '  Return type: SyslogAgentResult. If needs_clarification is true, ask the user the '
-    'clarifying_questions before calling again with the complete information.\n\n'
+    '- Syslog Investigation Tools: Monitor Nokia SR Linux syslog via Loki. '
+    'Investigations are opened automatically from Loki events or manually when the user reports a problem.\n'
+    '  Tools:\n'
+    '    - list_syslog_investigations: List all investigations (ID, device, status, summary).\n'
+    '    - get_syslog_investigation(investigation_id): Full details of one investigation.\n'
+    '    - open_syslog_investigation(description, device): Open a new persistent investigation '
+    'written to disk. ONLY call this when the user\'s message starts with the exact prefix '
+    '"/investigate". Strip the prefix and pass the remainder as the description. '
+    'Never call this based on inferred intent alone.\n'
+    '    - continue_syslog_investigation(investigation_id, follow_up, background): Resume '
+    'LLM-driven troubleshooting. By default waits for the result (background=False). '
+    'Set background=True only if the user explicitly asks to run it in the background.\n\n'
+    'STATEFUL INVESTIGATIONS:\n'
+    'open_syslog_investigation persists an investigation to disk. Only call it when the user\'s '
+    'message starts with the exact prefix "/investigate". For all other syslog-related requests '
+    '— questions, listing, status checks, continuations — use the read-only tools or answer '
+    'conversationally. Never call open_syslog_investigation based on inferred intent alone.\n\n'
     'Delegate requests to the appropriate sub-agent.\n\n'
     'When composing the `request` argument for any sub-agent call, write it as a '
     'self-contained message — the sub-agent has no access to the conversation history '
@@ -99,12 +114,45 @@ async def sleep_test(seconds: int) -> str:
 
 
 @orchestrator.tool_plain
-async def call_syslog_agent(request: str) -> SyslogAgentResult:
-    """Query the Syslog Investigation Agent — list investigations, get details, or continue troubleshooting.
-    Return type: SyslogAgentResult. If needs_clarification is true, ask the user the
-    clarifying_questions before calling again with the complete information.
+def list_syslog_investigations() -> str:
+    """List all syslog investigations (ID, device, status, created, summary)."""
+    return list_investigations()
+
+
+@orchestrator.tool_plain
+def get_syslog_investigation(investigation_id: str) -> str:
+    """Get full details of a specific syslog investigation by ID or unique prefix."""
+    return get_investigation_detail(investigation_id)
+
+
+@orchestrator.tool_plain
+async def open_syslog_investigation(description: str, device: str = '') -> str:
+    """Open a new user-reported investigation and start LLM-driven analysis in the background.
+
+    Use this when the user describes a new problem — not when they reference an existing investigation.
+
+    Args:
+        description: The user's problem description.
+        device: Optional short device name hint (e.g. "router1"). Leave empty if unknown.
     """
-    return await handle_syslog_request(request)
+    return await open_manual_investigation(description, device)
+
+
+@orchestrator.tool_plain
+async def continue_syslog_investigation(
+    investigation_id: str,
+    follow_up: str = '',
+    background: bool = False,
+) -> str:
+    """Resume LLM-driven troubleshooting for an existing investigation.
+
+    Args:
+        investigation_id: Full ID or unique prefix of the investigation.
+        follow_up: Optional focus instruction (e.g. "check neighboring devices").
+        background: If True, start in the background and return immediately.
+                    Only use when the user explicitly asks to run in the background.
+    """
+    return await continue_investigation(investigation_id, follow_up, synchronous=not background)
 
 
 @asynccontextmanager

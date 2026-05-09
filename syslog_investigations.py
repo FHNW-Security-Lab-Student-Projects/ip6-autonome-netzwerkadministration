@@ -5,7 +5,7 @@ error/critical/alert/emergency events and runs background LLM investigation.
 Supports listing, inspecting, and continuing troubleshooting of investigations.
 
 Import and use via agent delegation:
-    from syslog_agent import handle_syslog_request, syslog_lifespan
+    from syslog_investigations import syslog_lifespan, list_investigations, get_investigation_detail
 """
 
 import asyncio
@@ -40,12 +40,6 @@ load_dotenv(Path(__file__).parent / '.env')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
-
-class SyslogAgentResult(BaseModel):
-    answer: str | None = None
-    needs_clarification: bool = False
-    clarifying_questions: list[str] = []
-
 
 
 # ---------------------------------------------------------------------------
@@ -446,39 +440,9 @@ def _format_investigation_detail(inv: Investigation) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Syslog Dispatch Agent — LLM-driven user request handler
+# Investigation query / action functions (called directly by the orchestrator)
 # ---------------------------------------------------------------------------
 
-syslog_agent = Agent(
-    model=llm,
-    name='syslog_agent',
-    toolsets=[network_mcp_server, syslog_mcp_server],
-    output_type=SyslogAgentResult,
-    instructions=(
-        'You are a syslog investigation management assistant for Nokia SR Linux network devices. '
-        'Never guess investigation IDs, statuses, or findings. '
-        'When the user mentions a partial ID, pass it as-is to the relevant tool.\n\n'
-        'INVESTIGATION CONTINUATIONS — SYNC VS ASYNC:\n'
-        'continue_investigation has a synchronous parameter.\n'
-        '- Use synchronous=True (default) to wait for the result inline — the tool blocks until '
-        'the investigation finishes and returns the full result directly. '
-        'Do NOT call get_investigation_detail afterwards.\n'
-        '- Use synchronous=False only when the user explicitly asks to run it in the background '
-        '(e.g. "run it in the background"'
-        'The task runs in the background; respond with a confirmation and the status UI URL.\n'
-        'open_manual_investigation always runs asynchronously. After it confirms the task has started, '
-        'respond immediately with a confirmation and tell the user to check investigation_status.py for '
-        'live progress. Do NOT call get_investigation_detail afterwards.\n\n'
-        'OUTPUT FORMAT:\n'
-        'Always respond with a SyslogAgentResult:\n'
-        '- answer: your response or findings (null if needs_clarification is true)\n'
-        '- needs_clarification: true if required information is missing to fulfil the request\n'
-        '- clarifying_questions: specific questions to ask the user (empty if needs_clarification is false)'
-    ),
-)
-
-
-@syslog_agent.tool_plain
 def list_investigations() -> str:
     """List all known syslog investigations.
 
@@ -490,7 +454,6 @@ def list_investigations() -> str:
     return _format_investigation_list()
 
 
-@syslog_agent.tool_plain
 def get_investigation_detail(investigation_id: str) -> str:
     """Get full details of a specific investigation.
 
@@ -558,7 +521,6 @@ async def _run_continuation(inv: Investigation, follow_up_text: str) -> None:
         print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} continuation failed: {exc}', flush=True)
 
 
-@syslog_agent.tool_plain
 async def continue_investigation(
     investigation_id: str,
     follow_up: str = '',
@@ -612,7 +574,6 @@ async def continue_investigation(
     )
 
 
-@syslog_agent.tool_plain
 async def open_manual_investigation(description: str, device: str = '') -> str:
     """Open a new investigation from a user-reported problem and start investigating in the background.
 
@@ -651,17 +612,6 @@ async def open_manual_investigation(description: str, device: str = '') -> str:
         f'— tell them to open that URL in a browser (requires investigation_status.py to be running; '
         f'if it is not, they can start it and visit the link then).'
     )
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-async def handle_syslog_request(user_text: str) -> SyslogAgentResult:
-    """Handle a user request about syslog investigations via the syslog_agent LLM."""
-    with logfire.span('handle_syslog_request', user_text=user_text):
-        result = await syslog_agent.run(user_text)
-    return result.output
 
 
 # ---------------------------------------------------------------------------
