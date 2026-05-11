@@ -8,6 +8,7 @@ CLAUDE.md
 incidents.json
 investigations.json
 state_snapshots.json
+config_backups/
 
 # Containerlab runtime output (auto-generated on clab deploy)
 clab-testlab/

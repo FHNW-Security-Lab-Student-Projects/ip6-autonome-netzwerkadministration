@@ -10,6 +10,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
+from config_agent import config_agent, config_lifespan
 from network_agent import NetworkAgentResult, network_agent, network_lifespan
 from topology_agent import get_topology_response, topology_lifespan
 from state_snapshot_agent import snapshot_agent, snapshot_lifespan
@@ -85,6 +86,15 @@ INSTRUCTIONS = (
     '    - Retrieve device state at a specific point in time.\n'
     '    - Diff device state between two timestamps to identify what changed.\n'
     '    - Summarise snapshot coverage across all devices.\n\n'
+    '- call_config_agent (Config Agent): Configure Nokia SR Linux devices.\n'
+    '  ALWAYS follow this two-step workflow — never skip step 2:\n'
+    '  Step 1: Call call_config_agent with "VALIDATE ONLY: <full request>"\n'
+    '           → Returns a diff preview without applying anything.\n'
+    '  Step 2: Show the diff to the user and ask for explicit approval.\n'
+    '  Step 3: Only if the user says yes — call call_config_agent with\n'
+    '           "APPLY (user approved): device=<name> commands=<exact commands from step 1>"\n'
+    '  NEVER call call_config_agent with APPLY intent without prior user approval.\n'
+    '  NEVER apply configuration changes based on inferred intent alone.\n\n'
     'Delegate requests to the appropriate sub-agent.\n\n'
     'When composing the `request` argument for any sub-agent call, write it as a '
     'self-contained message — the sub-agent has no access to the conversation history '
@@ -164,6 +174,17 @@ async def continue_syslog_investigation(
 
 
 @orchestrator.tool_plain
+async def call_config_agent(request: str) -> str:
+    """Delegate a configuration request to the Config Agent.
+
+    Prefix the request with "VALIDATE ONLY:" to preview changes (safe, no commit).
+    Prefix with "APPLY (user approved):" to apply after the user has confirmed the diff.
+    """
+    result = await config_agent.run(request)
+    return result.output
+
+
+@orchestrator.tool_plain
 async def call_snapshot_agent(request: str) -> str:
     """Delegate a historical state query to the Snapshot Agent.
 
@@ -178,7 +199,7 @@ async def call_snapshot_agent(request: str) -> str:
 @asynccontextmanager
 async def main_lifespan():
     """Compose all sub-agent lifespans: MCP servers, topology refresh, Loki poller."""
-    async with network_lifespan(), syslog_lifespan(), topology_lifespan(), snapshot_lifespan():
+    async with network_lifespan(), syslog_lifespan(), topology_lifespan(), snapshot_lifespan(), config_lifespan():
         yield
 
 
