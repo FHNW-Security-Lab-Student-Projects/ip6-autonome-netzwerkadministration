@@ -54,7 +54,7 @@ MAX_SNAPSHOTS = 30      # per device per table — ~1 hour at 2-min intervals
 # SR Linux read-only commands to capture, keyed by table name used in the API
 SNAPSHOT_COMMANDS: dict[str, str] = {
     'route_table': 'show network-instance default route-table',
-    'arp': 'show network-instance default arp-entries',
+    'arp': 'show arpnd arp-entries',
     'interfaces': 'show interface brief',
 }
 
@@ -202,7 +202,7 @@ snapshot_agent = Agent(
 You have access to periodic snapshots of device state captured every 2 minutes.
 Available tables per device:
   - route_table : IP routing table  (show network-instance default route-table)
-  - arp         : ARP entries       (show network-instance default arp-entries)
+  - arp         : ARP entries       (show arpnd arp-entries)
   - interfaces  : Interface status  (show interface brief)
 
 Available devices: router1, router2, switch1, switch2.
