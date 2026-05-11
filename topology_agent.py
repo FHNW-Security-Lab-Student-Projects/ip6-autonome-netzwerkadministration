@@ -56,6 +56,7 @@ class TopologyNode(BaseModel):
     kind: str
     role: str | None = None
     layer: str | None = None
+    ip_address: str | None = None
 
 
 class TopologyLink(BaseModel):
@@ -74,7 +75,8 @@ class TopologyDiff(BaseModel):
 class TopologyResult(BaseModel):
     nodes: dict[str, TopologyNode]
     links: list[TopologyLink]
-    mermaid: str
+    client_links: list[TopologyLink]  # static from YAML, not discovered via LLDP
+    # mermaid: str
     summary: str
     diff: TopologyDiff
 
@@ -282,6 +284,49 @@ def _parse_desired_links(clab_data: dict, network_nodes: set[str]) -> list[Topol
     return desired
 
 
+def _parse_client_nodes(clab_data: dict) -> dict[str, TopologyNode]:
+    """Extract linux nodes labelled role=client from ContainerLab YAML."""
+    clients: dict[str, TopologyNode] = {}
+    for node_name, node_cfg in clab_data.get('topology', {}).get('nodes', {}).items():
+        if node_cfg.get('kind') != 'linux':
+            continue
+        labels = node_cfg.get('labels', {})
+        if labels.get('role') != 'client':
+            continue
+        ip_address = None
+        for cmd in node_cfg.get('exec', []):
+            m = re.search(r'ip addr add (\S+) dev', cmd)
+            if m:
+                ip_address = m.group(1)
+                break
+        clients[node_name] = TopologyNode(
+            name=node_name,
+            kind='linux',
+            role='client',
+            ip_address=ip_address,
+        )
+    return clients
+
+
+def _parse_client_links(clab_data: dict, client_nodes: set[str]) -> list[TopologyLink]:
+    """Extract links from ContainerLab YAML where at least one endpoint is a client node."""
+    client_links: list[TopologyLink] = []
+    for entry in clab_data.get('topology', {}).get('links', []):
+        endpoints = entry.get('endpoints', [])
+        if len(endpoints) != 2:
+            continue
+        node_a, port_a = endpoints[0].split(':', 1)
+        node_b, port_b = endpoints[1].split(':', 1)
+        if node_a in client_nodes or node_b in client_nodes:
+            client_links.append(TopologyLink(
+                node_a=node_a,
+                port_a=_normalize_port(port_a),
+                node_b=node_b,
+                port_b=_normalize_port(port_b),
+            ))
+    return client_links
+
+
 def _compute_diff(
     desired: list[TopologyLink],
     actual: list[TopologyLink],
@@ -332,7 +377,7 @@ async def _discover_topology(clab_file: str = DEFAULT_CLAB_FILE) -> TopologyResu
         return_exceptions=True,
     ))
 
-    # 3. Build nodes dict
+    # 3. Build nodes dict (network devices only)
     nodes: dict[str, TopologyNode] = {}
     for node_name, node_info in nodes_data.items():
         labels = node_info.get('labels', {})
@@ -342,6 +387,11 @@ async def _discover_topology(clab_file: str = DEFAULT_CLAB_FILE) -> TopologyResu
             role=labels.get('role'),
             layer=labels.get('layer'),
         )
+
+    # 3b. Add client nodes from YAML (no SSH — static definition only)
+    client_nodes_data = _parse_client_nodes(clab_data)
+    nodes.update(client_nodes_data)
+    client_links = _parse_client_links(clab_data, set(client_nodes_data.keys()))
 
     # 4. Collect and deduplicate links
     seen_pairs: set[frozenset] = set()
@@ -366,37 +416,53 @@ async def _discover_topology(clab_file: str = DEFAULT_CLAB_FILE) -> TopologyResu
                     port_b=nbr['neighbor_port'],
                 ))
 
-    # 5. Build Mermaid diagram
-    labeled: set[str] = set()
-    mermaid_lines = ['graph TD']
-
-    def _node_label(name: str) -> str:
-        n = nodes[name]
-        label = f'{name}\\n{n.role}' if n.role else name
-        return f'{name}["{label}"]'
-
-    for link in links:
-        a = _node_label(link.node_a) if link.node_a not in labeled else link.node_a
-        b = _node_label(link.node_b) if link.node_b not in labeled else link.node_b
-        labeled.update({link.node_a, link.node_b})
-        mermaid_lines.append(f'  {a} --- {b}')
+    # # 5. Build Mermaid diagram
+    # labeled: set[str] = set()
+    # mermaid_lines = ['graph TD']
+    #
+    # def _node_label(name: str) -> str:
+    #     n = nodes[name]
+    #     parts = [name]
+    #     if n.role:
+    #         parts.append(n.role)
+    #     if n.ip_address:
+    #         parts.append(n.ip_address)
+    #     label = '\\n'.join(parts)
+    #     return f'{name}["{label}"]'
+    #
+    # for link in links:
+    #     a = _node_label(link.node_a) if link.node_a not in labeled else link.node_a
+    #     b = _node_label(link.node_b) if link.node_b not in labeled else link.node_b
+    #     labeled.update({link.node_a, link.node_b})
+    #     mermaid_lines.append(f'  {a} --- {b}')
+    #
+    # for link in client_links:
+    #     a = _node_label(link.node_a) if link.node_a not in labeled else link.node_a
+    #     b = _node_label(link.node_b) if link.node_b not in labeled else link.node_b
+    #     labeled.update({link.node_a, link.node_b})
+    #     mermaid_lines.append(f'  {a} -.- {b}')
 
     # 6. Build summary + drift
     unreachable = [
         r['node'] for r in lldp_results
         if not isinstance(r, Exception) and 'error' in r
     ]
-    summary = f'Discovered {len(nodes)} network devices and {len(links)} links in lab "{lab_name}".'
+    net_device_count = len(nodes_data)
+    summary = (
+        f'Discovered {net_device_count} network devices and {len(client_nodes_data)} clients '
+        f'with {len(links)} network links in lab "{lab_name}".'
+    )
     if unreachable:
         summary += f' Unreachable: {", ".join(unreachable)}.'
 
-    desired_links = _parse_desired_links(clab_data, set(nodes.keys()))
+    desired_links = _parse_desired_links(clab_data, set(nodes_data.keys()))
     diff = _compute_diff(desired_links, links, unreachable)
 
     return TopologyResult(
         nodes=nodes,
         links=links,
-        mermaid='\n'.join(mermaid_lines),
+        client_links=client_links,
+        # mermaid='\n'.join(mermaid_lines),
         summary=summary,
         diff=diff,
     )
@@ -451,13 +517,16 @@ def _format_response(topology: TopologyResult, collected_at: datetime) -> str:
     age_s = int((datetime.now(timezone.utc) - collected_at).total_seconds())
     freshness = f'{age_s}s ago' if age_s < 60 else f'{age_s // 60}m {age_s % 60}s ago'
 
+    network_nodes = {n: v for n, v in topology.nodes.items() if v.role != 'client'}
+    client_nodes = {n: v for n, v in topology.nodes.items() if v.role == 'client'}
+
     lines: list[str] = [
         '## Network Topology Discovery\n',
         f'_Data collected {freshness}_\n',
         topology.summary,
-        f'\n### Network Devices ({len(topology.nodes)})',
+        f'\n### Network Devices ({len(network_nodes)})',
     ]
-    for name, node in topology.nodes.items():
+    for name, node in network_nodes.items():
         meta_parts = [node.kind]
         if node.role:
             meta_parts.append(f'role={node.role}')
@@ -465,11 +534,23 @@ def _format_response(topology: TopologyResult, collected_at: datetime) -> str:
             meta_parts.append(f'layer={node.layer}')
         lines.append(f'- **{name}**: {", ".join(meta_parts)}')
 
-    lines.append(f'\n### Links ({len(topology.links)})')
+    lines.append(f'\n### Links ({len(topology.links)}) — verified via LLDP')
     for link in topology.links:
         lines.append(f'- {link.node_a}:{link.port_a} ↔ {link.node_b}:{link.port_b}')
 
-    lines.append(f'\n### Mermaid Diagram\n```mermaid\n{topology.mermaid}\n```')
+    if topology.client_links:
+        lines.append(f'\n### Client Connections ({len(topology.client_links)}) — static from topology definition')
+        for link in topology.client_links:
+            client_name = (
+                link.node_a
+                if client_nodes.get(link.node_a) is not None
+                else link.node_b
+            )
+            client_node = client_nodes.get(client_name)
+            ip_info = f' ({client_node.ip_address})' if client_node and client_node.ip_address else ''
+            lines.append(f'- {link.node_a}:{link.port_a} ↔ {link.node_b}:{link.port_b}{ip_info}')
+
+    # lines.append(f'\n### Mermaid Diagram\n```mermaid\n{topology.mermaid}\n```')
 
     diff = topology.diff
     has_drift = diff.missing_links or diff.unexpected_links or diff.missing_nodes

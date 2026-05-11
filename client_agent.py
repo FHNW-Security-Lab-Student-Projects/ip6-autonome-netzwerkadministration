@@ -12,6 +12,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from network_agent import NetworkAgentResult, network_agent, network_lifespan
 from topology_agent import get_topology_response, topology_lifespan
+from state_snapshot_agent import snapshot_agent, snapshot_lifespan
 from syslog_investigations import (
     syslog_lifespan,
     list_investigations,
@@ -77,6 +78,13 @@ INSTRUCTIONS = (
     'message starts with the exact prefix "/investigate". For all other syslog-related requests '
     '— questions, listing, status checks, continuations — use the read-only tools or answer '
     'conversationally. Never call open_syslog_investigation based on inferred intent alone.\n\n'
+    '- call_snapshot_agent (Snapshot Agent): Historical device state captured every 2 minutes '
+    '(routing table, ARP entries, interface status). Use for questions about how state evolved '
+    'over time or what changed before an incident.\n'
+    '  Skills:\n'
+    '    - Retrieve device state at a specific point in time.\n'
+    '    - Diff device state between two timestamps to identify what changed.\n'
+    '    - Summarise snapshot coverage across all devices.\n\n'
     'Delegate requests to the appropriate sub-agent.\n\n'
     'When composing the `request` argument for any sub-agent call, write it as a '
     'self-contained message — the sub-agent has no access to the conversation history '
@@ -155,10 +163,22 @@ async def continue_syslog_investigation(
     return await continue_investigation(investigation_id, follow_up, synchronous=not background)
 
 
+@orchestrator.tool_plain
+async def call_snapshot_agent(request: str) -> str:
+    """Delegate a historical state query to the Snapshot Agent.
+
+    Use for questions about how device state evolved over time, e.g.:
+    'how did the routing table on router1 change before the incident?'
+    'what ARP entries were present on switch1 at 14:00?'
+    """
+    result = await snapshot_agent.run(request)
+    return result.output
+
+
 @asynccontextmanager
 async def main_lifespan():
     """Compose all sub-agent lifespans: MCP servers, topology refresh, Loki poller."""
-    async with network_lifespan(), syslog_lifespan(), topology_lifespan():
+    async with network_lifespan(), syslog_lifespan(), topology_lifespan(), snapshot_lifespan():
         yield
 
 
