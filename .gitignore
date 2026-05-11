@@ -7,6 +7,7 @@ CLAUDE.md
 .mypy_cache/
 incidents.json
 investigations.json
+state_snapshots.json
 
 # Containerlab runtime output (auto-generated on clab deploy)
 clab-testlab/
