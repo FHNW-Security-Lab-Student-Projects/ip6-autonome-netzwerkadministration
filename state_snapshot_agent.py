@@ -51,9 +51,8 @@ SNAPSHOTS_FILE = Path(__file__).parent / 'state_snapshots.json'
 REFRESH_INTERVAL = 120  # seconds between snapshot runs
 MAX_SNAPSHOTS = 30      # per device per table — ~1 hour at 2-min intervals
 
-# SR Linux read-only commands to capture, keyed by table name used in the API
-SNAPSHOT_COMMANDS: dict[str, str] = {
-    'route_table': 'show network-instance default route-table',
+# Static commands (not per-network-instance), keyed by table name used in the API
+STATIC_SNAPSHOT_COMMANDS: dict[str, str] = {
     'arp': 'show arpnd arp-entries',
     'interfaces': 'show interface brief',
 }
@@ -90,9 +89,44 @@ def _strip_ansi(text: str) -> str:
     return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
 
 
-def _ssh_send_command(params: dict, command: str) -> str:
+def _parse_network_instances(output: str) -> list[str]:
+    """Parse 'show network-instance' output and return NI names.
+    Falls back to ['default'] if parsing fails or output is empty.
+    """
+    names = []
+    in_data = False
+    for line in output.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if 'Name' in stripped and 'Type' in stripped and 'Admin state' in stripped:
+            in_data = True
+            continue
+        if stripped.startswith('-'):
+            continue
+        if in_data:
+            parts = stripped.split()
+            if parts:
+                names.append(parts[0])
+    return names if names else ['default']
+
+
+def _ssh_capture_device(params: dict) -> dict[str, str]:
+    """Open one SSH connection and collect all snapshot tables for a device."""
+    results: dict[str, str] = {}
     with ConnectHandler(**params) as conn:
-        return _strip_ansi(conn.send_command(command))
+        # Discover network instances first
+        ni_raw = _strip_ansi(conn.send_command('show network-instance'))
+        ni_names = _parse_network_instances(ni_raw)
+
+        for ni in ni_names:
+            output = _strip_ansi(conn.send_command(f'show network-instance {ni} route-table'))
+            results[f'route_table_{ni}'] = output
+
+        for table, command in STATIC_SNAPSHOT_COMMANDS.items():
+            results[table] = _strip_ansi(conn.send_command(command))
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -141,17 +175,14 @@ async def _snapshot_device(device_name: str) -> None:
         return
 
     ts = datetime.now(timezone.utc)
-    for table, command in SNAPSHOT_COMMANDS.items():
-        try:
-            output = await asyncio.to_thread(_ssh_send_command, params, command)
-            _store(device_name, table, output, ts)
-        except Exception as exc:
-            logfire.error(
-                'Snapshot command failed',
-                device=device_name,
-                table=table,
-                error=str(exc),
-            )
+    try:
+        tables = await asyncio.to_thread(_ssh_capture_device, params)
+    except Exception as exc:
+        logfire.error('Snapshot SSH session failed', device=device_name, error=str(exc))
+        return
+
+    for table, output in tables.items():
+        _store(device_name, table, output, ts)
 
 
 async def _snapshot_all() -> None:
@@ -188,9 +219,9 @@ async def _refresh_loop(interval: int = REFRESH_INTERVAL) -> None:
 # ---------------------------------------------------------------------------
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5.1',
+    'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
-    settings=ModelSettings(parallel_tool_calls=True),
+    settings=ModelSettings(parallel_tool_calls=True, timeout=180),
 )
 
 snapshot_agent = Agent(
@@ -201,9 +232,11 @@ snapshot_agent = Agent(
 
 You have access to periodic snapshots of device state captured every 2 minutes.
 Available tables per device:
-  - route_table : IP routing table  (show network-instance default route-table)
-  - arp         : ARP entries       (show arpnd arp-entries)
-  - interfaces  : Interface status  (show interface brief)
+  - route_table_<ni> : IP routing table per network-instance (e.g. route_table_default, route_table_mgmt)
+  - arp              : ARP entries       (show arpnd arp-entries)
+  - interfaces       : Interface status  (show interface brief)
+
+Call snapshot_status to discover which route_table_<ni> keys exist for each device.
 
 Available devices: router1, router2, switch1, switch2.
 

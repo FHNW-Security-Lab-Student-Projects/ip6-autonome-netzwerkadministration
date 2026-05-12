@@ -6,9 +6,11 @@ from pathlib import Path
 
 import logfire
 from dotenv import load_dotenv
+from openai import APITimeoutError
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
+from pydantic_ai.settings import ModelSettings
 
 from config_agent import config_agent, config_lifespan
 from network_agent import NetworkAgentResult, network_agent, network_lifespan
@@ -41,8 +43,9 @@ if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5.1',
+    'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
+    settings=ModelSettings(parallel_tool_calls=True, timeout=180),
 )
 
 
@@ -111,8 +114,13 @@ orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
 @orchestrator.tool_plain
 async def call_network_agent(request: str) -> NetworkAgentResult:
     """Delegate a read-only network query to the Network Agent."""
-    result = await network_agent.run(request)
-    return result.output
+    try:
+        result = await network_agent.run(request)
+        return result.output
+    except APITimeoutError:
+        return NetworkAgentResult(
+            answer='The network agent timed out after 3 minutes.' 
+        )
 
 
 @orchestrator.tool_plain
@@ -180,8 +188,11 @@ async def call_config_agent(request: str) -> str:
     Prefix the request with "VALIDATE ONLY:" to preview changes (safe, no commit).
     Prefix with "APPLY (user approved):" to apply after the user has confirmed the diff.
     """
-    result = await config_agent.run(request)
-    return result.output
+    try:
+        result = await config_agent.run(request)
+        return result.output
+    except APITimeoutError:
+        return 'The config agent timed out after 3 minutes.'
 
 
 @orchestrator.tool_plain
@@ -192,8 +203,11 @@ async def call_snapshot_agent(request: str) -> str:
     'how did the routing table on router1 change before the incident?'
     'what ARP entries were present on switch1 at 14:00?'
     """
-    result = await snapshot_agent.run(request)
-    return result.output
+    try:
+        result = await snapshot_agent.run(request)
+        return result.output
+    except APITimeoutError:
+        return 'The snapshot agent timed out after 3 minutes.'
 
 
 @asynccontextmanager

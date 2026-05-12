@@ -32,9 +32,9 @@ if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
 llm = OpenAIChatModel(
-    'z-ai/glm-5.1',
+    'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
-    settings=ModelSettings(parallel_tool_calls=True),
+    settings=ModelSettings(parallel_tool_calls=True, timeout=180),
 )
 
 mcp_server = MCPServerStdio(
