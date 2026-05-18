@@ -2,6 +2,7 @@ import asyncio
 import os
 import logging
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 import logfire
@@ -47,6 +48,44 @@ llm = OpenAIChatModel(
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
     settings=ModelSettings(parallel_tool_calls=True, timeout=180),
 )
+
+# Additional models offered in the web UI dropdown (label → OpenRouter model name).
+# The orchestrator's default model (GLM 5 above) is always included automatically.
+AVAILABLE_OPENROUTER_MODELS: dict[str, str] = {
+    'GLM5': 'z-ai/glm-5',
+    'Claude Sonnet 4.6': 'anthropic/claude-sonnet-4.6',
+    'Claude Opus 4.7': 'anthropic/claude-opus-4.7',
+    'GLM5.1': 'z-ai/glm-5.1',
+}
+
+# Pre-built Model objects for the web UI (imported by web_ui.py for to_web(models=...)).
+UI_EXTRA_MODELS: dict[str, OpenAIChatModel] = {
+    label: OpenAIChatModel(name, provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY))
+    for label, name in AVAILABLE_OPENROUTER_MODELS.items()
+}
+
+# ContextVar set by web_ui.py middleware on each request — holds the OpenRouter model
+# name selected in the UI (e.g. 'google/gemini-2.0-flash-001'), or None for the default.
+_active_model_name: ContextVar[str | None] = ContextVar('_active_model_name', default=None)
+
+# Cache of Model objects keyed by (model_name, parallel_tool_calls) to avoid re-creating
+# HTTP clients on every tool call.
+_model_cache: dict[tuple[str, bool], OpenAIChatModel] = {}
+
+
+def _get_agent_model(parallel_tools: bool = True) -> OpenAIChatModel | None:
+    """Return an override model for sub-agent calls, or None to use the sub-agent's default."""
+    name = _active_model_name.get()
+    if not name:
+        return None
+    key = (name, parallel_tools)
+    if key not in _model_cache:
+        _model_cache[key] = OpenAIChatModel(
+            name,
+            provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
+            settings=ModelSettings(parallel_tool_calls=parallel_tools, timeout=180),
+        )
+    return _model_cache[key]
 
 
 INSTRUCTIONS = (
@@ -115,11 +154,11 @@ orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
 async def call_network_agent(request: str) -> NetworkAgentResult:
     """Delegate a read-only network query to the Network Agent."""
     try:
-        result = await network_agent.run(request)
+        result = await network_agent.run(request, model=_get_agent_model())
         return result.output
     except APITimeoutError:
         return NetworkAgentResult(
-            answer='The network agent timed out after 3 minutes.' 
+            answer='The network agent timed out after 3 minutes.'
         )
 
 
@@ -189,7 +228,7 @@ async def call_config_agent(request: str) -> str:
     Prefix with "APPLY (user approved):" to apply after the user has confirmed the diff.
     """
     try:
-        result = await config_agent.run(request)
+        result = await config_agent.run(request, model=_get_agent_model(parallel_tools=True))
         return result.output
     except APITimeoutError:
         return 'The config agent timed out after 3 minutes.'
@@ -204,7 +243,7 @@ async def call_snapshot_agent(request: str) -> str:
     'what ARP entries were present on switch1 at 14:00?'
     """
     try:
-        result = await snapshot_agent.run(request)
+        result = await snapshot_agent.run(request, model=_get_agent_model())
         return result.output
     except APITimeoutError:
         return 'The snapshot agent timed out after 3 minutes.'
