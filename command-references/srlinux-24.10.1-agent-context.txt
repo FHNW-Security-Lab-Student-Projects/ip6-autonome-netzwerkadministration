@@ -1,6 +1,7 @@
 SR LINUX v24.10.1 READ-ONLY COMMAND REFERENCE
 Nokia 7220 IXR / 7250 IXR / 7730 SXR
 All commands are read-only (show / info from state / ping / traceroute).
+Revision: agent-verified — invalid commands removed or moved to KNOWN INVALID section.
 
 ================================================================================
 OUTPUT MODIFIERS (append to any command)
@@ -46,7 +47,6 @@ show version                         hostname, chassis type, SW version, last bo
 show platform chassis
 show platform environment            all modules: control, linecards, fans, PSUs, temperature
 show platform control * detail       CPU, memory, disk, SW version per control module
-show platform redundancy             CPM redundancy state
 show platform linecard * detail      linecard hardware and temp detail
 show platform fabric * detail        fabric module detail (chassis-based platforms)
 show platform fan-tray               fan tray status
@@ -54,6 +54,8 @@ show platform power-supply           power supply status
 
 NOTE: There is no "show system cpu", "show system memory" or "show system uptime".
       CPU and memory are read from "show platform control A detail" or info from state paths below.
+NOTE: "show platform redundancy" is INVALID on fixed-chassis platforms (7220 IXR).
+      It only exists on modular chassis with dual CPMs.
 
 STATE PATHS — SYSTEM / PLATFORM
 /system/information                             hostname, SW version, last-booted
@@ -69,10 +71,12 @@ show interface                   all UP interfaces with subinterface and IP summ
 show interface brief             tabular all interfaces (admin-state, oper-state, speed, type)
 show interface all               all interfaces including down with down-reason
 show interface <intf>            e.g. show interface ethernet-1/1
-show interface <intf> detail
-show interface <intf> statistics  in/out octets, packets, error frames, discarded frames
+show interface <intf> detail     includes statistics (in/out octets, packets, errors, discards)
 show interface <intf>.<idx>      specific subinterface  e.g. ethernet-1/1.0
-show interface <intf> transceiver  optics / SFP wavelength, Tx/Rx power, temp
+
+NOTE: "show interface <intf> statistics" is INVALID — stats are included in detail output.
+NOTE: "show interface <intf> transceiver" is INVALID as a show command.
+      Use state path below for transceiver/optics data.
 
 STATE PATHS — INTERFACES
 /interface[name=<N>]/oper-state
@@ -84,6 +88,7 @@ STATE PATHS — INTERFACES
 /interface[name=<N>]/statistics/out-error-frames
 /interface[name=<N>]/statistics/in-discarded-frames
 /interface[name=<N>]/statistics/out-discarded-frames
+/interface[name=<N>]/transceiver
 /interface[name=<N>]/subinterface[index=<I>]/oper-state
 /interface[name=<N>]/subinterface[index=<I>]/ipv4/address
 /interface[name=<N>]/subinterface[index=<I>]/ipv6/address
@@ -94,8 +99,9 @@ LAG / LACP
 show interface lag<N>
 show interface lag<N> detail
 show lag lag<N> lacp-state
-show system network-instance ethernet-segments
-show system network-instance ethernet-segments <es-name>
+
+NOTE: "show system network-instance ethernet-segments" is INVALID.
+      Use state path: info from state /system/network-instance
 
 STATE PATHS — LAG
 /interface[name=lag<N>]/lag/lacp/member[interface=*]
@@ -106,8 +112,10 @@ ARP / NEIGHBOR DISCOVERY
 ================================================================================
 show arpnd arp-entries
 show arpnd arp-entries interface <intf> subinterface <idx>
-show arpnd neighbor-entries
-show arpnd neighbor-entries interface <intf> subinterface <idx>
+show arpnd neighbors
+show arpnd neighbors interface <intf> subinterface <idx>
+
+NOTE: "show arpnd neighbor-entries" is INVALID. Use "show arpnd neighbors" (plural, no hyphen).
 
 STATE PATHS — ARP / ND
 /arpnd/arp-entries/arp-entry
@@ -117,8 +125,8 @@ STATE PATHS — ARP / ND
 NETWORK INSTANCES
 ================================================================================
 show network-instance                              all NIs with type and oper-state
-show network-instance <ni>                         specific NI detail
-show network-instance <ni> interface               interfaces attached to NI
+show network-instance summary                      summary view of all NIs
+show network-instance <ni> interfaces              interfaces attached to NI (plural)
 
 ROUTE TABLE
 show network-instance <ni> route-table
@@ -128,6 +136,10 @@ show network-instance <ni> route-table ipv4-unicast prefix <prefix/len>
 show network-instance <ni> route-table ipv4-unicast route <prefix/len>
 show network-instance <ni> route-table ipv4-unicast route <prefix/len> include-inactive
 show network-instance <ni> route-table ipv6-unicast
+
+NOTE: "show network-instance <ni>" with a specific NI name shows a help/usage menu, not detail.
+      Use "show network-instance summary" for an overview.
+NOTE: "show network-instance <ni> interface" (singular) is INVALID. Use "interfaces" (plural).
 
 NI TYPES: default (ip-vrf), mgmt, <custom ip-vrf>, <custom mac-vrf>
 
@@ -204,13 +216,12 @@ show network-instance <mac-vrf> protocols bgp-evpn
 show network-instance <mac-vrf> protocols bgp-evpn esi
 show network-instance <ip-vrf>  protocols bgp-evpn
 show tunnel-interface vxlan1 vxlan-interface <idx>
-show system network-instance ethernet-segments
-show system network-instance ethernet-segments <es-name>
 
 STATE PATHS — EVPN / VXLAN
 /network-instance[name=<N>]/bridge-table/mac-table
 /network-instance[name=<N>]/protocols/bgp-evpn
 /tunnel-interface[name=vxlan1]/vxlan-interface
+/system/network-instance/ethernet-segments
 
 ================================================================================
 LLDP
@@ -218,7 +229,9 @@ LLDP
 show system lldp
 show system lldp neighbor
 show system lldp neighbor interface <intf>
-show system lldp statistics
+
+NOTE: "show system lldp statistics" is INVALID.
+      Use: info from state /system/lldp
 
 STATE PATHS — LLDP
 /system/lldp/interface[name=<N>]/neighbor
@@ -240,26 +253,29 @@ show acl cpm-filter ipv6-filter entry <id> statistics
 ================================================================================
 BFD
 ================================================================================
-show bfd session
-show bfd session all
-show bfd summary
+NOTE: All "show bfd" commands are INVALID ("Unknown token").
+      Use state paths below instead.
 
 STATE PATHS — BFD
 /bfd/subinterface[id=<N>]
+info from state /bfd
 
 ================================================================================
 DHCP RELAY
 ================================================================================
-show network-instance <ni> dhcp-relay
-show network-instance <ni> dhcp-relay statistics
-show network-instance <ni> dhcpv6-relay
-show network-instance <ni> dhcpv6-relay statistics
+NOTE: "show network-instance <ni> dhcp-relay" is INVALID ("Unknown token").
+      Use state paths below instead.
+
+STATE PATHS — DHCP RELAY
+/network-instance[name=<N>]/dhcp-relay
+/network-instance[name=<N>]/dhcpv6-relay
+info from state /network-instance[name=<N>]/dhcp-relay
 
 ================================================================================
 MIRRORING
 ================================================================================
-show mirroring mirror-instance
-show mirroring mirror-instance <n>
+NOTE: "show mirroring mirror-instance" is INVALID ("Unknown token").
+      Use: info from state /mirror-instance
 
 ================================================================================
 TACACS / AAA
@@ -272,24 +288,43 @@ STATE PATHS — AAA
 ================================================================================
 QoS
 ================================================================================
-show qos interface <intf>
-show qos interface <intf> output queue
-show qos interface <intf> output statistics
+NOTE: All "show qos interface" commands are INVALID ("Unknown token").
+      Use state paths below instead.
+
+STATE PATHS — QoS
+info from state /interface[name=<N>]/subinterface[index=<I>]/qos
 
 ================================================================================
 CONNECTIVITY TESTS (read-only, no state change)
 ================================================================================
 ping <dst-ip>
 ping <dst-ip> network-instance <ni>
-ping <dst-ip> count <N> size <bytes> interval <sec>
+ping <dst-ip> -c <N> -s <bytes>
 traceroute <dst-ip>
 traceroute <dst-ip> network-instance <ni>
 tcptraceroute <dst-ip>
 
+NOTE: Keyword-style ping options (count <N> size <bytes> interval <sec>) are INVALID.
+      Use Linux-style flags: -c (count), -s (packet size).
+
 ================================================================================
 KNOWN INVALID COMMANDS (do not use)
 ================================================================================
-show system cpu          -> INVALID. Use: show platform control A detail
-show system memory       -> INVALID. Use: show platform control A detail
-show system processes    -> INVALID. Use: info from state /system/app-management/application[name=*]
-show system uptime       -> INVALID. Use: show version (shows Last Booted timestamp)
+show system cpu              -> INVALID. Use: show platform control A detail
+show system memory           -> INVALID. Use: show platform control A detail
+show system processes        -> INVALID. Use: info from state /system/app-management/application[name=*]
+show system uptime           -> INVALID. Use: show version (shows Last Booted timestamp)
+show platform redundancy     -> INVALID on fixed chassis. Only valid on modular chassis with dual CPMs.
+show interface <intf> statistics         -> INVALID. Use: show interface <intf> detail
+show interface <intf> transceiver        -> INVALID. Use: info from state /interface[name=<N>]/transceiver
+show network-instance <ni> interface     -> INVALID (singular). Use: show network-instance <ni> interfaces
+show network-instance <ni> dhcp-relay    -> INVALID. Use: info from state /network-instance[name=<N>]/dhcp-relay
+show arpnd neighbor-entries              -> INVALID. Use: show arpnd neighbors
+show system network-instance ethernet-segments -> INVALID. Use: info from state /system/network-instance
+show system lldp statistics              -> INVALID. Use: info from state /system/lldp
+show bfd session                         -> INVALID. Use: info from state /bfd
+show bfd session all                     -> INVALID. Use: info from state /bfd
+show bfd summary                         -> INVALID. Use: info from state /bfd
+show qos interface <intf>                -> INVALID. Use: info from state /interface[name=<N>]/subinterface[...]/qos
+show mirroring mirror-instance           -> INVALID. Use: info from state /mirror-instance
+ping <dst> count <N> size <B>            -> INVALID keyword syntax. Use: ping <dst> -c <N> -s <B>
