@@ -1,6 +1,7 @@
 import asyncio
 import os
 import logging
+import time
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -14,6 +15,12 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 
 from config_agent import config_agent, config_lifespan
+from experiment_tracker import (
+    ExperimentSession,
+    begin_session,
+    finish_session,
+    record_agent_run,
+)
 from network_agent import NetworkAgentResult, network_agent, network_lifespan
 from topology_agent import get_topology_response, topology_lifespan
 from state_snapshot_agent import snapshot_agent, snapshot_lifespan
@@ -67,6 +74,17 @@ UI_EXTRA_MODELS: dict[str, OpenAIChatModel] = {
 # ContextVar set by web_ui.py middleware on each request — holds the OpenRouter model
 # name selected in the UI (e.g. 'google/gemini-2.0-flash-001'), or None for the default.
 _active_model_name: ContextVar[str | None] = ContextVar('_active_model_name', default=None)
+
+# ContextVar holding the active experiment session for the current request/REPL turn.
+# Set by web_ui.py middleware (per HTTP request) or by main() (per REPL turn).
+_active_session: ContextVar[ExperimentSession | None] = ContextVar('_active_session', default=None)
+
+DEFAULT_AGENT_MODEL = 'z-ai/glm-5'
+
+
+def _effective_model() -> str:
+    """Return the currently active OpenRouter model name for sub-agent calls."""
+    return _active_model_name.get() or DEFAULT_AGENT_MODEL
 
 # Cache of Model objects keyed by (model_name, parallel_tool_calls) to avoid re-creating
 # HTTP clients on every tool call.
@@ -154,7 +172,11 @@ orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
 async def call_network_agent(request: str) -> NetworkAgentResult:
     """Delegate a read-only network query to the Network Agent."""
     try:
+        t0 = time.monotonic()
         result = await network_agent.run(request, model=_get_agent_model())
+        session = _active_session.get()
+        if session is not None:
+            record_agent_run(session, 'network_agent', _effective_model(), result, time.monotonic() - t0)
         return result.output
     except APITimeoutError:
         return NetworkAgentResult(
@@ -228,7 +250,11 @@ async def call_config_agent(request: str) -> str:
     Prefix with "APPLY (user approved):" to apply after the user has confirmed the diff.
     """
     try:
+        t0 = time.monotonic()
         result = await config_agent.run(request, model=_get_agent_model(parallel_tools=True))
+        session = _active_session.get()
+        if session is not None:
+            record_agent_run(session, 'config_agent', _effective_model(), result, time.monotonic() - t0)
         return result.output
     except APITimeoutError:
         return 'The config agent timed out after 3 minutes.'
@@ -243,7 +269,11 @@ async def call_snapshot_agent(request: str) -> str:
     'what ARP entries were present on switch1 at 14:00?'
     """
     try:
+        t0 = time.monotonic()
         result = await snapshot_agent.run(request, model=_get_agent_model())
+        session = _active_session.get()
+        if session is not None:
+            record_agent_run(session, 'snapshot_agent', _effective_model(), result, time.monotonic() - t0)
         return result.output
     except APITimeoutError:
         return 'The snapshot agent timed out after 3 minutes.'
