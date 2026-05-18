@@ -41,6 +41,7 @@ mcp_server = MCPServerStdio(
     command='uv',
     args=['run', 'mcp_server.py'],
     tool_prefix='network_',
+    timeout=30,
 )
 
 network_agent = Agent(

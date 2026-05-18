@@ -89,42 +89,47 @@ def _strip_ansi(text: str) -> str:
     return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
 
 
-def _parse_network_instances(output: str) -> list[str]:
-    """Parse 'show network-instance' output and return NI names.
-    Falls back to ['default'] if parsing fails or output is empty.
-    """
-    names = []
-    in_data = False
-    for line in output.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if 'Name' in stripped and 'Type' in stripped and 'Admin state' in stripped:
-            in_data = True
-            continue
-        if stripped.startswith('-'):
-            continue
-        if in_data:
-            parts = stripped.split()
-            if parts:
-                names.append(parts[0])
-    return names if names else ['default']
+def _parse_json_output(raw: str) -> dict | list | str:
+    """Strip ANSI and parse JSON; fall back to plain text on failure."""
+    cleaned = _strip_ansi(raw)
+    try:
+        return json.loads(cleaned)
+    except (json.JSONDecodeError, ValueError):
+        return cleaned
 
 
-def _ssh_capture_device(params: dict) -> dict[str, str]:
+def _parse_network_instances_json(data: dict | list | str) -> list[str]:
+    """Extract NI names from parsed 'show network-instance | as json' output."""
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if 'network-instance' in key and isinstance(value, list):
+                names = [e['name'] for e in value if 'name' in e]
+                if names:
+                    return names
+    return ['default']
+
+
+def _format_output(output: dict | list | str) -> str:
+    """Serialize a snapshot output value to a human/LLM-readable string."""
+    if isinstance(output, (dict, list)):
+        return json.dumps(output, indent=2)
+    return output
+
+
+def _ssh_capture_device(params: dict) -> dict[str, dict | list | str]:
     """Open one SSH connection and collect all snapshot tables for a device."""
-    results: dict[str, str] = {}
+    results: dict[str, dict | list | str] = {}
     with ConnectHandler(**params) as conn:
-        # Discover network instances first
-        ni_raw = _strip_ansi(conn.send_command('show network-instance'))
-        ni_names = _parse_network_instances(ni_raw)
+        ni_data = _parse_json_output(conn.send_command('show network-instance | as json'))
+        ni_names = _parse_network_instances_json(ni_data)
 
         for ni in ni_names:
-            output = _strip_ansi(conn.send_command(f'show network-instance {ni} route-table'))
-            results[f'route_table_{ni}'] = output
+            results[f'route_table_{ni}'] = _parse_json_output(
+                conn.send_command(f'show network-instance {ni} route-table | as json')
+            )
 
         for table, command in STATIC_SNAPSHOT_COMMANDS.items():
-            results[table] = _strip_ansi(conn.send_command(command))
+            results[table] = _parse_json_output(conn.send_command(f'{command} | as json'))
 
     return results
 
@@ -133,7 +138,7 @@ def _ssh_capture_device(params: dict) -> dict[str, str]:
 # In-memory store + disk persistence
 # ---------------------------------------------------------------------------
 
-# device → table → list of {"ts": ISO str, "output": str}, oldest first
+# device → table → list of {"ts": ISO str, "output": dict | list | str}, oldest first
 _snapshots: dict[str, dict[str, list[dict]]] = {}
 
 
@@ -156,7 +161,7 @@ def _save_to_disk() -> None:
         logfire.error('Failed to save snapshots to disk', error=str(exc))
 
 
-def _store(device: str, table: str, output: str, ts: datetime) -> None:
+def _store(device: str, table: str, output: dict | list | str, ts: datetime) -> None:
     _snapshots.setdefault(device, {}).setdefault(table, [])
     _snapshots[device][table].append({'ts': ts.isoformat(), 'output': output})
     if len(_snapshots[device][table]) > MAX_SNAPSHOTS:
@@ -291,7 +296,7 @@ def state_before(device: str, table: str, timestamp_iso: str) -> str:
     if not candidates:
         return f'No snapshot found before {timestamp_iso} for {device}/{table}.'
     snap = candidates[-1]
-    return f'Snapshot at {snap["ts"]}:\n\n{snap["output"]}'
+    return f'Snapshot at {snap["ts"]}:\n\n{_format_output(snap["output"])}'
 
 
 @snapshot_agent.tool_plain
@@ -326,8 +331,8 @@ def state_diff(device: str, table: str, t1_iso: str, t2_iso: str) -> str:
         return f'Both timestamps resolve to the same snapshot ({s1["ts"]}) — no diff.'
 
     diff_lines = list(difflib.unified_diff(
-        s1['output'].splitlines(keepends=True),
-        s2['output'].splitlines(keepends=True),
+        _format_output(s1['output']).splitlines(keepends=True),
+        _format_output(s2['output']).splitlines(keepends=True),
         fromfile=f'{device}/{table} @ {s1["ts"]}',
         tofile=f'{device}/{table} @ {s2["ts"]}',
     ))

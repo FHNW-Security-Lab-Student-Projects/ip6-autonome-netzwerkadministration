@@ -171,11 +171,13 @@ llm = OpenAIChatModel(
 network_mcp_server = MCPServerStdio(
     command='uv',
     args=['run', 'mcp_server.py'],
+    timeout=30,
 )
 
 syslog_mcp_server = MCPServerStdio(
     command='uv',
     args=['run', 'syslog_mcp_server.py'],
+    timeout=30,
 )
 
 INVESTIGATOR_INSTRUCTIONS_CONTINUATION = (

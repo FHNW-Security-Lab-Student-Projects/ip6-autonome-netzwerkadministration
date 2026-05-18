@@ -41,6 +41,7 @@ config_mcp = MCPServerStdio(
     command='uv',
     args=['run', 'config_mcp_server.py'],
     tool_prefix='config_',
+    timeout=30,
 )
 
 config_agent = Agent(
