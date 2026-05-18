@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import os
 import yaml
-# import json
 from pathlib import Path
-# from datetime import datetime
+from datetime import datetime
 from dotenv import load_dotenv
 import logfire
 from netmiko import ConnectHandler
@@ -29,7 +28,7 @@ mcp = FastMCP("MCP Server")
 
 INVENTORY_DIR = Path(__file__).parent / "inventory"
 COMMAND_REFERENCE_PATH = Path(__file__).parent / "command-references" / "srlinux-24.10.1-agent-context.txt"
-# BACKUP_DIR = Path(__file__).parent / "config_backups"
+CORRECTIONS_PATH = Path(__file__).parent / "command_corrections.md"
 
 
 def load_inventory():
@@ -75,6 +74,32 @@ def get_command_reference() -> str:
     Call this before constructing any SR Linux CLI command to ensure correct syntax.
     """
     return COMMAND_REFERENCE_PATH.read_text()
+
+
+@mcp.tool()
+def report_command_issue(command: str, issue: str) -> str:
+    """Report a command from the SR Linux command reference that did not work as documented.
+
+    Call this when a command from the reference produces an unexpected error or behaves
+    differently than the reference describes. Do NOT call for errors caused by wrong device
+    state, missing config, or permission issues — only for commands that appear incorrect
+    in the reference itself.
+
+    Args:
+        command: The exact command string that failed or behaved unexpectedly.
+        issue: Description of what went wrong and what the actual device response was.
+    """
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if not CORRECTIONS_PATH.exists():
+        CORRECTIONS_PATH.write_text("# SR Linux Command Reference Corrections\n\nEntries below were flagged by agents during operation.\n")
+    entry = (
+        f"\n## [{timestamp}] network-agent\n"
+        f"**Command:** `{command}`\n"
+        f"**Issue:** {issue}\n"
+    )
+    with open(CORRECTIONS_PATH, 'a') as f:
+        f.write(entry)
+    return "Issue reported. A human will review this entry in command_corrections.md."
 
 
 @mcp.tool()

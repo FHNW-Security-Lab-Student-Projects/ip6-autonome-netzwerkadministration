@@ -52,6 +52,7 @@ mcp = FastMCP('Config MCP Server')
 INVENTORY_DIR = Path(__file__).parent / 'inventory'
 BACKUP_DIR = Path(__file__).parent / 'config_backups'
 SR_LINUX_KNOWLEDGE_PATH = Path(__file__).parent / 'sr_linux_knowledge.txt'
+CORRECTIONS_PATH = Path(__file__).parent / 'command_corrections.md'
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +171,32 @@ def get_command_reference() -> str:
     Call this before constructing any configuration commands to verify correct syntax.
     """
     return SR_LINUX_KNOWLEDGE_PATH.read_text()
+
+
+@mcp.tool()
+def report_command_issue(command: str, issue: str) -> str:
+    """Report a command from the SR Linux command reference that did not work as documented.
+
+    Call this when a command from the reference produces an unexpected error or behaves
+    differently than the reference describes. Do NOT call for errors caused by wrong device
+    state, missing config, or permission issues — only for commands that appear incorrect
+    in the reference itself.
+
+    Args:
+        command: The exact command string that failed or behaved unexpectedly.
+        issue: Description of what went wrong and what the actual device response was.
+    """
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if not CORRECTIONS_PATH.exists():
+        CORRECTIONS_PATH.write_text('# SR Linux Command Reference Corrections\n\nEntries below were flagged by agents during operation.\n')
+    entry = (
+        f'\n## [{timestamp}] config-agent\n'
+        f'**Command:** `{command}`\n'
+        f'**Issue:** {issue}\n'
+    )
+    with open(CORRECTIONS_PATH, 'a') as f:
+        f.write(entry)
+    return 'Issue reported. A human will review this entry in command_corrections.md.'
 
 
 @mcp.tool()
