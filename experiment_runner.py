@@ -64,7 +64,7 @@ def _build_model(model_name: str) -> OpenAIChatModel:
     return OpenAIChatModel(
         model_name,
         provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
-        settings=ModelSettings(parallel_tool_calls=True, timeout=180),
+        settings=ModelSettings(timeout=180),
     )
 
 

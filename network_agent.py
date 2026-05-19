@@ -21,6 +21,12 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 
 
+# Structured output disabled — tool_choice='required' is not supported by all OpenRouter providers.
+# Using plain str output instead so tool_choice='auto' is used, which has broader model support.
+# class NetworkAgentResult(BaseModel):
+#     answer: str | None = None
+#     needs_clarification: bool = False
+#     clarifying_questions: list[str] = []
 class NetworkAgentResult(BaseModel):
     answer: str | None = None
     needs_clarification: bool = False
@@ -34,7 +40,7 @@ if not OPENROUTER_API_KEY:
 llm = OpenAIChatModel(
     'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
-    settings=ModelSettings(parallel_tool_calls=True, timeout=180),
+    settings=ModelSettings(timeout=180),
 )
 
 mcp_server = MCPServerStdio(
@@ -48,7 +54,8 @@ network_agent = Agent(
     model=llm,
     name='network_agent',
     toolsets=[mcp_server],
-    output_type=NetworkAgentResult,
+    output_type=str,
+    # output_type=NetworkAgentResult,  # disabled: tool_choice='required' not supported by all OpenRouter providers
     instructions=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.
 
 WORKFLOW:
@@ -56,14 +63,13 @@ WORKFLOW:
 - For greetings or capability questions: respond directly without using tools.
 - Always format output in a readable way (use lists or tables where appropriate).
 - If the request is missing required information (e.g. which device to query), do NOT guess.
-  Set needs_clarification=true and list the specific questions in clarifying_questions.
+  Say so explicitly and list the specific questions you need answered.
 
-OUTPUT FORMAT:
-Always respond with a NetworkAgentResult:
-- answer: your response or findings (null if needs_clarification is true)
-- needs_clarification: true if required information is missing
-- clarifying_questions: specific questions to ask the user (empty if needs_clarification is false)
-
+# OUTPUT FORMAT:
+# Always respond with a NetworkAgentResult:
+# - answer: your response or findings (null if needs_clarification is true)
+# - needs_clarification: true if required information is missing
+# - clarifying_questions: specific questions to ask the user (empty if needs_clarification is false)
 """,
 )
 

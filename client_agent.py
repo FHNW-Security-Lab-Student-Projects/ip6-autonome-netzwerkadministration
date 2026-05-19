@@ -22,7 +22,7 @@ from experiment_tracker import (
     make_tracked_http_client,
     record_agent_run,
 )
-from network_agent import NetworkAgentResult, network_agent, network_lifespan
+from network_agent import network_agent, network_lifespan
 from topology_agent import get_topology_response, topology_lifespan
 from state_snapshot_agent import snapshot_agent, snapshot_lifespan
 from syslog_investigations import (
@@ -58,7 +58,7 @@ _tracked_http_client = make_tracked_http_client()
 llm = OpenAIChatModel(
     'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
-    settings=ModelSettings(parallel_tool_calls=True, timeout=180),
+    settings=ModelSettings(timeout=180),
 )
 
 # Additional models offered in the web UI dropdown (label → OpenRouter model name).
@@ -73,7 +73,7 @@ AVAILABLE_OPENROUTER_MODELS: dict[str, str] = {
 
 # Pre-built Model objects for the web UI (imported by web_ui.py for to_web(models=...)).
 UI_EXTRA_MODELS: dict[str, OpenAIChatModel] = {
-    label: OpenAIChatModel(name, provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client))
+    label: OpenAIChatModel(name, provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client), settings=ModelSettings(timeout=180))
     for label, name in AVAILABLE_OPENROUTER_MODELS.items()
 }
 
@@ -92,24 +92,23 @@ def _effective_model() -> str:
     """Return the currently active OpenRouter model name for sub-agent calls."""
     return _active_model_name.get() or DEFAULT_AGENT_MODEL
 
-# Cache of Model objects keyed by (model_name, parallel_tool_calls) to avoid re-creating
+# Cache of Model objects keyed by model_name to avoid re-creating
 # HTTP clients on every tool call.
 _model_cache: dict[tuple[str, bool], OpenAIChatModel] = {}
 
 
-def _get_agent_model(parallel_tools: bool = True) -> OpenAIChatModel | None:
+def _get_agent_model() -> OpenAIChatModel | None:
     """Return an override model for sub-agent calls, or None to use the sub-agent's default."""
     name = _active_model_name.get()
     if not name:
         return None
-    key = (name, parallel_tools)
-    if key not in _model_cache:
-        _model_cache[key] = OpenAIChatModel(
+    if name not in _model_cache:
+        _model_cache[name] = OpenAIChatModel(
             name,
             provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
-            settings=ModelSettings(parallel_tool_calls=parallel_tools, timeout=180),
+            settings=ModelSettings(timeout=180),
         )
-    return _model_cache[key]
+    return _model_cache[name]
 
 
 INSTRUCTIONS = (
@@ -121,8 +120,8 @@ INSTRUCTIONS = (
     '  Skills:\n'
     '    - Show Network State: Execute read-only show commands on Nokia SR Linux devices. '
     'Query interface status, routing tables, device info, and backup listings.\n'
-    '  Return type: NetworkAgentResult. If needs_clarification is true, ask the user the '
-    'clarifying_questions before calling again with the complete information.\n\n'
+    '  Returns a plain text string with the findings. If the agent indicates it needs more '
+    'information, ask the user the clarifying questions before calling again.\n\n'
     '- call_topology_agent (Topology Discovery Agent): Returns a pre-built, cached network topology '
     'discovered from ContainerLab devices via LLDP. Topology is refreshed every 60 seconds.\n'
     '  Skills:\n'
@@ -175,7 +174,7 @@ orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
 
 
 @orchestrator.tool_plain
-async def call_network_agent(request: str) -> NetworkAgentResult:
+async def call_network_agent(request: str) -> str:
     """Delegate a read-only network query to the Network Agent."""
     try:
         with capture_generation_ids() as gen_ids:
@@ -185,9 +184,7 @@ async def call_network_agent(request: str) -> NetworkAgentResult:
             record_agent_run(session, 'network_agent', _effective_model(), result, gen_ids)
         return result.output
     except APITimeoutError:
-        return NetworkAgentResult(
-            answer='The network agent timed out after 3 minutes.'
-        )
+        return 'The network agent timed out after 3 minutes.'
 
 
 @orchestrator.tool_plain
@@ -257,7 +254,7 @@ async def call_config_agent(request: str) -> str:
     """
     try:
         with capture_generation_ids() as gen_ids:
-            result = await config_agent.run(request, model=_get_agent_model(parallel_tools=True))
+            result = await config_agent.run(request, model=_get_agent_model())
         session = _active_session.get()
         if session is not None:
             record_agent_run(session, 'config_agent', _effective_model(), result, gen_ids)
