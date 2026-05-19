@@ -34,7 +34,7 @@ if not OPENROUTER_API_KEY:
 llm = OpenAIChatModel(
     'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
-    settings=ModelSettings(parallel_tool_calls=False, timeout=180),  # Sequential — safety for config changes
+    settings=ModelSettings(parallel_tool_calls=True, timeout=180),  # Sequential — safety for config changes
 )
 
 config_mcp = MCPServerStdio(

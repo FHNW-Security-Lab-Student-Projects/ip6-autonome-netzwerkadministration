@@ -11,4 +11,5 @@ dependencies = [
     "pyyaml",
     "netmiko",
     "fastmcp",
+    "pandas>=3.0.3",
 ]

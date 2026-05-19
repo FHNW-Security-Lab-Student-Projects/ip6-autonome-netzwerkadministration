@@ -1,297 +1,168 @@
-# Nokia SR Linux CLI Knowledge Base
+SR LINUX v24.10.1 CONFIGURATION REFERENCE
+Nokia 7220 IXR / 7250 IXR / 7730 SXR
+All commands are configuration commands (set / delete / commit / discard / info / diff).
+Revision: agent-verified
 
-## CRITICAL: SR Linux vs Other Network OS
+================================================================================
+CRITICAL: SR LINUX CLI IS NOT CISCO / JUNIPER / ARISTA
+================================================================================
+NO "interface GigabitEthernet", NO "ip address", NO "no shutdown"
+NO JunOS-style "edit", NO Arista EOS syntax
+ALWAYS use SR Linux native set-path syntax as documented below.
 
-Nokia SR Linux uses a UNIQUE CLI syntax that is DIFFERENT from:
-- Cisco IOS/IOS-XE (NO "interface GigabitEthernet", NO "ip address" commands)
-- Juniper JunOS (different config hierarchy)
-- Arista EOS (different command structure)
+================================================================================
+CONFIGURATION MODE
+================================================================================
+enter candidate          enter candidate datastore (required before any set)
+set / <path> <k> <v>     configure a parameter
+delete / <path>          remove a config node
+diff                     show diff between candidate and running
+commit now               apply candidate to running
+commit save              apply and persist to startup
+discard                  abandon candidate changes
 
-ALWAYS use SR Linux native syntax as documented below.
+INFO COMMANDS (config inspection, no state change)
+info                     full candidate config at current context
+info flat                flat-path format (pasteable)
+info from running        running config at current context
+info / <path>            candidate config at specific path
+info | as json           output as JSON
+info | as yaml           output as YAML
 
-## CLI Architecture
+================================================================================
+INTERFACE NAMING
+================================================================================
+ethernet-1/<port>           data port          e.g. ethernet-1/1
+ethernet-1/<port>/<bkout>   breakout port      e.g. ethernet-1/3/1
+mgmt0                       management port
+system0                     loopback / router-id source
+lo<N>                       additional loopback e.g. lo0
+lag<N>                      link aggregation   e.g. lag1
+irb<N>                      integrated routing/bridging  e.g. irb0
 
-SR Linux uses a hierarchical configuration model with these key concepts:
-
-1. **Path-based configuration**: All config uses paths like `/interface/ethernet-1/1`
-2. **Subinterfaces**: Physical interfaces have subinterfaces (e.g., `ethernet-1/1.0`)
-3. **Network instances**: Layer 3 routing contexts (similar to VRFs)
-4. **JSON-like structure**: Config follows a tree hierarchy
-
-## Command Modes
-
-### Show Commands (Read-only)
-- Execute in any mode
-- Always start with `show`
-- No configuration changes
-
-### Configuration Commands
-- Use `enter candidate` to enter config mode
-- Make changes with `set` or direct path navigation
-- Use `commit now` to apply changes
-- Use `discard` to abandon changes
-
-## Common Show Commands
-
-### System Information
-```
-show version
-show system information
-show system uptime
-show system memory
-```
-
-### Interface Status
-```
-show interface brief
-show interface ethernet-1/1
-show interface ethernet-1/1 detail
-show interface ethernet-1/1 statistics
-show interface ethernet-1/1 subinterface 0
-```
-
-### Network Instances
-```
-show network-instance summary
-show network-instance default
-show network-instance default protocols
-show network-instance default route-table
-```
-
-### Routing
-```
-show network-instance default route-table all
-show network-instance default route-table ipv4-unicast
-show network-instance default protocols bgp neighbor
-```
-
-### System Resources
-```
-show system lldp
-show platform chassis
-show platform linecard
-show platform cpu
-```
-
-## Configuration Syntax
-
-### General Pattern
-```
-set /<path>/<to>/<resource> <parameter> <value>
-```
-
-### Interface Configuration
-
-#### Enable Physical Interface
-```
+================================================================================
+INTERFACE CONFIGURATION
+================================================================================
 set / interface ethernet-1/1 admin-state enable
-```
+set / interface ethernet-1/1 description "Link to Router2"
+set / interface ethernet-1/1 mtu 9000
 
-#### Create Subinterface with IPv4
-```
+SUBINTERFACE — ROUTED (IPv4)
 set / interface ethernet-1/1 subinterface 0
+set / interface ethernet-1/1 subinterface 0 admin-state enable
 set / interface ethernet-1/1 subinterface 0 ipv4 admin-state enable
 set / interface ethernet-1/1 subinterface 0 ipv4 address 192.168.1.1/24
-```
 
-#### Create Subinterface with IPv6
-```
+SUBINTERFACE — ROUTED (IPv6)
 set / interface ethernet-1/1 subinterface 0 ipv6 admin-state enable
 set / interface ethernet-1/1 subinterface 0 ipv6 address 2001:db8::1/64
-```
 
-#### Configure Interface Description
-```
-set / interface ethernet-1/1 description "Link to Router2"
-```
+SUBINTERFACE — BRIDGED (mac-vrf attachment)
+set / interface ethernet-1/1 vlan-tagging true
+set / interface ethernet-1/1 subinterface 10 type bridged
+set / interface ethernet-1/1 subinterface 10 vlan encap single-tagged vlan-id 10
 
-#### Configure MTU
-```
-set / interface ethernet-1/1 mtu 9000
-```
+SUBINTERFACE — BRIDGED UNTAGGED
+set / interface ethernet-1/1 vlan-tagging false
+set / interface ethernet-1/1 subinterface 0 type bridged
 
-### System Interface (Loopback)
-```
+NOTE: VLAN encapsulation is a property of the interface/subinterface pair.
+      There is no vlan node under network-instance bridge-table.
+
+LOOPBACK / SYSTEM INTERFACE
 set / interface system0 admin-state enable
 set / interface system0 subinterface 0
 set / interface system0 subinterface 0 ipv4 admin-state enable
 set / interface system0 subinterface 0 ipv4 address 10.0.0.1/32
-```
 
-### Network Instance Configuration
+LAG
+set / interface lag1 admin-state enable
+set / interface lag1 lag lag-type lacp
+set / interface ethernet-1/1 ethernet aggregate-id lag1
 
-#### Associate Interface with Network Instance
-```
-set / network-instance default interface ethernet-1/1.0
-set / network-instance default interface system0.0
-```
+================================================================================
+NETWORK INSTANCE CONFIGURATION
+================================================================================
+NI TYPES: default  |  ip-vrf  |  mac-vrf
 
-#### Configure Router ID
-```
-set / network-instance default router-id 10.0.0.1
-```
-
-#### Create Custom Network Instance (VRF)
-```
+CREATE ip-vrf
 set / network-instance vrf-blue type ip-vrf
 set / network-instance vrf-blue admin-state enable
-set / network-instance vrf-blue interface ethernet-1/2.0
 set / network-instance vrf-blue router-id 10.0.0.1
-```
 
-### Static Routes
-```
-set / network-instance default static-routes route 0.0.0.0/0 next-hop-group group1
+CREATE mac-vrf
+set / network-instance mac-vrf-1 type mac-vrf
+set / network-instance mac-vrf-1 admin-state enable
+
+ATTACH INTERFACE (use subinterface notation <intf>.<idx>)
+set / network-instance default interface ethernet-1/1.0
+set / network-instance default interface system0.0
+set / network-instance mac-vrf-1 interface ethernet-1/1.10
+
+NOTE: Associate subinterface to network-instance AFTER creating the subinterface.
+NOTE: Bridged subinterfaces attach to mac-vrf. Routed subinterfaces attach to default or ip-vrf.
+
+================================================================================
+STATIC ROUTES
+================================================================================
+set / network-instance default next-hop-groups group nhg1 nexthop 0 ip-address 192.168.1.254
+set / network-instance default static-routes route 0.0.0.0/0 next-hop-group nhg1
 set / network-instance default static-routes route 0.0.0.0/0 admin-state enable
-set / network-instance default next-hop-groups group group1 nexthop 1 ip-address 192.168.1.254
-```
 
-### BGP Configuration
-```
+================================================================================
+BGP CONFIGURATION
+================================================================================
 set / network-instance default protocols bgp admin-state enable
 set / network-instance default protocols bgp autonomous-system 65001
 set / network-instance default protocols bgp router-id 10.0.0.1
 
-# BGP Neighbor
-set / network-instance default protocols bgp neighbor 192.168.1.2 peer-as 65002
+BGP NEIGHBOR
 set / network-instance default protocols bgp neighbor 192.168.1.2 admin-state enable
-```
+set / network-instance default protocols bgp neighbor 192.168.1.2 peer-as 65002
 
-### ACLs and Filters
-```
+BGP GROUP
+set / network-instance default protocols bgp group ebgp admin-state enable
+set / network-instance default protocols bgp group ebgp peer-as 65002
+set / network-instance default protocols bgp neighbor 192.168.1.2 peer-group ebgp
+
+================================================================================
+ACL CONFIGURATION
+================================================================================
 set / acl ipv4-filter filter1 entry 10 match ipv4 source-ip prefix 192.168.1.0/24
 set / acl ipv4-filter filter1 entry 10 action accept
-```
+set / acl ipv4-filter filter1 entry 20 action drop
 
-## Common Mistakes to Avoid
+ATTACH TO INTERFACE
+set / interface ethernet-1/1 subinterface 0 acl input ipv4-filter filter1
 
-### WRONG (Cisco IOS syntax)
-```
-interface GigabitEthernet0/0
- ip address 192.168.1.1 255.255.255.0
- no shutdown
-```
+================================================================================
+COMMON MISTAKES
+================================================================================
+WRONG — Cisco IOS syntax:
+  interface GigabitEthernet0/0
+   ip address 192.168.1.1 255.255.255.0
+   no shutdown
 
-### CORRECT (SR Linux syntax)
-```
-set / interface ethernet-1/1 admin-state enable
-set / interface ethernet-1/1 subinterface 0
-set / interface ethernet-1/1 subinterface 0 ipv4 admin-state enable
-set / interface ethernet-1/1 subinterface 0 ipv4 address 192.168.1.1/24
-set / network-instance default interface ethernet-1/1.0
-```
+CORRECT — SR Linux syntax:
+  set / interface ethernet-1/1 admin-state enable
+  set / interface ethernet-1/1 subinterface 0
+  set / interface ethernet-1/1 subinterface 0 ipv4 admin-state enable
+  set / interface ethernet-1/1 subinterface 0 ipv4 address 192.168.1.1/24
+  set / network-instance default interface ethernet-1/1.0
 
-### WRONG (Generic show commands)
-```
-show ip interface brief
-show run
-show running-config
-```
+================================================================================
+BEST PRACTICES
+================================================================================
+1. enter candidate before any set command
+2. Create interface/subinterface before attaching to network-instance
+3. Always set admin-state enable on interface, subinterface, and protocol
+4. Use diff before commit now to review changes
+5. Subinterface association always uses <intf>.<subinterface-idx> notation
+6. Bridged subinterfaces -> mac-vrf only; routed subinterfaces -> default or ip-vrf only
 
-### CORRECT (SR Linux show commands)
-```
-show interface brief
-show running-config
-info from running
-```
-
-## Interface Naming
-
-- Physical interfaces: `ethernet-1/1`, `ethernet-1/2`, etc.
-- Subinterfaces: `ethernet-1/1.0`, `ethernet-1/1.1`, etc.
-- System interface (loopback): `system0.0`
-- Management interface: `mgmt0`
-
-## Configuration Management
-
-### View Current Config
-```
-info
-info flat
-info from running
-```
-
-### Compare Candidate vs Running
-```
-diff
-```
-
-### Commit Changes
-```
-commit now
-commit save
-```
-
-### Discard Changes
-```
-discard
-```
-
-### View Configuration in JSON
-```
-info | as json
-```
-
-## Network Instance Types
-
-1. **default**: Default routing instance (always exists)
-2. **ip-vrf**: Layer 3 VRF
-3. **mac-vrf**: Layer 2 EVPN instance
-
-## Best Practices
-
-1. **Always enable interfaces**: Interfaces and subinterfaces need `admin-state enable`
-2. **Subinterface association**: Use `interface <name>.<subinterface-id>` when associating with network-instance
-3. **Order matters**: Create interface/subinterface before associating with network-instance
-4. **Use candidate mode**: Always use `enter candidate` for configuration changes
-5. **Verify before commit**: Use `diff` to see changes before `commit now`
-6. **IPv4/IPv6**: Explicitly enable protocol admin-state for each address family
-
-## Validation Commands
-
-Before committing configuration, verify:
-```
-# Check candidate configuration
-info
-
-# Compare with running config
-diff
-
-# Validate specific interface
-info / interface ethernet-1/1
-
-# Check network instance config
-info / network-instance default
-```
-
-## Troubleshooting Commands
-
-```
-show system logging
-show system alarms
-show interface ethernet-1/1 detail
-show network-instance default protocols bgp neighbor detail
-show network-instance default route-table summary
-```
-
-## Command Completion
-
-SR Linux supports tab completion for:
-- Command keywords
-- Configuration paths
-- Interface names
-- Network instance names
-
-## Important Notes
-
-1. SR Linux is MODEL-DRIVEN: All config follows YANG models
-2. Interface subinterfaces must be created before configuration
-3. Network instance associations use subinterface notation (e.g., `ethernet-1/1.0`)
-4. Many features require explicit `admin-state enable`
-5. Configuration is hierarchical - understand the path structure
-
-## Reference Documentation
-
-- Official docs: https://documentation.nokia.com/srlinux/
-- Learn SR Linux: https://learn.srlinux.dev/
-- Container Lab: https://containerlab.dev/manual/kinds/srl/
+================================================================================
+REFERENCE
+================================================================================
+Official docs:   https://documentation.nokia.com/srlinux/
+Learn SR Linux:  https://learn.srlinux.dev/
+Container Lab:   https://containerlab.dev/manual/kinds/srl/

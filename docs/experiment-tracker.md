@@ -2,11 +2,15 @@
 
 ## Purpose
 
-The experiment tracker collects per-session metadata for every user turn processed by the web UI. The goal is to compare different LLMs on network troubleshooting tasks — measuring cost, latency, tool usage, and token consumption across agents without any manual data collection.
+The experiment tracker records per-session metrics for structured LLM comparison experiments. The goal is to compare different LLMs on network troubleshooting tasks — measuring cost, latency, tool usage, and token consumption across agents.
 
-Each user message triggers one **session**. A session records:
+> **The web UI (`web_ui.py`) does not do any tracking** — it is kept clean for demos.
+> All experiment data is collected exclusively via `experiment_runner.py`.
+> See [experiment-runner.md](experiment-runner.md) for how to run experiments.
+
+Each query submitted through `experiment_runner.py` triggers one **session**. A session records:
 - Which model was active
-- Which sub-agents were invoked
+- Which sub-agents were invoked (including the orchestrator)
 - Tokens consumed (input / output) per agent
 - Number of LLM round-trips and MCP tool calls per agent
 - Wall-clock duration per agent and total
@@ -25,29 +29,29 @@ Data is written to two outputs:
 |---|---|
 | `experiment_tracker.py` | Core module: dataclasses, pricing table, `begin/record/finish_session` |
 | `client_agent.py` | Sub-agent tool functions record their runs into the active session |
-| `web_ui.py` | Middleware creates a session per POST request and finishes it via `BackgroundTask` |
+| `experiment_runner.py` | Entry point for experiments — calls orchestrator directly, records full usage |
 
 ---
 
 ## Running Experiments
 
-### Basic use
+See [experiment-runner.md](experiment-runner.md) for the full usage guide.
 
-Start the web UI as normal and send messages through the browser. Every message is automatically recorded.
+### Quick start
 
 ```bash
-uv run python web_ui.py
+uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-01 --file scenarios/bgp-troubleshooting.txt
 ```
 
 ### Tagging a scenario
 
-Set `EXPERIMENT_SCENARIO` before starting to label all sessions in this run. This is the primary way to group sessions by experiment name for comparison.
+Set `EXPERIMENT_SCENARIO` before starting the runner to label all sessions in a batch. This is the primary way to group sessions by experiment name for comparison.
 
 ```bash
-EXPERIMENT_SCENARIO=bgp-flap-01 uv run python web_ui.py
+EXPERIMENT_SCENARIO=bgp-flap-01 uv run python experiment_runner.py --model z-ai/glm-5 --file scenarios/bgp-troubleshooting.txt
 ```
 
-Run the same scenario with a different model selected in the UI dropdown to produce a second batch of records with a different `model` field but the same `scenario`. Repeat for each LLM you want to compare.
+Run the same command with a different `--model` to produce a second batch with the same `scenario`. Repeat for each LLM you want to compare.
 
 ---
 
