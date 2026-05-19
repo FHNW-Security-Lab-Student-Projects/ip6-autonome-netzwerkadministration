@@ -80,16 +80,22 @@ def agent_breakdown(df: pd.DataFrame) -> pd.DataFrame:
     details['model']    = agents['model'].values
     details['scenario'] = agents['scenario'].values
 
+    # cost_usd is the current field name; estimated_cost_usd was used in older records
+    if 'cost_usd' not in details.columns and 'estimated_cost_usd' in details.columns:
+        details['cost_usd'] = details['estimated_cost_usd']
+    elif 'cost_usd' not in details.columns:
+        details['cost_usd'] = 0.0
+
     breakdown = (
         details.groupby(['model', 'agent_name'], sort=True)
         .agg(
-            runs              = ('input_tokens',        'count'),
-            avg_input_tokens  = ('input_tokens',        'mean'),
-            avg_output_tokens = ('output_tokens',       'mean'),
-            avg_tool_calls    = ('tool_calls',          'mean'),
-            avg_llm_requests  = ('llm_requests',        'mean'),
-            avg_duration_s    = ('duration_s',          'mean'),
-            avg_cost_usd      = ('estimated_cost_usd',  'mean'),
+            runs              = ('input_tokens',  'count'),
+            avg_input_tokens  = ('input_tokens',  'mean'),
+            avg_output_tokens = ('output_tokens', 'mean'),
+            avg_tool_calls    = ('tool_calls',    'mean'),
+            avg_llm_requests  = ('llm_requests',  'mean'),
+            avg_duration_s    = ('duration_s',    'mean'),
+            avg_cost_usd      = ('cost_usd',      'mean'),
         )
     )
     return breakdown.round({

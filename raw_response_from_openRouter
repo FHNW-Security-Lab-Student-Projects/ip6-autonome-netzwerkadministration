@@ -1,0 +1,36 @@
+==== QUERY ====
+"Say hello and describe yourself in 2-3 sentences."
+
+==== RESPONSE TEXT ====
+Hello there! I am a large language model developed by Z.ai, designed to assist with a wide range of tasks from answering questions to generating creative content. My purpose is to provide helpful, accurate, and safe information to support your needs.
+
+==== MODEL RESPONSE (raw Pydantic AI) ====
+ModelResponse(
+  parts=[
+    ThinkingPart(
+      content='The user wants a greeting and a brief self-description in 2-3 sentences.\n\n1.  **Greeting:** ...\n2.  **Self-description:** Identify as an AI, mention Z.ai, describe purpose.\n3.  Final: "Hello there! I am a large language model developed by Z.ai, designed to assist with a wide range of tasks. My purpose is to provide helpful, accurate, and safe information to answer your questions and spark creativity."',
+      id='reasoning',
+      provider_name='openrouter'
+    ),
+    TextPart(
+      content='Hello there! I am a large language model developed by Z.ai, designed to assist with a wide range of tasks from answering questions to generating creative content. My purpose is to provide helpful, accurate, and safe information to support your needs.'
+    )
+  ],
+  usage=RequestUsage(
+    input_tokens=17,
+    output_tokens=299,
+    details={'is_byok': False, 'audio_tokens': 0, 'reasoning_tokens': 274, 'image_tokens': 0}
+  ),
+  model_name='z-ai/glm-5-20260211',
+  timestamp=2026-05-19T11:36:55.079873+00:00,
+  provider_name='openrouter',
+  provider_url='https://openrouter.ai/api/v1',
+  provider_details={
+    'finish_reason': 'stop',
+    'timestamp': 2026-05-19T11:36:46+00:00
+  },
+  provider_response_id='gen-1779190606-nLMgRmC3OjaTOtaw22X4',
+  finish_reason='stop',
+  run_id='019e4006-2839-76f7-a2bc-a9ff87fceb1b',
+  conversation_id='019e4006-2839-76f7-a2bc-a9feefb7fd96'
+)

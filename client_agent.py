@@ -1,7 +1,6 @@
 import asyncio
 import os
 import logging
-import time
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -18,7 +17,9 @@ from config_agent import config_agent, config_lifespan
 from experiment_tracker import (
     ExperimentSession,
     begin_session,
+    capture_generation_ids,
     finish_session,
+    make_tracked_http_client,
     record_agent_run,
 )
 from network_agent import NetworkAgentResult, network_agent, network_lifespan
@@ -50,9 +51,13 @@ OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
+# Single shared httpx client with OpenRouter generation ID tracking hook.
+# All OpenRouterProvider instances use this so that capture_generation_ids() works.
+_tracked_http_client = make_tracked_http_client()
+
 llm = OpenAIChatModel(
     'z-ai/glm-5',
-    provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
+    provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
     settings=ModelSettings(parallel_tool_calls=True, timeout=180),
 )
 
@@ -63,11 +68,12 @@ AVAILABLE_OPENROUTER_MODELS: dict[str, str] = {
     'Claude Sonnet 4.6': 'anthropic/claude-sonnet-4.6',
     'Claude Opus 4.7': 'anthropic/claude-opus-4.7',
     'GLM5.1': 'z-ai/glm-5.1',
+    'qwen3.6-plus' : 'qwen/qwen3.6-plus',
 }
 
 # Pre-built Model objects for the web UI (imported by web_ui.py for to_web(models=...)).
 UI_EXTRA_MODELS: dict[str, OpenAIChatModel] = {
-    label: OpenAIChatModel(name, provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY))
+    label: OpenAIChatModel(name, provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client))
     for label, name in AVAILABLE_OPENROUTER_MODELS.items()
 }
 
@@ -100,7 +106,7 @@ def _get_agent_model(parallel_tools: bool = True) -> OpenAIChatModel | None:
     if key not in _model_cache:
         _model_cache[key] = OpenAIChatModel(
             name,
-            provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
+            provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
             settings=ModelSettings(parallel_tool_calls=parallel_tools, timeout=180),
         )
     return _model_cache[key]
@@ -172,11 +178,11 @@ orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
 async def call_network_agent(request: str) -> NetworkAgentResult:
     """Delegate a read-only network query to the Network Agent."""
     try:
-        t0 = time.monotonic()
-        result = await network_agent.run(request, model=_get_agent_model())
+        with capture_generation_ids() as gen_ids:
+            result = await network_agent.run(request, model=_get_agent_model())
         session = _active_session.get()
         if session is not None:
-            record_agent_run(session, 'network_agent', _effective_model(), result, time.monotonic() - t0)
+            record_agent_run(session, 'network_agent', _effective_model(), result, gen_ids)
         return result.output
     except APITimeoutError:
         return NetworkAgentResult(
@@ -250,11 +256,11 @@ async def call_config_agent(request: str) -> str:
     Prefix with "APPLY (user approved):" to apply after the user has confirmed the diff.
     """
     try:
-        t0 = time.monotonic()
-        result = await config_agent.run(request, model=_get_agent_model(parallel_tools=True))
+        with capture_generation_ids() as gen_ids:
+            result = await config_agent.run(request, model=_get_agent_model(parallel_tools=True))
         session = _active_session.get()
         if session is not None:
-            record_agent_run(session, 'config_agent', _effective_model(), result, time.monotonic() - t0)
+            record_agent_run(session, 'config_agent', _effective_model(), result, gen_ids)
         return result.output
     except APITimeoutError:
         return 'The config agent timed out after 3 minutes.'
@@ -269,11 +275,11 @@ async def call_snapshot_agent(request: str) -> str:
     'what ARP entries were present on switch1 at 14:00?'
     """
     try:
-        t0 = time.monotonic()
-        result = await snapshot_agent.run(request, model=_get_agent_model())
+        with capture_generation_ids() as gen_ids:
+            result = await snapshot_agent.run(request, model=_get_agent_model())
         session = _active_session.get()
         if session is not None:
-            record_agent_run(session, 'snapshot_agent', _effective_model(), result, time.monotonic() - t0)
+            record_agent_run(session, 'snapshot_agent', _effective_model(), result, gen_ids)
         return result.output
     except APITimeoutError:
         return 'The snapshot agent timed out after 3 minutes.'

@@ -4,5 +4,3 @@
 #   uv run python experiment_runner.py --model <model-id> --scenario basic-reachability --file scenarios/basic-reachability.txt
 
 What is the current status of all interfaces on router1?
-Is there any route to 10.10.10.0/24 on router2?
-List all devices in the network and their roles.

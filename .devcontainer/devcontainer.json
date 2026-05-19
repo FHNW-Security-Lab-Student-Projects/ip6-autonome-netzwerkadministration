@@ -1,6 +1,10 @@
 {
     "image": "ghcr.io/srl-labs/containerlab/devcontainer-dind-slim:latest",
     "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.cargo/bin:$PATH\" && uv python install 3.13 && uv sync",
+    "remoteEnv": {
+        "VIRTUAL_ENV": "",
+        "UV_LINK_MODE": "copy"
+    },
     "customizations": {
         "vscode": {
             "settings": {

@@ -1,0 +1,98 @@
+==== QUERY ====
+"Say hello and describe yourself in 2-3 sentences."
+Model: z-ai/glm-5
+
+==== GENERATION ID (from X-Generation-Id response header) ====
+gen-1779190771-kGq4XbrXZP3aWaFhEX7M
+
+==== OPENROUTER GENERATION API POLLING ====
+Endpoint: GET https://openrouter.ai/api/v1/generation?id=<generation_id>
+
+--- Attempt 1 (after 3s) — status 404 ---
+{
+  "error": {
+    "message": "Generation gen-1779190771-kGq4XbrXZP3aWaFhEX7M not found",
+    "code": 404
+  }
+}
+
+--- Attempt 2 (after 7s) — status 404 ---
+{
+  "error": {
+    "message": "Generation gen-1779190771-kGq4XbrXZP3aWaFhEX7M not found",
+    "code": 404
+  }
+}
+
+--- Attempt 3 (after 15s) — status 200 (SUCCESS) ---
+{
+  "data": {
+    "id": "gen-1779190771-kGq4XbrXZP3aWaFhEX7M",
+    "created_at": "2026-05-19T11:39:31.276Z",
+    "model": "z-ai/glm-5-20260211",
+    "provider_name": "DeepInfra",
+    "streamed": true,
+    "cancelled": false,
+
+    "latency": 1082,
+    "generation_time": 15431,
+
+    "tokens_prompt": 13,
+    "tokens_completion": 357,
+    "native_tokens_prompt": 17,
+    "native_tokens_completion": 318,
+    "native_tokens_reasoning": 308,
+    "native_tokens_cached": 8,
+    "native_tokens_completion_images": null,
+
+    "num_media_prompt": null,
+    "num_media_completion": 0,
+    "num_search_results": null,
+    "num_fetches": null,
+    "num_input_audio_prompt": null,
+
+    "usage": 0.0006678,
+    "total_cost": 0.0006678,
+    "cache_discount": 3.84e-06,
+    "upstream_inference_cost": 0,
+
+    "finish_reason": "stop",
+    "native_finish_reason": "stop",
+    "service_tier": null,
+
+    "is_byok": false,
+    "origin": "",
+    "user_agent": "pydantic-ai/1.94.0",
+    "http_referer": null,
+    "api_type": "completions",
+    "request_id": "req-1779190771-pwcrC5zBmxSQyB8RBYyt",
+    "upstream_id": "chatcmpl-RPUiC4jvfLEo32lYzCUZ9lTR",
+    "session_id": null,
+    "app_id": null,
+    "external_user": null,
+    "router": null,
+    "moderation_latency": null,
+    "response_cache_source_id": null,
+
+    "provider_responses": [
+      {
+        "endpoint_id": "fc28f8b4-9560-49bb-991e-3bb7bc1c3c1d",
+        "id": "chatcmpl-RPUiC4jvfLEo32lYzCUZ9lTR",
+        "is_byok": false,
+        "latency": 195,
+        "model_permaslug": "z-ai/glm-5-20260211",
+        "provider_name": "DeepInfra",
+        "status": 200
+      }
+    ]
+  }
+}
+
+==== SUMMARY ====
+Cost:                $0.0006678 USD
+Input tokens:        13  (native: 17, cached: 8)
+Output tokens:       357 (native: 318, reasoning: 308)
+Generation time:     15431 ms
+Latency (TTFT):      1082 ms
+Provider:            DeepInfra (via OpenRouter)
+Model (resolved):    z-ai/glm-5-20260211
