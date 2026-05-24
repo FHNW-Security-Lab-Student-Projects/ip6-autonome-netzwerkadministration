@@ -9,7 +9,6 @@ dependencies = [
     "httpx",
     "logfire[httpx]>=4.29.0",
     "pyyaml",
-    "netmiko",
     "fastmcp",
     "pandas>=3.0.3",
 ]

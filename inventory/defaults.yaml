@@ -1,2 +1,4 @@
 username: admin
 password: NokiaSrl1!
+jsonrpc_scheme: http
+jsonrpc_port: 80

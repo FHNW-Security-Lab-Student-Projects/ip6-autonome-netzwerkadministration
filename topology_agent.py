@@ -1,24 +1,23 @@
 """Topology Discovery Agent
 
-Discovers network topology from ContainerLab environments by SSHing directly
-into each network device and querying LLDP neighbors.
+Discovers network topology from ContainerLab environments by querying each
+network device's LLDP neighbors over JSON-RPC.
 
 Architecture:
   topology_agent.py (no LLM in the request path)
       └── background refresh task
               ├── parse testlab.clab.yml
-              └── SSH into each device in parallel (netmiko)
+              └── JSON-RPC into each device in parallel (httpx.AsyncClient)
 
 At startup and every REFRESH_INTERVAL seconds, topology discovery runs in the
 background and the result is cached. Callers use get_topology() or
-get_topology_response() to read the cache — no SSH on the hot path.
+get_topology_response() to read the cache — no device I/O on the hot path.
 
 Import and use via agent delegation:
     from topology_agent import get_topology_response, topology_lifespan
 """
 
 import asyncio
-import json
 import re
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -28,8 +27,9 @@ from pathlib import Path
 import logfire
 import yaml
 from dotenv import load_dotenv
-from netmiko import ConnectHandler
 from pydantic import BaseModel
+
+from srl_jsonrpc import SrlJsonRpcError, get_connection, jrpc_get
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -43,7 +43,6 @@ load_dotenv(Path(__file__).parent / '.env')
 NETWORK_DEVICE_KINDS: frozenset[str] = frozenset({'nokia_srlinux'})
 
 DEFAULT_CLAB_FILE = str(Path(__file__).parent / 'testlab.clab.yml')
-INVENTORY_DIR = Path(__file__).parent / 'inventory'
 REFRESH_INTERVAL = 60  # seconds between topology refreshes
 
 
@@ -94,145 +93,79 @@ _cache: CachedTopology | None = None
 
 
 # ---------------------------------------------------------------------------
-# Inventory helpers
+# LLDP parsing
 # ---------------------------------------------------------------------------
 
-def _load_inventory() -> tuple[dict, dict]:
-    """Load device inventory from YAML files. Returns (hosts, defaults)."""
-    with open(INVENTORY_DIR / 'hosts.yaml') as f:
-        hosts = yaml.safe_load(f)
-    with open(INVENTORY_DIR / 'defaults.yaml') as f:
-        defaults = yaml.safe_load(f)
-    return hosts, defaults
+def _extract_lldp_interfaces(result: object) -> list[dict]:
+    """Pull the list of interface objects out of a JSON-RPC `get` result.
 
-
-def _get_connection_params(node_name: str) -> dict:
-    """Look up a device in the inventory and return netmiko connection params.
-
-    Raises ValueError if the device is not found.
+    Defensive across the shapes SR Linux may return for the queried path.
     """
-    hosts, defaults = _load_inventory()
-    if node_name not in hosts:
-        raise ValueError(
-            f"Device '{node_name}' not found in inventory. "
-            f"Available: {list(hosts.keys())}"
-        )
-    device = hosts[node_name]
-    return {
-        'device_type': device['platform'],
-        'host': device['hostname'],
-        'username': defaults['username'],
-        'password': defaults['password'],
-    }
+    if isinstance(result, list):
+        return result
+    if isinstance(result, dict):
+        if 'interface' in result and isinstance(result['interface'], list):
+            return result['interface']
+        lldp = result.get('system', {}).get('lldp', {})
+        if isinstance(lldp, dict) and isinstance(lldp.get('interface'), list):
+            return lldp['interface']
+    return []
 
 
-# ---------------------------------------------------------------------------
-# SSH + output parsing helpers
-# ---------------------------------------------------------------------------
-
-def _strip_ansi(text: str) -> str:
-    """Remove ANSI escape codes that some devices emit over SSH."""
-    return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
-
-
-def _ssh_send_command(params: dict, command: str) -> str:
-    """Open an SSH session and run a single command. Returns raw output.
-
-    Synchronous — must be called via asyncio.to_thread().
-    """
-    with ConnectHandler(**params) as conn:
-        return conn.send_command(command)
-
-
-def _parse_srlinux_lldp(data: dict) -> list[dict]:
-    """Parse SR Linux 'show system lldp neighbor | as json' output.
-
-    The CLI JSON format uses a flat 'LLDP-Interface' list where each entry
-    represents one neighbor (one row per neighbor, not per interface):
-      {
-        "LLDP-Interface": [
-          {"Name": "ethernet-1/1", "Neighbor System Name": "router1", "Neighbor Port": "ethernet-1/2"},
-          ...
-        ]
-      }
-    """
+def _parse_srlinux_lldp(result: object) -> list[dict]:
+    """Convert a JSON-RPC LLDP get result into a flat list of neighbor entries."""
     neighbors: list[dict] = []
-    try:
-        for entry in data.get('LLDP-Interface', []):
-            local_port = entry.get('Name', 'unknown')
-            nbr_name = entry.get('Neighbor System Name', '')
-            nbr_port = entry.get('Neighbor Port', '')
+    for iface in _extract_lldp_interfaces(result):
+        if not isinstance(iface, dict):
+            continue
+        local_port = iface.get('name', 'unknown')
+        for nbr in iface.get('neighbor', []) or []:
+            if not isinstance(nbr, dict):
+                continue
+            nbr_name = nbr.get('system-name', '')
+            nbr_port = nbr.get('port-id', '')
             if nbr_name:
                 neighbors.append({
                     'local_port': local_port,
                     'neighbor_name': nbr_name,
                     'neighbor_port': nbr_port,
                 })
-    except (KeyError, TypeError, AttributeError) as exc:
-        print(f'[DEBUG][_parse_srlinux_lldp] parse exception: {exc}', flush=True)
     return neighbors
 
 
 # ---------------------------------------------------------------------------
-# Per-vendor SSH query functions
+# Per-vendor query functions
 # ---------------------------------------------------------------------------
 
 async def _query_srlinux(node_name: str) -> dict:
-    """SSH into a Nokia SR Linux device and return its LLDP neighbors."""
+    """Query a Nokia SR Linux device via JSON-RPC and return its LLDP neighbors."""
     try:
-        params = _get_connection_params(node_name)
+        conn = get_connection(node_name)
     except ValueError as e:
         return {'node': node_name, 'neighbors': [], 'error': str(e)}
 
     try:
-        raw = await asyncio.to_thread(
-            _ssh_send_command,
-            params,
-            'show system lldp neighbor | as json',
+        results = await jrpc_get(
+            conn,
+            ['/system/lldp/interface[name=*]'],
+            datastore='state',
         )
-    except Exception as e:
+    except SrlJsonRpcError as e:
         logfire.error(
-            'SSH command failed',
+            'JSON-RPC LLDP query failed',
             node=node_name,
-            host=params['host'],
+            host=conn.host,
             error=str(e),
         )
-        return {'node': node_name, 'neighbors': [], 'error': f'SSH error: {e}'}
+        return {'node': node_name, 'neighbors': [], 'error': f'JSON-RPC error: {e}'}
 
-    clean = _strip_ansi(raw)
-    json_start = clean.find('{')
-    if json_start == -1:
-        logfire.warning(
-            'No JSON in LLDP output',
-            node=node_name,
-            host=params['host'],
-            raw_output=raw,
-        )
-        return {
-            'node': node_name,
-            'neighbors': [],
-            'error': f'No JSON in output: {clean[:300]}',
-        }
-
-    try:
-        data = json.loads(clean[json_start:])
-    except json.JSONDecodeError as e:
-        logfire.error(
-            'LLDP JSON parse failed',
-            node=node_name,
-            host=params['host'],
-            raw_output=raw,
-            error=str(e),
-        )
-        return {'node': node_name, 'neighbors': [], 'error': f'JSON parse error: {e}'}
-
-    neighbors = _parse_srlinux_lldp(data)
+    raw = results[0] if results else {}
+    neighbors = _parse_srlinux_lldp(raw)
     logfire.info(
-        'SR Linux LLDP via SSH',
+        'SR Linux LLDP via JSON-RPC',
         node=node_name,
-        host=params['host'],
-        raw_output=raw,
-        parsed_json=data,
+        host=conn.host,
+        parsed_json=raw,
         neighbors=neighbors,
         neighbor_count=len(neighbors),
     )
@@ -242,8 +175,6 @@ async def _query_srlinux(node_name: str) -> dict:
 # Add new vendor functions here, e.g.:
 #
 # async def _query_arista(node_name: str) -> dict:
-#     params = _get_connection_params(node_name)
-#     raw = await asyncio.to_thread(_ssh_send_command, params, 'show lldp neighbors detail | json')
 #     ...
 
 

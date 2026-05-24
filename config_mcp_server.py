@@ -30,7 +30,8 @@ import logfire
 import yaml
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from netmiko import ConnectHandler
+
+from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli, jrpc_get
 
 env_file = Path(__file__).parent / '.env'
 if env_file.exists():
@@ -56,7 +57,7 @@ CORRECTIONS_PATH = Path(__file__).parent / 'command_corrections.md'
 
 
 # ---------------------------------------------------------------------------
-# Inventory + SSH helpers
+# Inventory helpers
 # ---------------------------------------------------------------------------
 
 def _load_inventory() -> tuple[dict, dict]:
@@ -67,26 +68,20 @@ def _load_inventory() -> tuple[dict, dict]:
     return hosts, defaults
 
 
-def _connect(device_name: str) -> ConnectHandler:
-    hosts, defaults = _load_inventory()
-    if device_name not in hosts:
-        raise ValueError(
-            f"Device '{device_name}' not found. Available: {list(hosts.keys())}"
-        )
-    device = hosts[device_name]
-    return ConnectHandler(
-        device_type=device['platform'],
-        host=device['hostname'],
-        username=defaults['username'],
-        password=defaults['password'],
-    )
-
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _backup_internal(device_name: str, conn: ConnectHandler) -> str:
+def _cli_result_to_text(raw: object) -> str:
+    """JSON-RPC cli with output-format=text returns strings; be defensive anyway."""
+    if isinstance(raw, str):
+        return raw
+    if raw is None:
+        return ''
+    return json.dumps(raw, indent=2)
+
+
+async def _backup_internal(device_name: str, conn: SrlConnection) -> str:
     """Create a timestamped JSON backup of running config. Returns backup file path."""
     device_backup_dir = BACKUP_DIR / device_name
     device_backup_dir.mkdir(parents=True, exist_ok=True)
@@ -94,12 +89,10 @@ def _backup_internal(device_name: str, conn: ConnectHandler) -> str:
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     backup_path = device_backup_dir / f'{timestamp}_backup.json'
 
-    raw_json = conn.send_command('info from running | as json', read_timeout=30)
-
-    try:
-        json.loads(raw_json)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f'Device returned invalid JSON for backup: {exc}') from exc
+    result = await jrpc_get(conn, ['/'], datastore='running')
+    if not result:
+        raise RuntimeError('Empty result from JSON-RPC get for backup')
+    raw_json = json.dumps(result[0], indent=2)
 
     hosts, _ = _load_inventory()
     hostname = hosts[device_name]['hostname']
@@ -115,18 +108,40 @@ def _backup_internal(device_name: str, conn: ConnectHandler) -> str:
     return str(backup_path)
 
 
-def _validate_internal(
-    conn: ConnectHandler, config_commands: list[str]
+async def _run_candidate_sequence(
+    conn: SrlConnection,
+    config_commands: list[str],
+    finalize: str,
+) -> tuple[str, list[str], str]:
+    """Execute enter candidate → set ... → diff → <finalize> as one CLI batch.
+
+    finalize is either 'discard now' (validation) or 'commit now' (apply).
+
+    Returns (diff_text, formatted_cmd_outputs, finalize_output).
+    """
+    commands = ['enter candidate', *config_commands, 'diff', finalize]
+    results = await jrpc_cli(conn, commands, output_format='text')
+
+    n = len(config_commands)
+    cmd_results = results[1:1 + n]
+    diff_raw = results[1 + n] if len(results) > 1 + n else ''
+    finalize_raw = results[2 + n] if len(results) > 2 + n else ''
+
+    cmd_outputs: list[str] = []
+    for cmd, raw in zip(config_commands, cmd_results):
+        out_str = _cli_result_to_text(raw).strip() or '(ok)'
+        cmd_outputs.append(f'  {cmd}\n  → {out_str}')
+
+    return _cli_result_to_text(diff_raw), cmd_outputs, _cli_result_to_text(finalize_raw)
+
+
+async def _validate_internal(
+    conn: SrlConnection, config_commands: list[str]
 ) -> tuple[str, list[str]]:
-    """Enter candidate, run commands, capture diff, discard. Returns (diff, cmd_outputs)."""
-    conn.send_command_timing('enter candidate')
-    cmd_outputs = []
-    for cmd in config_commands:
-        out = conn.send_command_timing(cmd)
-        out_str = out if isinstance(out, str) else str(out)
-        cmd_outputs.append(f'  {cmd}\n  → {out_str.strip() or "(ok)"}')
-    diff = conn.send_command_timing('diff')
-    conn.send_command_timing('discard now')
+    """Run commands in candidate, capture diff, discard. Returns (diff, cmd_outputs)."""
+    diff, cmd_outputs, _ = await _run_candidate_sequence(
+        conn, config_commands, finalize='discard now'
+    )
     return diff, cmd_outputs
 
 
@@ -200,7 +215,7 @@ def report_command_issue(command: str, issue: str) -> str:
 
 
 @mcp.tool()
-def validate_config(device_name: str, config_commands: list[str]) -> str:
+async def validate_config(device_name: str, config_commands: list[str]) -> str:
     """Preview configuration changes in candidate mode WITHOUT committing.
 
     Enters candidate mode, applies the commands, captures the diff, then discards
@@ -215,8 +230,8 @@ def validate_config(device_name: str, config_commands: list[str]) -> str:
         A summary of commands and the configuration diff showing what would change.
     """
     try:
-        with _connect(device_name) as conn:
-            diff, cmd_outputs = _validate_internal(conn, config_commands)
+        conn = get_connection(device_name)
+        diff, cmd_outputs = await _validate_internal(conn, config_commands)
         result = f'Validation preview for {device_name}\n'
         result += 'Commands:\n' + '\n'.join(cmd_outputs) + '\n\n'
         result += f'Diff (what would change):\n{diff or "(no changes detected)"}\n'
@@ -228,7 +243,7 @@ def validate_config(device_name: str, config_commands: list[str]) -> str:
 
 
 @mcp.tool()
-def backup_config(device_name: str) -> str:
+async def backup_config(device_name: str) -> str:
     """Create a timestamped JSON backup of the current running configuration.
 
     Args:
@@ -238,8 +253,8 @@ def backup_config(device_name: str) -> str:
         Path to the created backup file.
     """
     try:
-        with _connect(device_name) as conn:
-            path = _backup_internal(device_name, conn)
+        conn = get_connection(device_name)
+        path = await _backup_internal(device_name, conn)
         return f'Backup created: {path}'
     except Exception as exc:
         return f'Backup error on {device_name}: {exc}'
@@ -270,7 +285,7 @@ def list_backups(device_name: str) -> str:
 
 
 @mcp.tool()
-def apply_config(device_name: str, config_commands: list[str]) -> str:
+async def apply_config(device_name: str, config_commands: list[str]) -> str:
     """Apply configuration commands to a device and commit.
 
     Automatically creates a backup before making any changes.
@@ -288,39 +303,34 @@ def apply_config(device_name: str, config_commands: list[str]) -> str:
         Result including backup path, commands applied, diff, and commit status.
     """
     try:
-        with _connect(device_name) as conn:
-            # Auto-backup before any changes
+        conn = get_connection(device_name)
+
+        try:
+            backup_path = await _backup_internal(device_name, conn)
+            backup_msg = f'Backup created: {backup_path}'
+        except Exception as be:
+            backup_msg = f'Warning: backup failed: {be}'
+
+        diff, cmd_outputs, commit_str = await _run_candidate_sequence(
+            conn, config_commands, finalize='commit now'
+        )
+
+        success_marker = 'All changes have been committed.'
+        if success_marker not in commit_str:
             try:
-                backup_path = _backup_internal(device_name, conn)
-                backup_msg = f'Backup created: {backup_path}'
-            except Exception as be:
-                backup_msg = f'Warning: backup failed: {be}'
-
-            # Apply in candidate mode
-            conn.send_command_timing('enter candidate')
-            cmd_outputs = []
-            for cmd in config_commands:
-                out = conn.send_command_timing(cmd)
-                out_str = out if isinstance(out, str) else str(out)
-                cmd_outputs.append(f'  {cmd}\n  → {out_str.strip() or "(ok)"}')
-
-            diff = conn.send_command_timing('diff')
-            commit_out = conn.send_command_timing('commit now')
-            commit_str = commit_out if isinstance(commit_out, str) else str(commit_out)
-
-            success_marker = 'All changes have been committed.'
-            if success_marker not in commit_str:
-                conn.send_command_timing('discard now')
-                logfire.error('Config commit failed', device=device_name)
-                return (
-                    f'COMMIT FAILED on {device_name}\n\n'
-                    f'{backup_msg}\n\n'
-                    f'Commands:\n' + '\n'.join(cmd_outputs) + '\n\n'
-                    f'Diff:\n{diff}\n\n'
-                    f'Commit output:\n{commit_str}\n\n'
-                    f'Changes discarded. Device is in a clean state.\n'
-                    f'Review the error and correct the commands before retrying.'
-                )
+                await jrpc_cli(conn, ['discard now'], output_format='text')
+            except SrlJsonRpcError:
+                pass
+            logfire.error('Config commit failed', device=device_name)
+            return (
+                f'COMMIT FAILED on {device_name}\n\n'
+                f'{backup_msg}\n\n'
+                f'Commands:\n' + '\n'.join(cmd_outputs) + '\n\n'
+                f'Diff:\n{diff}\n\n'
+                f'Commit output:\n{commit_str}\n\n'
+                f'Changes discarded. Device is in a clean state.\n'
+                f'Review the error and correct the commands before retrying.'
+            )
 
         logfire.info('Config applied', device=device_name, commands=config_commands)
         return (

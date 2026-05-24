@@ -8,7 +8,7 @@ look like 5 minutes before the incident?".
 Architecture:
     state_snapshot_agent.py (Pydantic AI Agent + background refresh task)
         └── background refresh task
-                └── SSH into each device in parallel (netmiko)
+                └── JSON-RPC into each device in parallel (httpx.AsyncClient)
 
 At startup, existing snapshots are loaded from disk. The background loop then
 runs immediately and every REFRESH_INTERVAL seconds thereafter.
@@ -21,19 +21,18 @@ import asyncio
 import difflib
 import json
 import os
-import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
 import logfire
-import yaml
 from dotenv import load_dotenv
-from netmiko import ConnectHandler
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
+
+from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli, list_devices
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -46,7 +45,6 @@ if not OPENROUTER_API_KEY:
 # Constants
 # ---------------------------------------------------------------------------
 
-INVENTORY_DIR = Path(__file__).parent / 'inventory'
 SNAPSHOTS_FILE = Path(__file__).parent / 'state_snapshots.json'
 REFRESH_INTERVAL = 120  # seconds between snapshot runs
 MAX_SNAPSHOTS = 30      # per device per table — ~1 hour at 2-min intervals
@@ -59,43 +57,27 @@ STATIC_SNAPSHOT_COMMANDS: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# Inventory + SSH helpers (same pattern as topology_agent.py)
+# Snapshot capture helpers
 # ---------------------------------------------------------------------------
 
-def _load_inventory() -> tuple[dict, dict]:
-    with open(INVENTORY_DIR / 'hosts.yaml') as f:
-        hosts = yaml.safe_load(f)
-    with open(INVENTORY_DIR / 'defaults.yaml') as f:
-        defaults = yaml.safe_load(f)
-    return hosts, defaults
+def _coerce_output(raw: object) -> dict | list | str:
+    """Normalize a per-command JSON-RPC result.
 
-
-def _get_connection_params(device_name: str) -> dict:
-    hosts, defaults = _load_inventory()
-    if device_name not in hosts:
-        raise ValueError(
-            f"Device '{device_name}' not found. Available: {list(hosts.keys())}"
-        )
-    device = hosts[device_name]
-    return {
-        'device_type': device['platform'],
-        'host': device['hostname'],
-        'username': defaults['username'],
-        'password': defaults['password'],
-    }
-
-
-def _strip_ansi(text: str) -> str:
-    return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
-
-
-def _parse_json_output(raw: str) -> dict | list | str:
-    """Strip ANSI and parse JSON; fall back to plain text on failure."""
-    cleaned = _strip_ansi(raw)
-    try:
-        return json.loads(cleaned)
-    except (json.JSONDecodeError, ValueError):
-        return cleaned
+    `jrpc_cli(..., output_format='json')` returns already-decoded objects for
+    show commands. Some commands still come back as raw strings (e.g. those
+    with no JSON form) — keep those as text so existing diff tooling works.
+    """
+    if isinstance(raw, (dict, list)):
+        return raw
+    if isinstance(raw, str):
+        s = raw.strip()
+        if s and s[0] in '{[':
+            try:
+                return json.loads(s)
+            except (json.JSONDecodeError, ValueError):
+                return raw
+        return raw
+    return str(raw) if raw is not None else ''
 
 
 def _parse_network_instances_json(data: dict | list | str) -> list[str]:
@@ -116,22 +98,31 @@ def _format_output(output: dict | list | str) -> str:
     return output
 
 
-def _ssh_capture_device(params: dict) -> dict[str, dict | list | str]:
-    """Open one SSH connection and collect all snapshot tables for a device."""
-    results: dict[str, dict | list | str] = {}
-    with ConnectHandler(**params) as conn:
-        ni_data = _parse_json_output(conn.send_command('show network-instance | as json'))
-        ni_names = _parse_network_instances_json(ni_data)
+async def _capture_device(conn: SrlConnection) -> dict[str, dict | list | str]:
+    """Collect all snapshot tables for a device in two JSON-RPC `cli` batches."""
+    # Step 1: discover network-instances
+    ni_results = await jrpc_cli(
+        conn,
+        ['show network-instance | as json'],
+        output_format='json',
+    )
+    ni_data = _coerce_output(ni_results[0] if ni_results else {})
+    ni_names = _parse_network_instances_json(ni_data)
 
-        for ni in ni_names:
-            results[f'route_table_{ni}'] = _parse_json_output(
-                conn.send_command(f'show network-instance {ni} route-table | as json')
-            )
+    # Step 2: fetch per-NI route tables + static tables in a single batch
+    commands = [
+        *[f'show network-instance {ni} route-table | as json' for ni in ni_names],
+        *[f'{cmd} | as json' for cmd in STATIC_SNAPSHOT_COMMANDS.values()],
+    ]
+    batch = await jrpc_cli(conn, commands, output_format='json')
 
-        for table, command in STATIC_SNAPSHOT_COMMANDS.items():
-            results[table] = _parse_json_output(conn.send_command(f'{command} | as json'))
-
-    return results
+    out: dict[str, dict | list | str] = {}
+    for i, ni in enumerate(ni_names):
+        out[f'route_table_{ni}'] = _coerce_output(batch[i])
+    offset = len(ni_names)
+    for j, table in enumerate(STATIC_SNAPSHOT_COMMANDS.keys()):
+        out[table] = _coerce_output(batch[offset + j])
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -174,16 +165,19 @@ def _store(device: str, table: str, output: dict | list | str, ts: datetime) -> 
 
 async def _snapshot_device(device_name: str) -> None:
     try:
-        params = _get_connection_params(device_name)
+        conn = get_connection(device_name)
     except ValueError as exc:
         logfire.error('Device not in inventory', device=device_name, error=str(exc))
         return
 
     ts = datetime.now(timezone.utc)
     try:
-        tables = await asyncio.to_thread(_ssh_capture_device, params)
+        tables = await _capture_device(conn)
+    except SrlJsonRpcError as exc:
+        logfire.error('Snapshot JSON-RPC failed', device=device_name, error=str(exc))
+        return
     except Exception as exc:
-        logfire.error('Snapshot SSH session failed', device=device_name, error=str(exc))
+        logfire.error('Snapshot capture failed', device=device_name, error=str(exc))
         return
 
     for table, output in tables.items():
@@ -191,9 +185,8 @@ async def _snapshot_device(device_name: str) -> None:
 
 
 async def _snapshot_all() -> None:
-    hosts, _ = _load_inventory()
     await asyncio.gather(
-        *[_snapshot_device(name) for name in hosts],
+        *[_snapshot_device(name) for name in list_devices()],
         return_exceptions=True,
     )
     _save_to_disk()

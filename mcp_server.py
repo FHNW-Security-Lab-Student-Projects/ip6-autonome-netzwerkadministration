@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
+import json
 import os
 import yaml
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 import logfire
-from netmiko import ConnectHandler
 from fastmcp import FastMCP  # , Context
+import yang_index
+from srl_jsonrpc import SrlJsonRpcError, get_connection, jrpc_cli
 
 env_file = Path(__file__).parent / ".env"
 if env_file.exists():
@@ -40,33 +42,6 @@ def load_inventory():
     return hosts, defaults
 
 
-def connect_to_device(device_name: str):
-    """
-    Establish connection to a network device.
-
-    Args:
-        device_name: Device name from inventory (e.g., 'switch1', 'router1')
-
-    Returns:
-        Netmiko connection object
-    """
-    hosts, defaults = load_inventory()
-
-    if device_name not in hosts:
-        raise ValueError(f"Device '{device_name}' not found in inventory. Available: {list(hosts.keys())}")
-
-    device_info = hosts[device_name]
-
-    connection_params = {
-        'device_type': device_info['platform'],
-        'host': device_info['hostname'],
-        'username': defaults['username'],
-        'password': defaults['password'],
-    }
-
-    return ConnectHandler(**connection_params)
-
-
 @mcp.tool()
 def get_command_reference() -> str:
     """
@@ -74,6 +49,27 @@ def get_command_reference() -> str:
     Call this before constructing any SR Linux CLI command to ensure correct syntax.
     """
     return COMMAND_REFERENCE_PATH.read_text()
+
+
+@mcp.tool()
+def search_yang_paths(keyword: str, domain: str = "") -> str:
+    """Search SR Linux YANG model paths by keyword.
+
+    Use this when you need to find the correct gNMI/CLI state path for a concept
+    that isn't in the command reference cheat sheet.
+
+    Args:
+        keyword: Concept to search for, e.g. 'neighbor', 'oper-state', 'tx-power', 'bgp'.
+        domain:  Optional folder filter to narrow results, e.g. 'interfaces', 'bgp',
+                 'platform', 'routing-policy', 'network-instance'. Leave empty to search all.
+
+    Returns:
+        Matching paths with data type and config/state label.
+        config = writable configuration leaf
+        state  = read-only operational state leaf  (use with 'info from state <path>')
+    """
+    results = yang_index.search(keyword, domain or None, max_results=40)
+    return yang_index.format_results(results)
 
 
 @mcp.tool()
@@ -103,7 +99,7 @@ def report_command_issue(command: str, issue: str) -> str:
 
 
 @mcp.tool()
-def execute_show_command(device_name: str, command: str) -> str:
+async def execute_show_command(device_name: str, command: str) -> str:
     """
     Execute a show command on a network device.
 
@@ -115,11 +111,23 @@ def execute_show_command(device_name: str, command: str) -> str:
         Command output as string
     """
     try:
-        with connect_to_device(device_name) as conn:
-            output = conn.send_command(command)
-            return f"Command: {command}\nDevice: {device_name}\n\n{output}"
-    except Exception as e:
-        return f"Error executing command on {device_name}: {str(e)}"
+        conn = get_connection(device_name)
+    except ValueError as exc:
+        return f"Error executing command on {device_name}: {exc}"
+
+    try:
+        results = await jrpc_cli(conn, [command], output_format='json')
+        raw = results[0] if results else ''
+        output = raw if isinstance(raw, str) else json.dumps(raw, indent=2)
+    except SrlJsonRpcError:
+        try:
+            results = await jrpc_cli(conn, [command], output_format='text')
+            raw = results[0] if results else ''
+            output = raw if isinstance(raw, str) else str(raw)
+        except SrlJsonRpcError as exc:
+            return f"Error executing command on {device_name}: {exc}"
+
+    return f"Command: {command}\nDevice: {device_name}\n\n{output}"
 
 
 @mcp.tool()
