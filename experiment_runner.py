@@ -40,6 +40,8 @@ from pydantic_ai.settings import ModelSettings
 
 load_dotenv(Path(__file__).parent / '.env')
 
+from failure_log import FAILURE_LOG_PATH
+
 from client_agent import (
     DEFAULT_AGENT_MODEL,
     OPENROUTER_API_KEY,
@@ -58,6 +60,13 @@ from experiment_tracker import (
     finish_session,
     record_agent_run,
 )
+
+
+def _count_failure_log_lines() -> int:
+    try:
+        return sum(1 for _ in FAILURE_LOG_PATH.open())
+    except FileNotFoundError:
+        return 0
 
 
 def _build_model(model_name: str) -> OpenAIChatModel:
@@ -115,6 +124,7 @@ def _print_results(
         print(
             f'  {session.total_input_tokens:,} in / {session.total_output_tokens:,} out'
             f'  |  {session.total_tool_calls} tools'
+            f'  |  {session.invalid_commands} invalid cmds'
             f'  |  {session.duration_s:.1f}s'
             f'  |  {cost_str}'
             f'  |  {status}'
@@ -135,6 +145,7 @@ def _print_results(
         print(f'  Total tokens:  {sum(s.total_input_tokens for s in successful):,} in'
               f'  /  {sum(s.total_output_tokens for s in successful):,} out')
         print(f'  Total tools:   {sum(s.total_tool_calls for s in successful):,}')
+        print(f'  Invalid cmds:  {sum(s.invalid_commands for s in sessions):,}')
         total_cost = sum(s.total_cost_usd for s in successful)
         print(f'  Total cost:    {"$" + f"{total_cost:.6f}" if total_cost else "unavailable"}')
     print(f'{"═" * W}')
@@ -158,20 +169,27 @@ async def _run_turn(
     session = begin_session(user_query=query, model=model_name, scenario=scenario)
     _active_session.set(session)
 
+    failures_before = _count_failure_log_lines()
     try:
         with capture_generation_ids() as gen_ids:
             result = await orchestrator.run(query, model=model, message_history=message_history)
         record_agent_run(session, 'orchestrator', model_name, result, gen_ids)
+        session.invalid_commands = _count_failure_log_lines() - failures_before
         return session, True, '', result.output, result.all_messages()
     except APITimeoutError:
+        session.invalid_commands = _count_failure_log_lines() - failures_before
         return session, False, 'Orchestrator timed out after 3 minutes', '', message_history
     except Exception as exc:
+        session.invalid_commands = _count_failure_log_lines() - failures_before
         return session, False, str(exc), '', message_history
 
 
 async def run(model_name: str, scenario: str, queries: list[str], multi_turn: bool) -> None:
     _active_model_name.set(model_name)
     model = _build_model(model_name)
+
+    # Clear the failure log so counts only reflect this run.
+    FAILURE_LOG_PATH.write_text('')
 
     # (session, success, error, output)
     pending: list[tuple[ExperimentSession, bool, str, str]] = []

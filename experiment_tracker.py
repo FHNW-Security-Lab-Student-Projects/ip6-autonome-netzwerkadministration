@@ -188,6 +188,7 @@ class ExperimentSession:
     total_cost_usd: float = 0.0
     total_tool_calls: int = 0
     total_llm_requests: int = 0
+    invalid_commands: int = 0
     success: bool = True
     error: str = ''
 

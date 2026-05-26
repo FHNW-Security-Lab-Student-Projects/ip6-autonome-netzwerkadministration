@@ -43,6 +43,7 @@ def load(path: Path, scenario: str = '') -> pd.DataFrame:
     df = pd.DataFrame(records)
     df['scenario'] = df['scenario'].fillna('').replace('', '(none)')
     df['success'] = df['success'].fillna(True)
+    df['invalid_commands'] = df['invalid_commands'].fillna(0).astype(int) if 'invalid_commands' in df.columns else 0
     if scenario:
         df = df[df['scenario'] == scenario]
     return df
@@ -56,19 +57,20 @@ def scenario_summary(df: pd.DataFrame) -> pd.DataFrame:
     summary = (
         df.groupby(['scenario', 'model'], sort=True)
         .agg(
-            turns             = ('session_id',          'count'),
-            avg_duration_s    = ('duration_s',           'mean'),
-            avg_input_tokens  = ('total_input_tokens',   'mean'),
-            avg_output_tokens = ('total_output_tokens',  'mean'),
-            avg_tool_calls    = ('total_tool_calls',     'mean'),
-            avg_llm_requests  = ('total_llm_requests',   'mean'),
-            total_cost_usd    = ('total_cost_usd',       'sum'),
-            success_rate      = ('success',              'mean'),
+            turns                = ('session_id',          'count'),
+            avg_duration_s       = ('duration_s',           'mean'),
+            avg_input_tokens     = ('total_input_tokens',   'mean'),
+            avg_output_tokens    = ('total_output_tokens',  'mean'),
+            avg_tool_calls       = ('total_tool_calls',     'mean'),
+            avg_llm_requests     = ('total_llm_requests',   'mean'),
+            avg_invalid_commands = ('invalid_commands',     'mean'),
+            total_cost_usd       = ('total_cost_usd',       'sum'),
+            success_rate         = ('success',              'mean'),
         )
     )
     return summary.round({
         'avg_duration_s': 1, 'avg_input_tokens': 0, 'avg_output_tokens': 0,
-        'avg_tool_calls': 1, 'avg_llm_requests': 1,
+        'avg_tool_calls': 1, 'avg_llm_requests': 1, 'avg_invalid_commands': 1,
         'total_cost_usd': 6, 'success_rate': 2,
     })
 
