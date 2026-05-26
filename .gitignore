@@ -1,4 +1,5 @@
 .DS_Store
+YANG_MODELS/
 .env
 __pycache__/
 .venv/

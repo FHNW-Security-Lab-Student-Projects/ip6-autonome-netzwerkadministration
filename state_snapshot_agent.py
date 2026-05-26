@@ -99,8 +99,15 @@ def _format_output(output: dict | list | str) -> str:
 
 
 async def _capture_device(conn: SrlConnection) -> dict[str, dict | list | str]:
-    """Collect all snapshot tables for a device in two JSON-RPC `cli` batches."""
-    # Step 1: discover network-instances
+    """Collect all snapshot tables for a device.
+
+    One JSON-RPC `cli` call per command, gathered concurrently. We can't batch
+    multiple commands into a single call: SR Linux's `cli` method concatenates
+    all command outputs into a single `[{"text": "..."}]` result entry instead
+    of returning one entry per command, regardless of `output-format`. Issuing
+    each command separately keeps the result shape unambiguous (one parsed
+    object per call) at the cost of 1+N HTTP requests instead of 2.
+    """
     ni_results = await jrpc_cli(
         conn,
         ['show network-instance | as json'],
@@ -109,19 +116,19 @@ async def _capture_device(conn: SrlConnection) -> dict[str, dict | list | str]:
     ni_data = _coerce_output(ni_results[0] if ni_results else {})
     ni_names = _parse_network_instances_json(ni_data)
 
-    # Step 2: fetch per-NI route tables + static tables in a single batch
-    commands = [
-        *[f'show network-instance {ni} route-table | as json' for ni in ni_names],
-        *[f'{cmd} | as json' for cmd in STATIC_SNAPSHOT_COMMANDS.values()],
-    ]
-    batch = await jrpc_cli(conn, commands, output_format='json')
+    async def _one(cmd: str) -> dict | list | str:
+        res = await jrpc_cli(conn, [cmd], output_format='json')
+        return _coerce_output(res[0] if res else {})
+
+    route_cmds = [f'show network-instance {ni} route-table | as json' for ni in ni_names]
+    static_cmds = [f'{cmd} | as json' for cmd in STATIC_SNAPSHOT_COMMANDS.values()]
+    results = await asyncio.gather(*[_one(c) for c in route_cmds + static_cmds])
 
     out: dict[str, dict | list | str] = {}
-    for i, ni in enumerate(ni_names):
-        out[f'route_table_{ni}'] = _coerce_output(batch[i])
-    offset = len(ni_names)
-    for j, table in enumerate(STATIC_SNAPSHOT_COMMANDS.keys()):
-        out[table] = _coerce_output(batch[offset + j])
+    for ni, r in zip(ni_names, results[:len(ni_names)]):
+        out[f'route_table_{ni}'] = r
+    for table, r in zip(STATIC_SNAPSHOT_COMMANDS, results[len(ni_names):]):
+        out[table] = r
     return out
 
 

@@ -7,10 +7,9 @@ first access so the MCP server only pays the parse cost once.
 """
 
 import re
-from functools import lru_cache
 from pathlib import Path
 
-YANG_ROOT = Path("/Users/dominikkrebs/IP6/YANG_MODELS/srlinux-yang-models/all/v24.10.1/srl_nokia/models")
+YANG_ROOT = Path(__file__).resolve().parent / "YANG_MODELS/srlinux-yang-models/all/v24.10.1/srl_nokia/models"
 
 _BODY_KEYWORDS = {
     "container", "list", "leaf", "leaf-list", "grouping", "augment",
@@ -212,13 +211,26 @@ def _parse_file(yang_file: Path) -> list[dict]:
     return results
 
 
-@lru_cache(maxsize=1)
+_index_cache: list[dict] | None = None
+
+
 def get_index() -> list[dict]:
-    """Build and return the full path index (cached after first call)."""
+    """Build and return the full path index (cached after first successful build)."""
+    global _index_cache
+    if _index_cache is not None:
+        return _index_cache
+    if not YANG_ROOT.exists():
+        raise FileNotFoundError(
+            f"YANG model directory not found: {YANG_ROOT}\n"
+            "Check that the srlinux-yang-models repo is cloned at the expected path."
+        )
     index: list[dict] = []
     for yang_file in sorted(YANG_ROOT.rglob("*.yang")):
         index.extend(_parse_file(yang_file))
-    return index
+    if not index:
+        raise RuntimeError(f"YANG index built empty — no .yang files parsed from {YANG_ROOT}")
+    _index_cache = index
+    return _index_cache
 
 
 # ---------------------------------------------------------------------------
@@ -242,12 +254,148 @@ def search(keyword: str, domain: str | None = None, max_results: int = 40) -> li
     return results
 
 
-def format_results(entries: list[dict]) -> str:
+def _container_of(leaf_path: str) -> str:
+    """Return the parent container path for a leaf path."""
+    return leaf_path.rsplit("/", 1)[0] or "/"
+
+
+def format_results(
+    entries: list[dict],
+    max_leaves_per_container: int = 4,
+) -> str:
+    """
+    Format search results grouped by parent container.
+
+    Each container is printed once with its leaves indented underneath; if a
+    container has more than `max_leaves_per_container` matching leaves, the
+    extras are summarised as `... +N more`. This keeps navigational signal
+    while trimming bulk for searches that match many sibling leaves under the
+    same container (e.g. /network-instance/route-table/ipv4-unicast/route[*]).
+    """
     if not entries:
         return "No YANG paths found for that keyword."
-    lines = []
+
+    groups: dict[str, list[dict]] = {}
+    order: list[str] = []
     for e in entries:
-        kind = "config" if e["config"] else "state"
-        desc = f"  # {e['description']}" if e['description'] else ""
-        lines.append(f"{e['path']}  [{e['type']} | {kind}]{desc}")
+        container = _container_of(e["path"])
+        if container not in groups:
+            groups[container] = []
+            order.append(container)
+        groups[container].append(e)
+
+    lines: list[str] = []
+    for container in order:
+        leaves = groups[container]
+        if len(leaves) == 1:
+            e = leaves[0]
+            kind = "config" if e["config"] else "state"
+            desc = f"  # {e['description']}" if e["description"] else ""
+            lines.append(f"{e['path']}  [{e['type']} | {kind}]{desc}")
+            continue
+
+        lines.append(f"{container}/")
+        for e in leaves[:max_leaves_per_container]:
+            leaf_name = e["path"].rsplit("/", 1)[-1]
+            kind = "config" if e["config"] else "state"
+            desc = f"  # {e['description']}" if e["description"] else ""
+            lines.append(f"  {leaf_name}  [{e['type']} | {kind}]{desc}")
+        extra = len(leaves) - max_leaves_per_container
+        if extra > 0:
+            lines.append(f"  ... +{extra} more leaves under this container")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Navigation: list immediate children of a YANG path
+# ---------------------------------------------------------------------------
+
+_KEY_BRACKET_RE = re.compile(r"\[[^\]]*\]")
+
+
+def _strip_keys(path: str) -> str:
+    """Drop every `[...]` key segment entirely.
+
+    The YANG parser is inconsistent: paths reached through `augment` statements
+    carry no `[key=*]` brackets, while paths reached directly do. Comparing
+    bracket-stripped forms makes matching robust to that inconsistency.
+    """
+    return _KEY_BRACKET_RE.sub("", path)
+
+
+def _normalise_input_path(path: str) -> str:
+    """Ensure leading slash, drop trailing slash; keys are tolerated either way."""
+    if not path:
+        return ""
+    p = path.strip()
+    if not p.startswith("/"):
+        p = "/" + p
+    return p.rstrip("/")
+
+
+def list_children(path: str) -> list[dict]:
+    """
+    Return the immediate children of a YANG container/list path.
+
+    Derived from the leaf index: any leaf with `<path>/<segment>/...` contributes
+    `<segment>` as a child. Containers without leaves underneath will not appear
+    (rare in real SR Linux schemas).
+
+    Each child dict has: name, kind ("list" if it carries a `[...]` key segment,
+    "container" or "leaf" otherwise), leaf_count, sample_description.
+
+    Matching is bracket-insensitive: a query for
+    `/network-instance[name=default]/route-table` matches index entries stored
+    as either `/network-instance/route-table/...` (augment-derived, no keys)
+    or `/network-instance[name=*]/route-table/...`.
+    """
+    raw_prefix = _normalise_input_path(path)
+    if not raw_prefix:
+        return []
+    prefix_stripped = _strip_keys(raw_prefix)
+    prefix_slash = prefix_stripped + "/"
+
+    children: dict[str, dict] = {}
+    for entry in get_index():
+        ipath_full = entry["path"]
+        ipath_stripped = _strip_keys(ipath_full)
+        if not ipath_stripped.startswith(prefix_slash):
+            continue
+
+        # Walk the original (bracketed) path segment-by-segment, skipping
+        # exactly as many segments as the (stripped) prefix consumed. This
+        # preserves the `[key=*]` annotation on the returned child name when
+        # the index has it.
+        prefix_seg_count = prefix_stripped.count("/")  # leading "/" counts as 1
+        full_segments = ipath_full.lstrip("/").split("/")
+        if len(full_segments) <= prefix_seg_count:
+            continue
+        first = full_segments[prefix_seg_count]
+        deeper = len(full_segments) > prefix_seg_count + 1
+        kind = "list" if "[" in first else ("container" if deeper else "leaf")
+
+        child = children.setdefault(
+            first,
+            {"name": first, "kind": kind, "leaf_count": 0, "sample_description": ""},
+        )
+        # Prefer "list"/"container" over "leaf" if we see deeper paths later
+        if child["kind"] == "leaf" and kind != "leaf":
+            child["kind"] = kind
+        child["leaf_count"] += 1
+        if not child["sample_description"] and entry.get("description"):
+            child["sample_description"] = entry["description"]
+    return sorted(children.values(), key=lambda c: c["name"])
+
+
+def format_children(path: str, children: list[dict]) -> str:
+    if not children:
+        return (
+            f"No children found under {path!r}. "
+            "Check the path spelling, or call search_yang_paths with a keyword."
+        )
+    lines = [f"Children of {path}:"]
+    for c in children:
+        marker = {"list": "[]", "container": "/ ", "leaf": "  "}.get(c["kind"], "  ")
+        desc = f"  # {c['sample_description']}" if c["sample_description"] else ""
+        lines.append(f"  {marker} {c['name']}  ({c['leaf_count']} leaves below){desc}")
     return "\n".join(lines)
