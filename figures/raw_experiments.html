@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Raw experiment sessions</title>
+<link rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    margin: 2em;
+    color: #222;
+  }
+  h1 { font-size: 1.4em; margin-bottom: 0.2em; }
+  .meta { color: #555; font-size: 0.9em; margin-bottom: 1.5em; }
+  .meta div { margin: 0.15em 0; }
+  table.dataTable { font-size: 0.85em; }
+  table.dataTable thead th { background: #f3f4f6; }
+  table.dataTable tbody tr.ok td { background: #f1faf3; }
+  table.dataTable tbody tr.fail td { background: #fdecea; }
+  table.dataTable tbody tr:hover td { background: #eaf2ff !important; }
+  td, th { padding: 6px 10px !important; }
+</style>
+</head>
+<body>
+<h1>Raw experiment sessions</h1>
+<div class="meta">
+  <div><b>Generated:</b> 2026-05-26 11:23 UTC</div>
+  <div><b>Sessions:</b> 6</div>
+  <div><b>Models:</b> qwen/qwen3.6-plus, z-ai/glm-5</div>
+  <div><b>Scenarios:</b> client1-client3-communication</div>
+</div>
+<table class="dataframe display compact" id="sessions">
+  <thead>
+    <tr style="text-align: right;">
+      <th>session_id</th>
+      <th>started_at</th>
+      <th>model</th>
+      <th>scenario</th>
+      <th>user_query</th>
+      <th>duration_s</th>
+      <th>total_input_tokens</th>
+      <th>total_output_tokens</th>
+      <th>total_cost_usd</th>
+      <th>total_tool_calls</th>
+      <th>total_llm_requests</th>
+      <th>invalid_commands</th>
+      <th>success</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>7972c979</td>
+      <td>2026-05-26 10:28</td>
+      <td>qwen/qwen3.6-plus</td>
+      <td>client1-client3-communication</td>
+      <td>can client1 and client3 communicate with each other currentl</td>
+      <td>180.2</td>
+      <td>313080</td>
+      <td>5856</td>
+      <td>$0.1132</td>
+      <td>51</td>
+      <td>22</td>
+      <td>5</td>
+      <td>yes</td>
+    </tr>
+    <tr class="ok">
+      <td>e0866de9</td>
+      <td>2026-05-26 10:32</td>
+      <td>qwen/qwen3.6-plus</td>
+      <td>client1-client3-communication</td>
+      <td>can client1 and client3 communicate with each other currentl</td>
+      <td>195.7</td>
+      <td>318856</td>
+      <td>7196</td>
+      <td>$0.1177</td>
+      <td>59</td>
+      <td>22</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="ok">
+      <td>34886224</td>
+      <td>2026-05-26 10:40</td>
+      <td>qwen/qwen3.6-plus</td>
+      <td>client1-client3-communication</td>
+      <td>can client1 and client3 communicate with each other currentl</td>
+      <td>186.9</td>
+      <td>340202</td>
+      <td>6387</td>
+      <td>$0.1230</td>
+      <td>50</td>
+      <td>23</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="ok">
+      <td>b26a09c0</td>
+      <td>2026-05-26 10:45</td>
+      <td>z-ai/glm-5</td>
+      <td>client1-client3-communication</td>
+      <td>can client1 and client3 communicate with each other currentl</td>
+      <td>118.0</td>
+      <td>166090</td>
+      <td>3172</td>
+      <td>$0.0748</td>
+      <td>28</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="ok">
+      <td>3242726e</td>
+      <td>2026-05-26 10:47</td>
+      <td>z-ai/glm-5</td>
+      <td>client1-client3-communication</td>
+      <td>can client1 and client3 communicate with each other currentl</td>
+      <td>96.0</td>
+      <td>288323</td>
+      <td>3002</td>
+      <td>$0.1581</td>
+      <td>17</td>
+      <td>8</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="ok">
+      <td>5ccda7cd</td>
+      <td>2026-05-26 10:51</td>
+      <td>z-ai/glm-5</td>
+      <td>client1-client3-communication</td>
+      <td>can client1 and client3 communicate with each other currentl</td>
+      <td>136.4</td>
+      <td>130339</td>
+      <td>5137</td>
+      <td>$0.0645</td>
+      <td>50</td>
+      <td>11</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+  </tbody>
+</table>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script>
+  $(function() {
+    $('#sessions').DataTable({
+      pageLength: 25,
+      order: [[1, 'desc']],
+      lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+    });
+  });
+</script>
+</body>
+</html>
