@@ -1,0 +1,8 @@
+# scenario: bgp-peer-shutdown  (tier: medium)
+root_cause: >
+  The eBGP neighbor 10.0.0.2 on router1 is administratively disabled (admin-state
+  disable), so the session to router2 is not Established even though interface
+  ethernet-1/2 and the 10.0.0.0/30 link are up. With no BGP session, cross-router
+  routes are gone and client1 cannot reach client3. A correct answer pins it to the
+  BGP neighbor on router1 being shut down — NOT a physical/interface fault, a cable
+  issue, or a switch/VLAN problem.

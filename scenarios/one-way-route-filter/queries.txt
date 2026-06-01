@@ -1,0 +1,4 @@
+# scenario: one-way-route-filter  (tier: hard -- SILENT, not in syslog)
+client1 cannot reach client3, even though the BGP session between the routers is Established. Investigate.
+Compare the BGP route tables on router1 and router2 -- one router is missing a prefix the other has learned. Which prefix, on which router, and why?
+Summarise the single root cause: name the device, the missing prefix, and the policy that drops it.

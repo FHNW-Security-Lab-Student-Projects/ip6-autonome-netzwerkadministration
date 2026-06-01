@@ -1,0 +1,9 @@
+# scenario: missing-export-policy  (tier: medium)
+root_cause: >
+  router1's eBGP export policy (export-lan) has been removed, so although the session
+  to router2 is Established, router1 advertises none of its LAN prefixes (192.168.1.0/24,
+  192.168.10.0/24). router2 therefore has no route back toward client1/client2 and
+  return traffic fails. A correct answer identifies that router1 is not advertising its
+  routes due to a missing/empty BGP export policy — NOT that the session is down (it is
+  up) and NOT an interface or VLAN fault. Checking only "BGP Established" and stopping
+  is a MISS.

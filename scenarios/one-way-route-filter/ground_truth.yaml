@@ -1,0 +1,11 @@
+# scenario: one-way-route-filter  (tier: hard)
+root_cause: >
+  router1 has a BGP import policy (block-client3) that rejects the 10.10.10.0/24 prefix
+  advertised by router2. As a result router1's route table has no route to client3's
+  subnet, so client1 cannot reach client3 (and client3's pings to client1 also fail,
+  because router1 has no way to send the replies back). The tell-tale is an asymmetry in
+  the ROUTE TABLES, not the pings: router2 has learned 192.168.1.0/24 from router1, but
+  router1 is missing 10.10.10.0/24 from router2 -- even though the eBGP session is
+  Established. A correct answer identifies router1's BGP import policy dropping
+  10.10.10.0/24. Reject answers blaming a down link, a dead BGP session (it is up), a
+  missing export on router2, or a problem on switch2/client3.

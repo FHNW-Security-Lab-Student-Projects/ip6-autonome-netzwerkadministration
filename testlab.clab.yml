@@ -46,7 +46,7 @@ topology:
       kind: nokia_srlinux
       image: ghcr.io/nokia/srlinux:24.10.1
       type: ixr-d1
-      startup-config: configs/srl-syslog.cfg
+      startup-config: configs/switch1.cfg
       labels:
         role: switch
         layer: access
@@ -55,7 +55,7 @@ topology:
       kind: nokia_srlinux
       image: ghcr.io/nokia/srlinux:24.10.1
       type: ixr-d1
-      startup-config: configs/srl-syslog.cfg
+      startup-config: configs/switch2.cfg
       labels:
         role: switch
         layer: access
@@ -65,7 +65,7 @@ topology:
       kind: nokia_srlinux
       image: ghcr.io/nokia/srlinux:24.10.1
       type: ixr-d1
-      startup-config: configs/srl-syslog.cfg
+      startup-config: configs/router1.cfg
       labels:
         role: router
         layer: core
@@ -74,7 +74,7 @@ topology:
       kind: nokia_srlinux
       image: ghcr.io/nokia/srlinux:24.10.1
       type: ixr-d1
-      startup-config: configs/srl-syslog.cfg
+      startup-config: configs/router2.cfg
       labels:
         role: router
         layer: core

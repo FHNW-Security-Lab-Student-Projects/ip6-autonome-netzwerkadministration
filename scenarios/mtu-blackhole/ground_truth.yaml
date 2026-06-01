@@ -1,0 +1,9 @@
+# scenario: mtu-blackhole  (tier: hard)
+root_cause: >
+  router1's link to router2 (ethernet-1/2, subinterface 0) has its IP MTU lowered to 1280
+  (the platform minimum), while the rest of the path carries larger frames. Small packets
+  pass, but larger packets with DF set are silently dropped, producing a path-MTU
+  blackhole -- default-size ping works yet bulk transfers / big packets stall. A correct
+  answer pins it to the reduced IP MTU on router1's e1-2 (the router-to-router link).
+  Reject answers blaming BGP, routing, an ACL, or a down interface -- connectivity exists
+  for small packets, so "no problem found" is a MISS.

@@ -1,0 +1,4 @@
+# scenario: missing-export-policy  (tier: medium — SILENT, not in syslog)
+Traffic from client1 to client3 fails, yet the BGP sessions report as Established. Investigate.
+Inspect what routes each router is advertising and receiving (RIB-in / RIB-out), not just session state.
+Summarise the single root cause: name the device and exactly what is misconfigured in BGP.

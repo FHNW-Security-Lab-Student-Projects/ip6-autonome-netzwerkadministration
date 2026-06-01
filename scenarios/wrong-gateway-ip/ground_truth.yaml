@@ -1,0 +1,8 @@
+# scenario: wrong-gateway-ip  (tier: hard)
+root_cause: >
+  router1's VLAN10 routed sub-interface (ethernet-1/1.10) is configured with the wrong
+  IP address — 192.168.1.2/24 instead of 192.168.1.1/24 — so the default gateway that
+  client1 points at (192.168.1.1) does not exist on the network and ARP for it fails.
+  client1 is therefore cut off from everything off-subnet. A correct answer pins it to the
+  wrong/typo IP on router1 e1-1.10 (gateway should be .1, is .2). Reject answers blaming
+  BGP, routing, a down interface, VLANs, or client1's own configuration.

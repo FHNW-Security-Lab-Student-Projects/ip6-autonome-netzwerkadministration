@@ -1,0 +1,4 @@
+# scenario: intf-down  (tier: easy — in syslog, single show command)
+Client1 reports it can no longer reach client3. Investigate the network and find the cause.
+Check interface and BGP state on the routers to confirm what you found.
+Summarise the single root cause: name the device, the interface, and what is wrong with it.
