@@ -2,23 +2,28 @@
 """Experiment runner for LLM comparison research.
 
 Runs queries through the full agent pipeline (orchestrator + all sub-agents) and
-records complete token/cost/latency metrics for every turn — including the
-orchestrator's own LLM calls, which are not available in the web UI path.
-
-Results are appended to experiment_log.jsonl (same file as the web UI tracker).
+records complete token/cost/latency metrics — plus the orchestrator's final
+answer — for every turn. Results are appended to experiment_log.jsonl.
 
 Usage:
-    # Interactive — type queries one by one, Ctrl-C or "exit" to stop
-    uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-flap-01
-
-    # Batch — run all queries from a plain-text file (one query per line, # = comment)
-    uv run python experiment_runner.py --model z-ai/glm-5 --scenario bgp-flap-01 --file scenarios/bgp-flap.txt
+    # Folder-based scenario (recommended). Runner loads scenarios/<name>/queries.txt,
+    # runs setup.sh before the queries, runs teardown.sh after (best-effort).
+    uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-troubleshooting
 
     # Multi-turn — carry conversation history between queries in the same run
-    uv run python experiment_runner.py --model z-ai/glm-5 --scenario bgp-multi-turn --file scenarios/bgp-flap.txt --multi-turn
+    uv run python experiment_runner.py --model z-ai/glm-5 --scenario bgp-troubleshooting --multi-turn
 
-    # Default model (z-ai/glm-5)
-    uv run python experiment_runner.py --scenario quick-test
+    # Skip the scenario's setup.sh / teardown.sh (sanity run against unbroken topology)
+    uv run python experiment_runner.py --model z-ai/glm-5 --scenario bgp-troubleshooting --no-fault
+
+    # Ad-hoc query file outside scenarios/
+    uv run python experiment_runner.py --model z-ai/glm-5 --scenario adhoc --file path/to/queries.txt
+
+After the runner finishes, evaluate correctness by hand (no LLM judge — you read each
+answer and press f/m/s):
+
+    uv run python evaluate_experiments.py
+    uv run python evaluate_experiments.py --review        # read-only markdown report
 
 Available OpenRouter model IDs (examples):
     z-ai/glm-5                        anthropic/claude-sonnet-4.6
@@ -30,7 +35,12 @@ Available OpenRouter model IDs (examples):
 import argparse
 import asyncio
 import os
+import subprocess
+import sys
+import uuid
 from pathlib import Path
+
+SCENARIOS_DIR = Path(__file__).parent / 'scenarios'
 
 from dotenv import load_dotenv
 from openai import APITimeoutError
@@ -77,7 +87,7 @@ def _build_model(model_name: str) -> OpenAIChatModel:
     )
 
 
-def _load_queries(path: str) -> list[str]:
+def _load_queries(path: str | Path) -> list[str]:
     queries = []
     for line in Path(path).read_text().splitlines():
         stripped = line.strip()
@@ -86,6 +96,34 @@ def _load_queries(path: str) -> list[str]:
     if not queries:
         raise ValueError(f'No queries found in {path} (empty file or all lines are comments)')
     return queries
+
+
+def _resolve_scenario_dir(scenario: str) -> Path | None:
+    """Return scenarios/<scenario>/ if it exists as a directory, else None."""
+    if not scenario:
+        return None
+    candidate = SCENARIOS_DIR / scenario
+    return candidate if candidate.is_dir() else None
+
+
+def _run_script(path: Path, *, check: bool, label: str) -> None:
+    """Run a shell script (setup.sh / teardown.sh) and stream its output.
+
+    On setup: check=True — propagate failure so the experiment aborts before any query runs.
+    On teardown: check=False — best-effort; log loudly to stderr if it fails, but never
+    let teardown failure mask the experiment results.
+    """
+    print(f'  → running {label}: {path}')
+    completed = subprocess.run(
+        ['bash', str(path)],
+        cwd=path.parent,
+        check=False,
+    )
+    if completed.returncode != 0:
+        msg = f'{label} ({path}) exited with status {completed.returncode}'
+        if check:
+            raise RuntimeError(msg)
+        print(f'  ⚠ {msg} — continuing anyway', file=sys.stderr)
 
 
 def _print_results(
@@ -158,6 +196,7 @@ async def _run_turn(
     model_name: str,
     model: OpenAIChatModel,
     scenario: str,
+    run_id: str,
     message_history: list,
 ) -> tuple[ExperimentSession, list[str], bool, str, str, list]:
     """Run one query. Returns (session, success, error, output, updated_history).
@@ -166,7 +205,7 @@ async def _run_turn(
     Does NOT call finish_session — caller batches cost fetching first.
     Gen_ids are stored inside each AgentRunRecord via record_agent_run().
     """
-    session = begin_session(user_query=query, model=model_name, scenario=scenario)
+    session = begin_session(user_query=query, model=model_name, scenario=scenario, run_id=run_id)
     _active_session.set(session)
 
     failures_before = _count_failure_log_lines()
@@ -175,6 +214,7 @@ async def _run_turn(
             result = await orchestrator.run(query, model=model, message_history=message_history)
         record_agent_run(session, 'orchestrator', model_name, result, gen_ids)
         session.invalid_commands = _count_failure_log_lines() - failures_before
+        session.output = result.output
         return session, True, '', result.output, result.all_messages()
     except APITimeoutError:
         session.invalid_commands = _count_failure_log_lines() - failures_before
@@ -184,12 +224,21 @@ async def _run_turn(
         return session, False, str(exc), '', message_history
 
 
-async def run(model_name: str, scenario: str, queries: list[str], multi_turn: bool) -> None:
+async def run(
+    model_name: str,
+    scenario: str,
+    queries: list[str],
+    multi_turn: bool,
+    scenario_dir: Path | None = None,
+    apply_fault: bool = True,
+) -> None:
     _active_model_name.set(model_name)
     model = _build_model(model_name)
 
     # Clear the failure log so counts only reflect this run.
     FAILURE_LOG_PATH.write_text('')
+
+    run_id = uuid.uuid4().hex
 
     # (session, success, error, output)
     pending: list[tuple[ExperimentSession, bool, str, str]] = []
@@ -198,35 +247,45 @@ async def run(model_name: str, scenario: str, queries: list[str], multi_turn: bo
 
     print(f'Running {total} {"query" if total == 1 else "queries"}'
           f' with {model_name}'
-          f'{f" [{scenario}]" if scenario else ""}...')
+          f'{f" [{scenario}]" if scenario else ""} (run_id={run_id[:8]})...')
 
-    async with main_lifespan():
-        for i, query in enumerate(queries, 1):
-            print(f'  [{i}/{total}] {query[:60]}{"..." if len(query) > 60 else ""}')
-            session, success, error, output, message_history = await _run_turn(
-                query, model_name, model, scenario,
-                message_history if multi_turn else [],
-            )
-            pending.append((session, success, error, output))
+    setup = scenario_dir / 'setup.sh' if scenario_dir else None
+    teardown = scenario_dir / 'teardown.sh' if scenario_dir else None
 
-        if not queries:
-            print('\nInteractive mode — type your query and press Enter. Type "exit" to stop.\n')
-            loop = asyncio.get_event_loop()
-            turn = 0
-            while True:
-                try:
-                    query = (await loop.run_in_executor(None, input, 'Query: ')).strip()
-                except (KeyboardInterrupt, EOFError):
-                    print('\nStopped.')
-                    break
-                if not query or query.lower() in ('exit', 'quit'):
-                    break
-                turn += 1
+    if apply_fault and setup and setup.exists():
+        _run_script(setup, check=True, label='setup')
+
+    try:
+        async with main_lifespan():
+            for i, query in enumerate(queries, 1):
+                print(f'  [{i}/{total}] {query[:60]}{"..." if len(query) > 60 else ""}')
                 session, success, error, output, message_history = await _run_turn(
-                    query, model_name, model, scenario,
+                    query, model_name, model, scenario, run_id,
                     message_history if multi_turn else [],
                 )
                 pending.append((session, success, error, output))
+
+            if not queries:
+                print('\nInteractive mode — type your query and press Enter. Type "exit" to stop.\n')
+                loop = asyncio.get_event_loop()
+                turn = 0
+                while True:
+                    try:
+                        query = (await loop.run_in_executor(None, input, 'Query: ')).strip()
+                    except (KeyboardInterrupt, EOFError):
+                        print('\nStopped.')
+                        break
+                    if not query or query.lower() in ('exit', 'quit'):
+                        break
+                    turn += 1
+                    session, success, error, output, message_history = await _run_turn(
+                        query, model_name, model, scenario, run_id,
+                        message_history if multi_turn else [],
+                    )
+                    pending.append((session, success, error, output))
+    finally:
+        if apply_fault and teardown and teardown.exists():
+            _run_script(teardown, check=False, label='teardown')
 
     print('Fetching costs from OpenRouter...')
     sessions = [s for s, _, _, _ in pending]
@@ -268,10 +327,26 @@ def main() -> None:
         action='store_true',
         help='Carry conversation history between queries in the same run.',
     )
+    parser.add_argument(
+        '--no-fault',
+        action='store_true',
+        help='Skip the scenario setup.sh / teardown.sh scripts. '
+             'Use for sanity runs against the unbroken topology.',
+    )
     args = parser.parse_args()
 
+    scenario_dir = _resolve_scenario_dir(args.scenario)
     queries: list[str] = []
-    if args.file:
+
+    if scenario_dir is not None:
+        queries_path = scenario_dir / 'queries.txt'
+        if not queries_path.exists():
+            raise SystemExit(f'Scenario folder {scenario_dir} is missing queries.txt')
+        queries = _load_queries(queries_path)
+        print(f'Loaded {len(queries)} queries from {queries_path}')
+        if args.file:
+            print(f'  (ignoring --file {args.file}; scenario folder takes precedence)')
+    elif args.file:
         queries = _load_queries(args.file)
         print(f'Loaded {len(queries)} queries from {args.file}')
 
@@ -280,6 +355,8 @@ def main() -> None:
         scenario=args.scenario,
         queries=queries,
         multi_turn=args.multi_turn,
+        scenario_dir=scenario_dir,
+        apply_fault=not args.no_fault,
     ))
 
 

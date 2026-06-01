@@ -181,6 +181,8 @@ class ExperimentSession:
     user_query: str
     scenario: str           # optional label for structured experiments (e.g. "bgp-flap-01")
     agent_runs: list[AgentRunRecord] = field(default_factory=list)
+    run_id: str = ''        # UUID shared by every session in one experiment_runner invocation
+    output: str = ''        # orchestrator's final natural-language answer
     # Filled by finish_session()
     duration_s: float = 0.0
     total_input_tokens: int = 0
@@ -203,6 +205,7 @@ def begin_session(
     user_query: str,
     model: str,
     scenario: str = '',
+    run_id: str = '',
 ) -> ExperimentSession:
     """Start a new experiment session. Call before running the orchestrator."""
     session_id = uuid.uuid4().hex
@@ -215,6 +218,7 @@ def begin_session(
         model=model,
         user_query=user_query,
         scenario=scenario,
+        run_id=run_id,
     )
 
 
@@ -274,9 +278,11 @@ def finish_session(
     logfire.info(
         'experiment_session',
         session_id=session.session_id,
+        run_id=session.run_id,
         scenario=session.scenario,
         model=session.model,
         user_query=session.user_query[:300],
+        output=session.output[:1000],
         duration_s=session.duration_s,
         total_input_tokens=session.total_input_tokens,
         total_output_tokens=session.total_output_tokens,

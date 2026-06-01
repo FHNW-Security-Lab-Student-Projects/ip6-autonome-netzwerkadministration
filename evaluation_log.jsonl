@@ -1,0 +1,2 @@
+{"session_id": "4d31ee22e55e47d484acc577f237c1f6", "run_id": "c56a8941451e42c5ac33568a46eef2ae", "model": "z-ai/glm-5", "scenario": "client1-client3-communication", "found_issue": true, "note": "", "evaluator": "manual", "evaluated_at": "2026-06-01T08:18:31.772398+00:00"}
+{"session_id": "217bbc0d4cbe4080be9205ee056bddc4", "run_id": "c077f529e988475f990141528392690b", "model": "qwen/qwen3.6-plus", "scenario": "client1-client3-communication", "found_issue": true, "note": "", "evaluator": "manual", "evaluated_at": "2026-06-01T08:18:44.689276+00:00"}

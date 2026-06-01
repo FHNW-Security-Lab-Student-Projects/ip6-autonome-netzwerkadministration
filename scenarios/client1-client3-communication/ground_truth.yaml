@@ -1,0 +1,3 @@
+# scenario: client1-client3-communication  (baseline — no fault injected)
+root_cause: >
+  There is not l2 and l3 configuration on the network. The communication is currently not possible.

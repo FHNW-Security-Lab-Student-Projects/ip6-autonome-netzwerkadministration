@@ -19,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 DEFAULT_LOG = Path(__file__).parent / 'experiment_log.jsonl'
+DEFAULT_EVAL_LOG = Path(__file__).parent / 'evaluation_log.jsonl'
 
 WIDTH = 80
 
@@ -49,6 +50,34 @@ def load(path: Path, scenario: str = '') -> pd.DataFrame:
     return df
 
 
+def load_verdicts(path: Path) -> pd.DataFrame:
+    """Load evaluation_log.jsonl as a DataFrame keyed by session_id.
+
+    Returns an empty frame if the file doesn't exist yet — analysis still works,
+    the found_issue column just stays empty.
+    """
+    if not path.exists():
+        return pd.DataFrame(columns=['session_id', 'found_issue'])
+    records = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                records.append(json.loads(line))
+    if not records:
+        return pd.DataFrame(columns=['session_id', 'found_issue'])
+    return pd.DataFrame(records)
+
+
+def join_verdicts(df: pd.DataFrame, verdicts: pd.DataFrame) -> pd.DataFrame:
+    """Left-join the found_issue verdict onto session df. Un-evaluated sessions get NaN."""
+    if verdicts.empty or 'found_issue' not in verdicts.columns:
+        df = df.copy()
+        df['found_issue'] = pd.NA
+        return df
+    return df.merge(verdicts[['session_id', 'found_issue']], on='session_id', how='left')
+
+
 # ---------------------------------------------------------------------------
 # Aggregations
 # ---------------------------------------------------------------------------
@@ -68,10 +97,27 @@ def scenario_summary(df: pd.DataFrame) -> pd.DataFrame:
             success_rate         = ('success',              'mean'),
         )
     )
+
+    # found_rate is computed only when verdicts are joined in. You evaluate only the
+    # last (concluding) turn of each run, so the rate is over EVALUATED turns, not
+    # all turns — evaluated_turns shows coverage.
+    if 'found_issue' in df.columns:
+        evaluated = df[df['found_issue'].notna()]
+        if not evaluated.empty:
+            verdict_summary = (
+                evaluated.groupby(['scenario', 'model'], sort=True)
+                .agg(
+                    evaluated_turns = ('found_issue', 'count'),
+                    found_rate      = ('found_issue', lambda s: s.astype(bool).mean()),
+                )
+            )
+            summary = summary.join(verdict_summary, how='left')
+            summary['evaluated_turns'] = summary['evaluated_turns'].fillna(0).astype(int)
+
     return summary.round({
         'avg_duration_s': 1, 'avg_input_tokens': 0, 'avg_output_tokens': 0,
         'avg_tool_calls': 1, 'avg_llm_requests': 1, 'avg_invalid_commands': 1,
-        'total_cost_usd': 6, 'success_rate': 2,
+        'total_cost_usd': 6, 'success_rate': 2, 'found_rate': 2,
     })
 
 
@@ -136,6 +182,10 @@ def print_report(df: pd.DataFrame) -> None:
     print('  EXPERIMENT COMPARISON REPORT')
     print(f'  Generated : {now}')
     print(f'  Sessions  : {len(df)}')
+    if 'found_issue' in df.columns:
+        evaluated = int(df['found_issue'].notna().sum())
+        print(f'  Evaluated : {evaluated}/{len(df)}'
+              f'{" (no verdicts yet — run evaluate_experiments.py)" if evaluated == 0 else ""}')
     print(f'  Scenarios : {", ".join(scenarios)}')
     print(f'  Models    : {", ".join(models)}')
     print('═' * WIDTH)
@@ -209,6 +259,14 @@ def main() -> None:
         metavar='BASE',
         help='Export tables to <BASE>_summary.csv, <BASE>_agents.csv, <BASE>_failures.csv',
     )
+    parser.add_argument(
+        '--eval-file', '-e',
+        default=str(DEFAULT_EVAL_LOG),
+        metavar='PATH',
+        help=f'Path to evaluation_log.jsonl with your manual verdicts '
+             f'(default: {DEFAULT_EVAL_LOG.name}). Missing file is fine — '
+             f'correctness columns are simply omitted.',
+    )
     args = parser.parse_args()
 
     path = Path(args.file)
@@ -219,6 +277,9 @@ def main() -> None:
     if df.empty:
         print('No matching records found.')
         return
+
+    verdicts = load_verdicts(Path(args.eval_file))
+    df = join_verdicts(df, verdicts)
 
     print_report(df)
 

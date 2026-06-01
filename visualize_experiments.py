@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from analyze_experiments import DEFAULT_LOG, load
+from analyze_experiments import DEFAULT_EVAL_LOG, DEFAULT_LOG, join_verdicts, load, load_verdicts
 
 
 sns.set_theme(context='paper', style='whitegrid', palette='colorblind')
@@ -104,6 +104,37 @@ def plot_scenario_performance(df: pd.DataFrame, out_dir: Path, ext: str) -> list
     return written
 
 
+def plot_correctness(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
+    """Bar chart of found_rate — the fraction of evaluated runs the agent got right.
+
+    The source of truth is your manual verdicts in evaluation_log.jsonl (the
+    `found_issue` column joined onto the sessions), NOT the `success` field — `success`
+    only means the run didn't crash. Only evaluated runs count toward the rate; runs
+    you haven't labelled yet are excluded, and if nothing is labelled the chart is
+    skipped rather than drawn empty.
+    """
+    if 'found_issue' not in df.columns:
+        print('  [skip] correctness chart: no evaluation_log.jsonl joined.')
+        return []
+    evaluated = df[df['found_issue'].notna()].copy()
+    if evaluated.empty:
+        print('  [skip] correctness chart: no verdicts yet — run evaluate_experiments.py.')
+        return []
+    evaluated['found'] = evaluated['found_issue'].astype(bool).astype(int)
+
+    fig, ax = plt.subplots()
+    # errorbar=None: the bar height is the mean of found (0/1) per group = the found
+    # rate. With few runs per cell, a CI would be noise, so show the rate cleanly.
+    sns.barplot(data=evaluated, x='scenario', y='found', hue='model',
+                ax=ax, errorbar=None)
+    ax.set_xlabel('Scenario')
+    ax.set_ylabel('Found rate')
+    ax.set_ylim(0, 1)
+    ax.legend(title='Model', fontsize=8)
+    _rotate_xticks(ax)
+    return [_save(fig, out_dir, 'correctness_found_rate', ext)]
+
+
 def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
     written: list[Path] = []
     metrics = [
@@ -155,6 +186,14 @@ def main() -> None:
         default='pdf',
         help='Output format (default: pdf, recommended for LaTeX)',
     )
+    parser.add_argument(
+        '--eval-file', '-e',
+        default=str(DEFAULT_EVAL_LOG),
+        metavar='PATH',
+        help=f'Path to evaluation_log.jsonl with your manual verdicts '
+             f'(default: {DEFAULT_EVAL_LOG.name}). Missing file is fine — the '
+             f'correctness chart is simply skipped.',
+    )
     args = parser.parse_args()
 
     path = Path(args.file)
@@ -166,12 +205,16 @@ def main() -> None:
         print('No matching records found.')
         return
 
+    verdicts = load_verdicts(Path(args.eval_file))
+    df = join_verdicts(df, verdicts)
+
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []
     written += plot_model_comparison(df, out_dir, args.format)
     written += plot_scenario_performance(df, out_dir, args.format)
+    written += plot_correctness(df, out_dir, args.format)
     written += plot_distributions(df, out_dir, args.format)
 
     print(f'Wrote {len(written)} figure(s) to {out_dir}/')

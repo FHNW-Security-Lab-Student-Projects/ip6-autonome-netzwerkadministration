@@ -19,8 +19,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from analyze_experiments import DEFAULT_LOG, load
+from analyze_experiments import DEFAULT_EVAL_LOG, DEFAULT_LOG, join_verdicts, load, load_verdicts
 from visualize_experiments import _save  # reuse same save helper
+
+# Colours for the per-session verdict shown on each y-axis label. Mirrors the
+# green/red/grey of raw_experiments_html.py — the manual verdict in
+# evaluation_log.jsonl is the source of truth for what succeeded, so it drives
+# the label colour; a crashed run with no verdict stays red, unevaluated is grey.
+VERDICT_FOUND = '#1a7f37'
+VERDICT_MISSED = 'crimson'
+VERDICT_UNEVAL = '#888888'
 
 
 sns.set_theme(context='paper', style='whitegrid', palette='colorblind')
@@ -38,6 +46,26 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     out = out.sort_values('started_at', kind='stable').reset_index(drop=True)
     out['label'] = out['session_id'].astype(str).str[:8] + ' · ' + out['model']
     return out
+
+
+def _verdict_style(row: pd.Series) -> tuple[str, str]:
+    """Return (label_suffix, colour) encoding the manual verdict + crash state.
+
+    Verdict (from evaluation_log.jsonl) is the source of truth and wins when present:
+    ✓ found / ✗ missed. Otherwise the run is unevaluated. A crashed run is suffixed
+    with `*` and stays red even when unevaluated, since a crash is never a success.
+    """
+    found = row.get('found_issue')
+    crashed = not bool(row.get('success', True))
+    star = ' *' if crashed else ''
+    # mathtext symbols render via matplotlib's own fonts, so they don't depend on
+    # the serif face having a ✓/✗ glyph (DejaVu Serif lacks them).
+    if pd.notna(found):
+        if bool(found):
+            return rf' $\checkmark${star}', VERDICT_FOUND
+        return rf' $\times${star}', VERDICT_MISSED
+    # Unevaluated: grey unless it crashed, in which case flag it red.
+    return star, (VERDICT_MISSED if crashed else VERDICT_UNEVAL)
 
 
 def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
@@ -64,14 +92,11 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
     ax.set_xlabel('Duration (s)')
     ax.invert_yaxis()
     ax.set_yticks(list(y))
-    labels = [
-        f'{lab} *' if not ok else lab
-        for lab, ok in zip(df['label'], df['success'])
-    ]
+    styles = [_verdict_style(row) for _, row in df.iterrows()]
+    labels = [f'{lab}{suffix}' for lab, (suffix, _) in zip(df['label'], styles)]
     ax.set_yticklabels(labels)
-    for tick, ok in zip(ax.get_yticklabels(), df['success']):
-        if not ok:
-            tick.set_color('crimson')
+    for tick, (_, colour) in zip(ax.get_yticklabels(), styles):
+        tick.set_color(colour)
 
     # 2. Cost
     ax = axes[1]
@@ -91,7 +116,8 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
     ax.barh(y, df['total_tool_calls'], color=bar_colors)
     ax.set_xlabel('Tool calls')
 
-    # Legend: model colours + token-shade explanation.
+    # Legend: bar colours = model, token shades, and the y-label verdict key
+    # (verdict is the source of truth for success; it colours the y-labels).
     model_handles = [
         plt.Rectangle((0, 0), 1, 1, color=palette[m]) for m in models
     ]
@@ -99,9 +125,16 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
         plt.Rectangle((0, 0), 1, 1, facecolor='gray', edgecolor='none'),
         plt.Rectangle((0, 0), 1, 1, facecolor='gray', edgecolor='none', alpha=0.45),
     ]
+    verdict_handles = [
+        plt.Rectangle((0, 0), 1, 1, color=VERDICT_FOUND),
+        plt.Rectangle((0, 0), 1, 1, color=VERDICT_MISSED),
+        plt.Rectangle((0, 0), 1, 1, color=VERDICT_UNEVAL),
+        plt.Line2D([], [], linestyle='none', marker='*', color=VERDICT_MISSED),
+    ]
     fig.legend(
-        handles=model_handles + token_handles,
-        labels=models + ['input tokens', 'output tokens'],
+        handles=model_handles + token_handles + verdict_handles,
+        labels=(models + ['input tokens', 'output tokens']
+                + ['label: found', 'label: missed', 'label: unevaluated', 'crashed (*)']),
         loc='lower center',
         ncol=min(6, len(models) + 2),
         bbox_to_anchor=(0.5, -0.02),
@@ -111,7 +144,7 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
 
     fig.suptitle('Raw experiment sessions (one row per session)', y=1.0,
                  fontsize=10)
-    fig.tight_layout(rect=(0, 0.04, 1, 0.98))
+    fig.tight_layout(rect=(0, 0.08, 1, 0.98))
 
     return _save(fig, out_dir, 'raw_sessions_overview', ext)
 
@@ -145,6 +178,14 @@ def main() -> None:
         default='pdf',
         help='Output format (default: pdf, recommended for LaTeX)',
     )
+    parser.add_argument(
+        '--eval-file', '-e',
+        default=str(DEFAULT_EVAL_LOG),
+        metavar='PATH',
+        help=f'Path to evaluation_log.jsonl with your manual verdicts '
+             f'(default: {DEFAULT_EVAL_LOG.name}). Missing file is fine — '
+             f'labels just show as unevaluated (grey).',
+    )
     args = parser.parse_args()
 
     path = Path(args.file)
@@ -155,6 +196,9 @@ def main() -> None:
     if df.empty:
         print('No matching records found.')
         return
+
+    verdicts = load_verdicts(Path(args.eval_file))
+    df = join_verdicts(df, verdicts)
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)

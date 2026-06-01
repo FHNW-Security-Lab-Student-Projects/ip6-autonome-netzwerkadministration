@@ -4,10 +4,11 @@
 
 `visualize_experiments.py` reads the same `experiment_log.jsonl` as `analyze_experiments.py` and writes **vector PDF charts** intended for inclusion in a LaTeX document. It is a companion to the text/CSV report — same data, graphical view.
 
-Three groups of charts are produced:
+Four groups of charts are produced:
 
 - **Model comparison** — mean per metric (cost, duration, tokens, tool calls) with ±1 std error bars.
 - **Scenario performance** — same metrics grouped by scenario, with model as the hue.
+- **Correctness** — `found_rate` per scenario × model, sourced from your manual verdicts in `evaluation_log.jsonl` (the `found_issue` field). This is the **source of truth for what was successful**, not the `success` field — `success` only means a run didn't crash. Only evaluated runs count; the chart is skipped if you haven't evaluated anything yet.
 - **Distributions** — boxplots (with individual points overlaid) showing run-to-run variability per model.
 
 ---
@@ -33,18 +34,20 @@ uv run python visualize_experiments.py --file path/to/other.jsonl
 
 ### CLI options
 
-| Flag                | Default                 | Description                                       |
-|---------------------|-------------------------|---------------------------------------------------|
-| `--file` / `-f`     | `experiment_log.jsonl`  | Path to the JSONL log file                        |
-| `--scenario` / `-s` | *(all)*                 | Filter to a single scenario label                 |
-| `--out` / `-o`      | `figures`               | Output directory (created if missing)             |
-| `--format`          | `pdf`                   | `pdf` (recommended for LaTeX) or `png`            |
+| Flag                 | Default                 | Description                                                        |
+|----------------------|-------------------------|--------------------------------------------------------------------|
+| `--file` / `-f`      | `experiment_log.jsonl`  | Path to the JSONL log file                                         |
+| `--scenario` / `-s`  | *(all)*                 | Filter to a single scenario label                                  |
+| `--out` / `-o`       | `figures`               | Output directory (created if missing)                              |
+| `--format`           | `pdf`                   | `pdf` (recommended for LaTeX) or `png`                             |
+| `--eval-file` / `-e` | `evaluation_log.jsonl`  | Manual verdicts for the correctness chart; missing file = skipped  |
 
 ---
 
 ## Generated files
 
-Running with defaults produces ten files in `figures/`:
+Running with defaults produces up to eleven files in `figures/` (the correctness chart
+is omitted when there are no verdicts yet):
 
 | File                                       | Chart                                       |
 |--------------------------------------------|---------------------------------------------|
@@ -55,6 +58,7 @@ Running with defaults produces ten files in `figures/`:
 | `scenario_performance_duration.pdf`        | Duration grouped by scenario × model        |
 | `scenario_performance_cost.pdf`            | Cost grouped by scenario × model            |
 | `scenario_performance_tool_calls.pdf`      | Tool calls grouped by scenario × model      |
+| `correctness_found_rate.pdf`               | Found rate (manual verdicts) by scenario × model |
 | `distribution_duration.pdf`                | Duration boxplot per model                  |
 | `distribution_tokens.pdf`                  | Input-tokens boxplot per model              |
 | `distribution_cost.pdf`                    | Cost boxplot per model                      |

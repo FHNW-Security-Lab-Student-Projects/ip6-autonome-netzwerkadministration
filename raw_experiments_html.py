@@ -12,16 +12,18 @@ Usage:
 
 import argparse
 import html
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 
-from analyze_experiments import DEFAULT_LOG, load
+from analyze_experiments import DEFAULT_EVAL_LOG, DEFAULT_LOG, join_verdicts, load, load_verdicts
 
 
 COLUMNS = [
     'session_id', 'started_at', 'model', 'scenario', 'user_query',
+    'verdict',  # from evaluation_log.jsonl — '—' when not evaluated
     'duration_s', 'total_input_tokens', 'total_output_tokens',
     'total_cost_usd', 'total_tool_calls', 'total_llm_requests',
     'invalid_commands', 'success',
@@ -37,6 +39,15 @@ def _format(df: pd.DataFrame) -> pd.DataFrame:
     out['duration_s'] = out['duration_s'].round(1)
     out['total_cost_usd'] = out['total_cost_usd'].map(lambda v: f'${v:.4f}')
     out['success'] = out['success'].map(lambda v: 'yes' if v else 'no')
+    def _verdict_label(v) -> str:
+        if pd.isna(v):
+            return '—'
+        return 'found' if bool(v) else 'missed'
+
+    if 'found_issue' in out.columns:
+        out['verdict'] = out['found_issue'].map(_verdict_label)
+    else:
+        out['verdict'] = '—'
     return out[COLUMNS]
 
 
@@ -49,18 +60,26 @@ def _render(df_formatted: pd.DataFrame, df_raw: pd.DataFrame) -> str:
         border=0,
     )
 
-    # Tag each <tr> with a class so CSS can colour success/failure rows.
+    # Tag each data row's <tr> with a verdict class so CSS can colour rows. When a
+    # session hasn't been evaluated yet, fall back to success/fail colouring.
+    # pandas renders the header row as `<tr style="text-align: right;">` and every
+    # data row as a bare `<tr>`, so each bare `<tr>` is exactly one data row (in
+    # order) — we substitute them one at a time and leave the styled header alone.
     success_flags = df_raw['success'].tolist()
-    rows = table_html.split('<tr>')
-    rebuilt = [rows[0]]
-    body_rows = rows[1:]
-    # First <tr> after split is the header row; data rows come after.
-    if body_rows:
-        rebuilt.append('<tr>' + body_rows[0])
-        for raw_row, ok in zip(body_rows[1:], success_flags):
-            cls = 'ok' if ok else 'fail'
-            rebuilt.append(f'<tr class="{cls}">' + raw_row)
-    table_html = ''.join(rebuilt)
+    verdicts = (df_raw['found_issue'].tolist()
+                if 'found_issue' in df_raw.columns
+                else [None] * len(df_raw))
+    classes = []
+    for ok, verdict in zip(success_flags, verdicts):
+        if pd.notna(verdict):
+            classes.append('verdict-found' if bool(verdict) else 'verdict-missed')
+        else:
+            classes.append('ok' if ok else 'fail')
+
+    class_iter = iter(classes)
+    table_html = re.sub(r'<tr>',
+                        lambda _m: f'<tr class="{next(class_iter)}">',
+                        table_html)
 
     generated_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
     n_sessions = len(df_raw)
@@ -85,6 +104,10 @@ def _render(df_formatted: pd.DataFrame, df_raw: pd.DataFrame) -> str:
   .meta div {{ margin: 0.15em 0; }}
   table.dataTable {{ font-size: 0.85em; }}
   table.dataTable thead th {{ background: #f3f4f6; }}
+  /* Row colouring: evaluated sessions are green (found) or red (missed); un-evaluated
+     sessions fall back to ok/fail based on whether the agent crashed. */
+  table.dataTable tbody tr.verdict-found td {{ background: #e6f7ea; }}
+  table.dataTable tbody tr.verdict-missed td {{ background: #fde0de; }}
   table.dataTable tbody tr.ok td {{ background: #f1faf3; }}
   table.dataTable tbody tr.fail td {{ background: #fdecea; }}
   table.dataTable tbody tr:hover td {{ background: #eaf2ff !important; }}
@@ -140,6 +163,13 @@ def main() -> None:
         metavar='PATH',
         help='Output HTML file (default: figures/raw_experiments.html)',
     )
+    parser.add_argument(
+        '--eval-file', '-e',
+        default=str(DEFAULT_EVAL_LOG),
+        metavar='PATH',
+        help=f'Path to evaluation_log.jsonl (default: {DEFAULT_EVAL_LOG.name}). '
+             f'Missing file is fine — verdict column shows "—" for un-evaluated sessions.',
+    )
     args = parser.parse_args()
 
     path = Path(args.file)
@@ -150,6 +180,9 @@ def main() -> None:
     if df.empty:
         print('No matching records found.')
         return
+
+    verdicts = load_verdicts(Path(args.eval_file))
+    df = join_verdicts(df, verdicts)
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
