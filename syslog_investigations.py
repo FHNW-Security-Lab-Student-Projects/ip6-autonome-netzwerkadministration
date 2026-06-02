@@ -27,6 +27,7 @@ import uvicorn
 from dotenv import dotenv_values, load_dotenv
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelMessagesTypeAdapter
+from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
@@ -35,6 +36,8 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+
+from agent_history import compact_tool_history
 
 load_dotenv(Path(__file__).parent / '.env')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
@@ -232,6 +235,9 @@ syslog_investigator = Agent(
     model=llm,
     name='syslog_investigator',
     toolsets=[network_mcp_server, syslog_mcp_server],
+    # Investigations run multi-turn and accumulate Loki + show output; stub older
+    # oversized tool returns so they aren't re-sent verbatim each loop (agent_history.py).
+    capabilities=[ProcessHistory(processor=compact_tool_history)],
 )
 
 

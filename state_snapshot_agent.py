@@ -28,10 +28,12 @@ from pathlib import Path
 import logfire
 from dotenv import load_dotenv
 from pydantic_ai import Agent
+from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 
+from agent_history import compact_tool_history
 from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli, list_devices
 
 load_dotenv(Path(__file__).parent / '.env')
@@ -233,6 +235,9 @@ snapshot_agent = Agent(
     model=llm,
     name='snapshot_agent',
     output_type=str,
+    # state_before / state_diff can return large snapshot bodies; stub older ones
+    # so they aren't re-sent verbatim each loop (see agent_history.py).
+    capabilities=[ProcessHistory(processor=compact_tool_history)],
     instructions="""You are a network state history agent for Nokia SR Linux devices.
 
 You have access to periodic snapshots of device state captured every 2 minutes.

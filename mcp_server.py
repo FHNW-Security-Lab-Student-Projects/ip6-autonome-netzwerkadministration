@@ -40,8 +40,10 @@ SHOW_FAILURE_PATTERNS = (
 
 # Hard cap on the serialized body of a JSON-RPC `get` response. A bare container
 # path (e.g. `/interface`) can return tens of KB and flood the LLM context, so we
-# truncate and nudge the model toward a narrower query instead.
-_MAX_GET_CHARS = 6000
+# truncate and nudge the model toward a narrower query instead. Kept deliberately
+# tight: these payloads are re-sent on every loop of the agent, so a smaller cap
+# compounds across the whole run (see agent_history.py for the history-side trim).
+_MAX_GET_CHARS = 3000
 
 
 def _detect_show_failure(output: str) -> str | None:
@@ -119,7 +121,7 @@ def _search_yang_paths_impl(keyword: str, domain: str = "") -> str:
             "results unchanged. Re-read the earlier response in context, or call "
             "list_yang_children(<path>) to drill into a specific container.)"
         )
-    results = yang_index.search(keyword, domain or None, max_results=40)
+    results = yang_index.search(keyword, domain or None, max_results=15)
     return yang_index.format_results(results)
 
 
