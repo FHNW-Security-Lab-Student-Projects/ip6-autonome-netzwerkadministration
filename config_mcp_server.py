@@ -9,9 +9,7 @@ Tools:
   - get_device_info      : device details from inventory
   - get_command_reference: SR Linux configuration command reference
   - validate_config      : enter candidate, run commands, show diff, discard (safe preview)
-  - backup_config        : create timestamped JSON backup to config_backups/
-  - list_backups         : list available backups for a device
-  - apply_config         : auto-backup + enter candidate + apply commands + commit
+  - apply_config         : enter candidate + apply commands + commit
 
 User approval is handled at the orchestrator level — this server does NOT use MCP
 elicitation. apply_config must only be called after the user has approved the diff
@@ -23,7 +21,6 @@ Run standalone for testing:
 
 import json
 import os
-from datetime import datetime
 from pathlib import Path
 
 import logfire
@@ -32,7 +29,8 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 
 from failure_log import log_command_failure
-from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli, jrpc_get
+from session_dedup import CallTracker
+from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli
 
 env_file = Path(__file__).parent / '.env'
 if env_file.exists():
@@ -52,7 +50,6 @@ else:
 mcp = FastMCP('Config MCP Server')
 
 INVENTORY_DIR = Path(__file__).parent / 'inventory'
-BACKUP_DIR = Path(__file__).parent / 'config_backups'
 SR_LINUX_KNOWLEDGE_PATH = Path(__file__).parent / 'sr_linux_knowledge.txt'
 
 
@@ -79,33 +76,6 @@ def _cli_result_to_text(raw: object) -> str:
     if raw is None:
         return ''
     return json.dumps(raw, indent=2)
-
-
-async def _backup_internal(device_name: str, conn: SrlConnection) -> str:
-    """Create a timestamped JSON backup of running config. Returns backup file path."""
-    device_backup_dir = BACKUP_DIR / device_name
-    device_backup_dir.mkdir(parents=True, exist_ok=True)
-
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    backup_path = device_backup_dir / f'{timestamp}_backup.json'
-
-    result = await jrpc_get(conn, ['/'], datastore='running')
-    if not result:
-        raise RuntimeError('Empty result from JSON-RPC get for backup')
-    raw_json = json.dumps(result[0], indent=2)
-
-    hosts, _ = _load_inventory()
-    hostname = hosts[device_name]['hostname']
-
-    backup_path.write_text(
-        f'# SR Linux Configuration Backup\n'
-        f'# Device: {device_name}  Hostname: {hostname}\n'
-        f'# Timestamp: {timestamp}\n'
-        f'{"─" * 80}\n'
-        f'JSON_START\n{raw_json}\nJSON_END\n'
-    )
-    logfire.info('Config backup created', device=device_name, path=str(backup_path))
-    return str(backup_path)
 
 
 async def _run_candidate_sequence(
@@ -149,10 +119,20 @@ async def _validate_internal(
 # MCP tools
 # ---------------------------------------------------------------------------
 
+_list_devices_tracker = CallTracker()
+_device_info_tracker = CallTracker()
+_command_reference_tracker = CallTracker()
+
+
 @mcp.tool()
 def list_all_devices() -> str:
     """Return all network devices from inventory with hostname and platform."""
     try:
+        if _list_devices_tracker.seen_before():
+            return (
+                '(Device inventory already returned this session — it is static. '
+                'Re-read the earlier response in context instead of fetching it again.)'
+            )
         hosts, _ = _load_inventory()
         lines = ['Available devices:']
         for name, info in hosts.items():
@@ -173,6 +153,11 @@ def get_device_info(device_name: str) -> str:
         hosts, _ = _load_inventory()
         if device_name not in hosts:
             return f"Device '{device_name}' not found. Available: {list(hosts.keys())}"
+        if _device_info_tracker.seen_before(device_name):
+            return (
+                f'(Info for {device_name!r} already returned this session — inventory is '
+                'static. Re-read the earlier response in context instead of fetching it again.)'
+            )
         d = hosts[device_name]
         return f'Device: {device_name}\nHostname: {d["hostname"]}\nPlatform: {d["platform"]}'
     except Exception as exc:
@@ -185,6 +170,11 @@ def get_command_reference() -> str:
 
     Call this before constructing any configuration commands to verify correct syntax.
     """
+    if _command_reference_tracker.seen_before():
+        return (
+            '(Command reference already returned this session — contents are static. '
+            'Re-read the earlier response in context instead of fetching it again.)'
+        )
     return SR_LINUX_KNOWLEDGE_PATH.read_text()
 
 
@@ -217,52 +207,8 @@ async def validate_config(device_name: str, config_commands: list[str]) -> str:
 
 
 @mcp.tool()
-async def backup_config(device_name: str) -> str:
-    """Create a timestamped JSON backup of the current running configuration.
-
-    Args:
-        device_name: Device name from inventory.
-
-    Returns:
-        Path to the created backup file.
-    """
-    try:
-        conn = get_connection(device_name)
-        path = await _backup_internal(device_name, conn)
-        return f'Backup created: {path}'
-    except Exception as exc:
-        return f'Backup error on {device_name}: {exc}'
-
-
-@mcp.tool()
-def list_backups(device_name: str) -> str:
-    """List available configuration backups for a device, newest first.
-
-    Args:
-        device_name: Device name from inventory.
-    """
-    device_backup_dir = BACKUP_DIR / device_name
-    if not device_backup_dir.exists():
-        return f'No backups found for {device_name}.'
-    files = sorted(
-        device_backup_dir.glob('*_backup.json'),
-        key=lambda f: f.stat().st_mtime,
-        reverse=True,
-    )
-    if not files:
-        return f'No backups found for {device_name}.'
-    lines = [f'Backups for {device_name} ({len(files)} total):']
-    for f in files:
-        ts = datetime.fromtimestamp(f.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')
-        lines.append(f'  {f.name}  [{ts}]  {f}')
-    return '\n'.join(lines)
-
-
-@mcp.tool()
 async def apply_config(device_name: str, config_commands: list[str]) -> str:
     """Apply configuration commands to a device and commit.
-
-    Automatically creates a backup before making any changes.
 
     IMPORTANT: Only call this after the user has explicitly approved the validated
     diff returned by validate_config. Do NOT call this speculatively.
@@ -274,16 +220,10 @@ async def apply_config(device_name: str, config_commands: list[str]) -> str:
                          'commit now', or 'discard'.
 
     Returns:
-        Result including backup path, commands applied, diff, and commit status.
+        Result including commands applied, diff, and commit status.
     """
     try:
         conn = get_connection(device_name)
-
-        try:
-            backup_path = await _backup_internal(device_name, conn)
-            backup_msg = f'Backup created: {backup_path}'
-        except Exception as be:
-            backup_msg = f'Warning: backup failed: {be}'
 
         diff, cmd_outputs, commit_str = await _run_candidate_sequence(
             conn, config_commands, finalize='commit now'
@@ -305,7 +245,6 @@ async def apply_config(device_name: str, config_commands: list[str]) -> str:
             logfire.error('Config commit failed', device=device_name)
             return (
                 f'COMMIT FAILED on {device_name}\n\n'
-                f'{backup_msg}\n\n'
                 f'Commands:\n' + '\n'.join(cmd_outputs) + '\n\n'
                 f'Diff:\n{diff}\n\n'
                 f'Commit output:\n{commit_str}\n\n'
@@ -316,7 +255,6 @@ async def apply_config(device_name: str, config_commands: list[str]) -> str:
         logfire.info('Config applied', device=device_name, commands=config_commands)
         return (
             f'Configuration applied successfully to {device_name}\n\n'
-            f'{backup_msg}\n\n'
             f'Commands:\n' + '\n'.join(cmd_outputs) + '\n\n'
             f'Changes applied (diff):\n{diff}\n\n'
             f'Commit result:\n{commit_str}'

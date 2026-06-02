@@ -8,7 +8,7 @@ TWO-STEP APPROVAL WORKFLOW (enforced by orchestrator instructions):
             → Agent calls validate_config, returns the diff preview.
   Step 2 — User reviews the diff and approves.
   Step 3 — Orchestrator calls with "APPLY (user approved): <device> <commands>"
-            → Agent calls apply_config (auto-backup + commit).
+            → Agent calls apply_config (commit).
 
 Import and use via agent delegation:
     from config_agent import config_agent, config_lifespan
@@ -74,8 +74,7 @@ WORKFLOW — determined by the request prefix:
 ► If the request starts with "APPLY (user approved):":
   1. Extract the device name and exact config_commands from the request.
   2. Call config_apply_config(device_name, config_commands).
-     (A backup is created automatically before any changes.)
-  3. Report: backup path, commands applied, diff, commit result.
+  3. Report: commands applied, diff, commit result.
   4. If commit fails, report the full error and do NOT retry automatically.
 
 ► If the request has no prefix or is ambiguous:

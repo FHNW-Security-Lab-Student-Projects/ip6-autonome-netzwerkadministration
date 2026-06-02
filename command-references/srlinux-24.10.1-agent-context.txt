@@ -4,7 +4,6 @@ Nokia 7220 IXR / 7250 IXR / 7730 SXR
 ================================================================================
 TWO ROUTES TO DEVICE DATA  (pick deliberately)
 ================================================================================
-PREFERRED — structured reads over JSON-RPC `get`:
   get_state_path(device, "<yang-path>")    # operational state
   get_config_path(device, "<yang-path>")   # running config
 
@@ -14,7 +13,7 @@ PREFERRED — structured reads over JSON-RPC `get`:
   - If the path you need isn't in KEY STATE PATHS below, call
     search_yang_paths(keyword, domain) first, then GET the returned path.
 
-CLI ESCAPE — only when a YANG path won't do:
+CLI command:
   execute_show_command(device, "<cli-command>")
 
   - Use for formatted operational views (`show interface brief`,
@@ -77,7 +76,7 @@ info /path                raw running config at YANG path
 info from state /path     raw operational state at YANG path
 info detail /path         running config including all defaults
 
-CLI PATH SYNTAX  (only applies when forced through execute_show_command —
+CLI PATH SYNTAX  (only applies when used through execute_show_command —
                   prefer get_state_path / get_config_path which accept YANG paths as-is)
   - Segments are SPACE-SEPARATED in CLI, not joined by '/'.
   - List keys are SPACE-SEPARATED VALUES, NEVER [name=VALUE] bracket form.

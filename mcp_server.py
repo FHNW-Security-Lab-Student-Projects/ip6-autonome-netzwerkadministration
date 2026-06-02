@@ -8,6 +8,7 @@ import logfire
 from fastmcp import FastMCP  # , Context
 import yang_index
 from failure_log import log_command_failure
+from session_dedup import CallTracker
 from srl_jsonrpc import SrlJsonRpcError, get_connection, jrpc_cli, jrpc_get
 
 env_file = Path(__file__).parent / ".env"
@@ -81,7 +82,7 @@ def load_inventory():
     return hosts, defaults
 
 
-_command_reference_returned = False
+_command_reference_tracker = CallTracker()
 
 
 @mcp.tool()
@@ -90,28 +91,22 @@ def get_command_reference() -> str:
     Return the SR Linux read-only command reference.
     Call this before constructing any SR Linux CLI command to ensure correct syntax.
     """
-    global _command_reference_returned
-    if _command_reference_returned:
+    if _command_reference_tracker.seen_before():
         return (
             "(Command reference already returned this session — contents are static. "
             "Re-read the earlier response in context instead of fetching it again.)"
         )
-    _command_reference_returned = True
     return COMMAND_REFERENCE_PATH.read_text()
 
 
-_RECENT_SEARCH_KEYS: dict[tuple[str, str], int] = {}
-_RECENT_SEARCH_LIMIT = 32
+_search_tracker = CallTracker()
+# Backward-compat alias: tests reset/inspect this dict directly.
+_RECENT_SEARCH_KEYS = _search_tracker.counts
 
 
 def _remember_search(key: tuple[str, str]) -> int:
     """Return the prior call count for `key` (0 if new), then record this call."""
-    prior = _RECENT_SEARCH_KEYS.get(key, 0)
-    _RECENT_SEARCH_KEYS[key] = prior + 1
-    if len(_RECENT_SEARCH_KEYS) > _RECENT_SEARCH_LIMIT:
-        oldest = next(iter(_RECENT_SEARCH_KEYS))
-        del _RECENT_SEARCH_KEYS[oldest]
-    return prior
+    return _search_tracker.record(key)
 
 
 def _search_yang_paths_impl(keyword: str, domain: str = "") -> str:
@@ -331,6 +326,9 @@ async def get_config_path(device_name: str, path: str) -> str:
     return f"GET running {path}\nDevice: {device_name}\n\n{body}"
 
 
+_device_info_tracker = CallTracker()
+
+
 @mcp.tool()
 def get_device_info(device_name: str) -> str:
     """
@@ -347,10 +345,19 @@ def get_device_info(device_name: str) -> str:
         if device_name not in hosts:
             return f"Device '{device_name}' not found. Available devices: {', '.join(hosts.keys())}"
 
+        if _device_info_tracker.seen_before(device_name):
+            return (
+                f"(Info for {device_name!r} already returned this session — inventory is "
+                "static. Re-read the earlier response in context instead of fetching it again.)"
+            )
+
         device = hosts[device_name]
         return f"Device: {device_name}\nHostname: {device['hostname']}\nPlatform: {device['platform']}"
     except Exception as e:
         return f"Error getting device info: {str(e)}"
+
+
+_list_devices_tracker = CallTracker()
 
 
 @mcp.tool()
@@ -362,6 +369,11 @@ def list_all_devices() -> str:
         Complete list of devices with their platform and hostname information
     """
     try:
+        if _list_devices_tracker.seen_before():
+            return (
+                "(Device inventory already returned this session — it is static. "
+                "Re-read the earlier response in context instead of fetching it again.)"
+            )
         hosts, _ = load_inventory()
         inventory_lines = ["Network Device Inventory:\n"]
         for name, info in hosts.items():
