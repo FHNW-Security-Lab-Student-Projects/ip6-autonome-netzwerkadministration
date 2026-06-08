@@ -1,0 +1,144 @@
+SR LINUX 24.10.1 — YANG PATH QUICK REFERENCE (read-only monitoring)
+====================================================================
+
+Curated from the srlinux-yang-models v24.10.1 source. These are the high-value
+state/config paths for monitoring tasks — NOT an exhaustive dump. If the path you
+need is not here, fall back to search_yang_paths(keyword) / list_yang_children(path).
+
+Notation:
+  - Paths use native YANG notation accepted by get_state_path / get_config_path,
+    including [key=value] list keys. Wildcards: [name=*] matches all entries.
+  - [state]  = read-only operational data (datastore 'state', get_state_path).
+  - [config] = writable, also readable as configured value (get_config_path).
+  - For a brief-style overview across many items, query ONE leaf with a wildcard
+    key, e.g. /interface[name=*]/oper-state — never the bare container /interface.
+
+List keys you will reuse (the value goes inside the brackets):
+  interface           key: name              e.g. [name=ethernet-1/1]
+  subinterface        key: index             e.g. [index=0]
+  network-instance    key: name              e.g. [name=default]
+  bgp neighbor        key: peer-address      e.g. [peer-address=10.0.0.1]
+  isis instance       key: name   interface key: interface-name
+  ospf instance       key: name   area key: area-id   interface key: interface-name
+  lldp interface      key: name   neighbor key: id
+
+
+INTERFACES  (/interface[name=*])
+--------------------------------------------------------------------------------
+/interface[name=*]/oper-state                 [state]  up | down
+/interface[name=*]/admin-state                [config] enable | disable
+/interface[name=*]/oper-down-reason           [state]  why the port is down
+/interface[name=*]/last-change                [state]  timestamp of last transition
+/interface[name=*]/mtu                         [config] L2 MTU
+/interface[name=*]/ifindex                     [state]  SNMP ifIndex
+/interface[name=*]/description                 [config]
+/interface[name=*]/ethernet/port-speed         [config] e.g. 100G
+/interface[name=*]/ethernet/hw-mac-address     [state]  burned-in MAC
+/interface[name=*]/ethernet/statistics/in-crc-error-frames  [state]
+/interface[name=*]/statistics/in-octets        [state]
+/interface[name=*]/statistics/out-octets       [state]
+/interface[name=*]/statistics/in-error-packets [state]
+/interface[name=*]/statistics/out-error-packets[state]
+/interface[name=*]/statistics/carrier-transitions [state]  flap counter
+/interface[name=*]/traffic-rate/in-bps         [state]  live rate
+/interface[name=*]/traffic-rate/out-bps        [state]
+
+Subinterfaces and IP addressing:
+/interface[name=*]/subinterface[index=*]/oper-state          [state]
+/interface[name=*]/subinterface[index=*]/admin-state         [config]
+/interface[name=*]/subinterface[index=*]/ip-mtu              [config]
+/interface[name=*]/subinterface[index=*]/ipv4/admin-state    [config]
+/interface[name=*]/subinterface[index=*]/ipv4/address[ip-prefix=*]/ip-prefix         [config]
+/interface[name=*]/subinterface[index=*]/ipv4/address[ip-prefix=*]/primary           [config]
+/interface[name=*]/subinterface[index=*]/ipv6/address[ip-prefix=*]/ip-prefix         [config]
+
+LAG (link aggregation): /interface[name=lag*]/lag/... ; members carry
+/interface[name=*]/ethernet/aggregate-id and LACP state under .../lacp.
+
+
+NETWORK-INSTANCE  (/network-instance[name=*])  — VRFs, default, mac-vrf
+--------------------------------------------------------------------------------
+/network-instance[name=*]/oper-state           [state]
+/network-instance[name=*]/admin-state          [config]
+/network-instance[name=*]/type                 [config] default | ip-vrf | mac-vrf
+/network-instance[name=*]/router-id            [config]
+/network-instance[name=*]/description          [config]
+/network-instance[name=*]/interface[name=*]/oper-state   [state]  member subifs
+
+
+ROUTE TABLE  (/network-instance[name=*]/route-table)
+--------------------------------------------------------------------------------
+/network-instance[name=*]/route-table/ipv4-unicast/statistics/active-routes   [state]
+/network-instance[name=*]/route-table/ipv4-unicast/statistics/total-routes    [state]
+/network-instance[name=*]/route-table/ipv4-unicast/route[ipv4-prefix=*]/active        [state]
+/network-instance[name=*]/route-table/ipv4-unicast/route[ipv4-prefix=*]/route-type    [state]  bgp|isis|ospf|local|static
+/network-instance[name=*]/route-table/ipv4-unicast/route[ipv4-prefix=*]/route-owner   [state]
+/network-instance[name=*]/route-table/ipv4-unicast/route[ipv4-prefix=*]/next-hop-group[state]
+/network-instance[name=*]/route-table/ipv6-unicast/route[ipv6-prefix=*]/active        [state]
+(ipv6-unicast mirrors ipv4-unicast with ipv6-prefix keys.)
+
+
+BGP  (/network-instance[name=*]/protocols/bgp)
+--------------------------------------------------------------------------------
+/network-instance[name=*]/protocols/bgp/admin-state            [config]
+/network-instance[name=*]/protocols/bgp/autonomous-system      [config] local AS
+/network-instance[name=*]/protocols/bgp/router-id              [config]
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/session-state          [state]  established|active|connect|idle|...
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/last-state             [state]
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/last-event             [state]
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/last-established        [state]  uptime since
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/established-transitions [state]  flap count
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/peer-as                [config]
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/admin-state            [config]
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/afi-safi[afi-safi-name=*]/received-routes  [state]
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/sent-messages/...      [state]  per-type counters
+/network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/received-messages/...  [state]
+
+
+ISIS  (/network-instance[name=*]/protocols/isis/instance[name=*])
+--------------------------------------------------------------------------------
+/network-instance[name=*]/protocols/isis/instance[name=*]/oper-state         [state]
+/network-instance[name=*]/protocols/isis/instance[name=*]/oper-system-id     [state]
+/network-instance[name=*]/protocols/isis/instance[name=*]/interface[interface-name=*]/oper-state                [state]
+/network-instance[name=*]/protocols/isis/instance[name=*]/interface[interface-name=*]/adjacency[neighbor-system-id=*][adjacency-level=*]/hostname   [state]
+   (adjacency list is keyed by neighbor-system-id + adjacency-level; call
+    list_yang_children on the adjacency path to enumerate its other leaves.)
+
+
+OSPF  (/network-instance[name=*]/protocols/ospf/instance[name=*])
+--------------------------------------------------------------------------------
+/network-instance[name=*]/protocols/ospf/instance[name=*]/oper-state         [state]
+/network-instance[name=*]/protocols/ospf/instance[name=*]/router-id          [config]
+/network-instance[name=*]/protocols/ospf/instance[name=*]/area[area-id=*]/interface[interface-name=*]/oper-state          [state]
+/network-instance[name=*]/protocols/ospf/instance[name=*]/area[area-id=*]/interface[interface-name=*]/neighbor[router-id=*]/adjacency-state  [state]  full|2-way|init|...
+/network-instance[name=*]/protocols/ospf/instance[name=*]/area[area-id=*]/interface[interface-name=*]/neighbor-count      [state]
+
+
+LLDP  (/system/lldp)  — discover physical neighbors
+--------------------------------------------------------------------------------
+/system/lldp/interface[name=*]/neighbor[id=*]/system-name      [state]  remote hostname
+/system/lldp/interface[name=*]/neighbor[id=*]/chassis-id       [state]
+/system/lldp/interface[name=*]/neighbor[id=*]/port-id          [state]  remote port
+/system/lldp/interface[name=*]/statistics/...                  [state]
+
+
+SYSTEM
+--------------------------------------------------------------------------------
+/system/information/version            [state]  software version string
+/system/information/last-booted        [state]
+/system/information/current-datetime   [state]
+/system/name/host-name                 [config] device hostname
+
+
+PLATFORM  (/platform)  — hardware health
+--------------------------------------------------------------------------------
+/platform/control[slot=*]/oper-state           [state]  control module up/down
+/platform/control[slot=*]/type                 [state]
+/platform/fan-tray[id=*]/oper-state            [state]
+/platform/fan-tray[id=*]/speed                 [state]  % of max
+/platform/fan-tray[id=*]/speed-rpm             [state]
+/platform/control[slot=*]/cpu[index=*]/total/instant       [state]  CPU load
+/platform/linecard[slot=*]/oper-state          [state]  line card up/down
+/platform/power-supply[id=*]/oper-state        [state]
+(chassis temperature and other sensors live under /platform too —
+ list_yang_children /platform to enumerate.)

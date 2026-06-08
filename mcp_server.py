@@ -6,7 +6,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 import logfire
 from fastmcp import FastMCP  # , Context
-import yang_index
 from failure_log import log_command_failure
 from session_dedup import CallTracker
 from srl_jsonrpc import SrlJsonRpcError, get_connection, jrpc_cli, jrpc_get
@@ -30,7 +29,6 @@ else:
 mcp = FastMCP("MCP Server")
 
 INVENTORY_DIR = Path(__file__).parent / "inventory"
-COMMAND_REFERENCE_PATH = Path(__file__).parent / "command-references" / "srlinux-24.10.1-agent-context.txt"
 
 SHOW_FAILURE_PATTERNS = (
     "Parsing error: Unknown token",
@@ -82,112 +80,6 @@ def load_inventory():
     with open(INVENTORY_DIR / "defaults.yaml") as f:
         defaults = yaml.safe_load(f)
     return hosts, defaults
-
-
-_command_reference_tracker = CallTracker()
-
-
-@mcp.tool()
-def get_command_reference() -> str:
-    """
-    Return the SR Linux read-only command reference.
-    Call this before constructing any SR Linux CLI command to ensure correct syntax.
-    """
-    if _command_reference_tracker.seen_before():
-        return (
-            "(Command reference already returned this session — contents are static. "
-            "Re-read the earlier response in context instead of fetching it again.)"
-        )
-    return COMMAND_REFERENCE_PATH.read_text()
-
-
-_search_tracker = CallTracker()
-# Backward-compat alias: tests reset/inspect this dict directly.
-_RECENT_SEARCH_KEYS = _search_tracker.counts
-
-
-def _remember_search(key: tuple[str, str]) -> int:
-    """Return the prior call count for `key` (0 if new), then record this call."""
-    return _search_tracker.record(key)
-
-
-def _search_yang_paths_impl(keyword: str, domain: str = "") -> str:
-    """Plain (non-MCP) entrypoint for testing. Applies dedup + formatting."""
-    key = (keyword.lower(), (domain or "").lower())
-    prior = _remember_search(key)
-    if prior > 0:
-        return (
-            f"(Already searched keyword={keyword!r} domain={domain!r} this session — "
-            "results unchanged. Re-read the earlier response in context, or call "
-            "list_yang_children(<path>) to drill into a specific container.)"
-        )
-    results = yang_index.search(keyword, domain or None, max_results=15)
-    return yang_index.format_results(results)
-
-
-@mcp.tool()
-def search_yang_paths(keyword: str, domain: str = "") -> str:
-    """Search SR Linux YANG model paths by keyword.
-
-    Use this when you need to find the correct gNMI/CLI state path for a concept
-    that isn't in the command reference cheat sheet.
-
-    YANG uses kebab-case names (e.g. 'oper-state', 'route-table', 'admin-state').
-    Search individual path segments, not full paths.
-
-    For navigating *into* a known path (listing its child containers/lists),
-    prefer list_yang_children — it's far cheaper than a broad keyword search.
-
-    Args:
-        keyword: YANG path segment or concept to search for.
-                 Good examples: 'oper-state', 'neighbor', 'lldp', 'route-table',
-                 'bgp', 'isis', 'ospf', 'prefix', 'mac-table', 'lag', 'vlan', 'mtu'.
-                 Use short, specific terms — not full sentences.
-        domain:  Optional folder to narrow results. Valid values:
-                 acl, bfd, ethcfm, grpc, interfaces, network-instance, oam,
-                 platform, qos, routing-policy, sync, system, transport-security,
-                 tunnel, twamp.
-                 Note: BGP, ISIS, OSPF, and MPLS live under 'network-instance'.
-                 Leave empty to search all domains.
-
-    Returns:
-        Matching paths grouped by parent container, with type and config/state
-        label. config = writable; state = read-only operational.
-    """
-    return _search_yang_paths_impl(keyword, domain)
-
-
-@mcp.tool()
-def list_yang_children(path: str) -> str:
-    """List the immediate child segments (containers, lists, leaves) of a YANG path.
-
-    Use this for navigation when you already know a path and want to see what's
-    underneath it — far cheaper than a broad keyword search, and the answer to
-    questions like "what lives under /network-instance[name=*]/route-table?".
-
-    Accepts native YANG path notation. Concrete list keys (e.g. `[name=default]`)
-    are normalised internally to the wildcard form (`[name=*]`).
-
-    Args:
-        path: YANG container or list path. Examples:
-              '/interface[name=*]'
-              '/network-instance[name=default]/route-table'
-              '/system/lldp'
-
-    Returns:
-        Each immediate child on its own line, annotated as list (`[]`),
-        container (`/`) or leaf, with the count of leaves below it.
-    """
-    key = ("children", path.strip().lower())
-    prior = _remember_search(key)
-    if prior > 0:
-        return (
-            f"(Already listed children of {path!r} this session — the YANG model is "
-            "static, so results are unchanged. Re-read the earlier response in context, "
-            "or call list_yang_children on a deeper sub-path to drill in.)"
-        )
-    children = yang_index.list_children(path)
-    return yang_index.format_children(path, children)
 
 
 @mcp.tool()
@@ -243,10 +135,9 @@ async def execute_show_command(device_name: str, command: str) -> str:
 async def get_state_path(device_name: str, path: str) -> str:
     """Read raw operational state at a YANG path via JSON-RPC `get`.
 
-    Prefer this over execute_show_command when you already know (or have
-    looked up via search_yang_paths) the YANG path you want. Accepts native
-    YANG path notation including `[name=<value>]` list keys — the syntax
-    restrictions of the SR Linux CLI parser do NOT apply here.
+    Prefer this over execute_show_command when you already know the YANG path
+    you want. Accepts native YANG path notation including `[name=<value>]` list
+    keys — the syntax restrictions of the SR Linux CLI parser do NOT apply here.
 
     ALWAYS query the narrowest path that answers your question. Do NOT request a
     bare container like '/interface' — it returns every item with every counter

@@ -2,9 +2,9 @@
 
 A sub-agent run loops the model over its full message history on every request.
 Each loop re-sends every prior tool return verbatim, so large `get`/show payloads
-and YANG search results pile up: observed `network_agent` runs reached ~190k median
-and ~340k peak input tokens for a single query. Beyond cost, that buries the salient
-evidence in a haystack and dilutes the model's attention.
+pile up: observed `network_agent` runs reached ~190k median and ~340k peak input
+tokens for a single query. Beyond cost, that buries the salient evidence in a
+haystack and dilutes the model's attention.
 
 `compact_tool_history` keeps recent and small tool returns intact but collapses older
 oversized ones to a one-line stub. The model still sees that the call happened (tool
@@ -36,6 +36,16 @@ KEEP_VERBATIM_BELOW = 600
 # this window gets stubbed.
 KEEP_RECENT = 3
 
+# Tool returns whose body contains any of these markers are device-reported failures.
+# They carry the correction (what was wrong + valid options) the model needs to avoid
+# repeating the same bad call, so they are kept verbatim regardless of size or age.
+ERROR_MARKERS = ("Parsing error:", "Error reading")
+
+
+def _is_error_return(part: ToolReturnPart) -> bool:
+    """True if `part` is a string tool return carrying a device failure message."""
+    return isinstance(part.content, str) and any(m in part.content for m in ERROR_MARKERS)
+
 
 def _stub(part: ToolReturnPart) -> ToolReturnPart:
     """Return a copy of `part` with its large string body replaced by a short note."""
@@ -54,9 +64,10 @@ def _stub(part: ToolReturnPart) -> ToolReturnPart:
 def compact_tool_history(messages: list[ModelMessage]) -> list[ModelMessage]:
     """Collapse older oversized tool-return payloads to a one-line stub.
 
-    Every small tool return (<= KEEP_VERBATIM_BELOW chars) and the most recent
-    KEEP_RECENT oversized returns are left untouched. Older oversized returns are
-    replaced with a stub naming the tool and the elided size.
+    Every small tool return (<= KEEP_VERBATIM_BELOW chars), every device error
+    return (see ERROR_MARKERS), and the most recent KEEP_RECENT oversized returns
+    are left untouched. Older oversized returns are replaced with a stub naming the
+    tool and the elided size.
 
     A new message list is returned; the input messages are not mutated, so persisted
     histories (e.g. syslog investigations) are unaffected.
@@ -75,6 +86,7 @@ def compact_tool_history(messages: list[ModelMessage]) -> list[ModelMessage]:
                 isinstance(part, ToolReturnPart)
                 and isinstance(part.content, str)
                 and len(part.content) > KEEP_VERBATIM_BELOW
+                and not _is_error_return(part)
             ):
                 oversized.append((mi, pi))
 

@@ -67,23 +67,18 @@ network_agent = Agent(
 TOOL SELECTION (two routes to device data — pick deliberately):
 
 1. network_get_state_path(device, path)  / network_get_config_path(device, path)
-   - Preferred when you know (or can look up) the YANG path you want.
+   - Preferred when you know the YANG path you want.
    - Accepts native YANG path notation, INCLUDING `[name=<value>]` list keys
      and slash-joined segments. No CLI parser quirks apply here.
    - Returns structured JSON. Best for precise leaf/container reads.
-   - If you don't know the path (DONT GUESS), call network_search_yang_paths(keyword, domain)
-     first, then GET the specific path it returns.
 
 2. network_execute_show_command(device, command)
    - Use it when you want a formatted operational and consolidated view (`show interface brief`,
      `show network-instance default route-table`, `show version`, etc.) that has
      no clean YANG-path equivalent, or when a `ping` / `traceroute` is required.
    - The CLI parser does NOT accept `[name=<value>]` bracket syntax or
-     slash-joined YANG paths — translate to space-separated form per the cheat
-     sheet, or use get_*_path instead.
+     slash-joined YANG paths — use get_*_path for those instead.
    - For ping, ALWAYS bound it with `-c <N>` or the RPC will time out.
-   - Call network_get_command_reference() before constructing any non-trivial
-     show / info command; do not invent syntax from memory.
 
 WORKFLOW:
 - If the request is missing required information (e.g. which device to query),

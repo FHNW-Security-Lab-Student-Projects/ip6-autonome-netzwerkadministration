@@ -1,0 +1,171 @@
+NOKIA SR LINUX READ-ONLY AGENT REFERENCE | SR Linux 24.10
+Source: learn.srlinux.dev + documentation.nokia.com/srlinux
+
+--- TRANSPORT ---
+GET  = JSON-RPC method:"get" datastore:"state" path:"<YANG-path>" — structured JSON, use for specific state leaves/containers
+CLI  = JSON-RPC method:"cli" commands:["<show cmd>"] — use for CLI plugins that aggregate multiple YANG paths (no single path equivalent)
+RULE: YANG path listed → prefer GET. No path listed → use CLI.
+
+--- S1: PLATFORM ---
+CLI  show platform chassis [detail]
+CLI  show platform environment
+CLI  show platform control * detail         # cpu / memory / uptime here, not show system cpu/memory
+CLI  show platform linecard * detail
+CLI  show platform fabric * detail
+GET  /platform/fan-tray[id=*]              # speed, oper-state
+GET  /platform/power-supply[id=*]          # oper-state, capacity, used-capacity
+GET  /platform/environment/temperature
+GET  /platform/control[slot=A]/cpu[index=*]
+GET  /platform/control[slot=A]/cpu[index=all]/total/instant  # single instant CPU% reading
+GET  /platform/control[slot=A]/memory
+GET  /platform/control[slot=A]/memory/utilized  # specific utilized memory leaf
+GET  /system/information                   # version, hostname, chassis-type, last-booted
+CLI  show version                          # brief version string (less detail than GET /system/information)
+
+--- S2: INTERFACES ---
+# Names: ethernet-1/1..N, ethernet-2/1..N, mgmt0, lo0/lo1, system0
+CLI  show interface                        # all UP interfaces + subinterfaces
+CLI  show interface brief                  # all interfaces tabular (admin/oper/speed)
+CLI  show interface all                    # all interfaces including DOWN
+CLI  show interface ethernet-1/1           # single interface + reason-if-down
+CLI  show interface ethernet-1/1 detail    # includes counters — use this instead of 'statistics' subcommand
+GET  /interface[name=ethernet-1/1]/oper-state
+GET  /interface[name=ethernet-1/1]/oper-down-reason  # reason string when oper-state=down
+GET  /interface[name=ethernet-1/1]/admin-state
+GET  /interface[name=*]/oper-state         # all interfaces bulk
+GET  /interface[name=ethernet-1/1]         # full: oper-state, admin-state, mtu, ifindex, last-change, ethernet/hw-mac-address, ethernet/port-speed, subinterface[index=0]/ipv4/address
+GET  /interface[name=ethernet-1/1]/statistics  # in-octets, out-octets, in-errors, out-errors, in-discards, out-discards, in-unicast-pkts, out-unicast-pkts
+GET  /interface[name=ethernet-1/1]/statistics/in-octets   # specific leaf
+GET  /interface[name=ethernet-1/1]/statistics/out-octets  # specific leaf
+GET  /interface[name=ethernet-1/1]/subinterface[index=0]  # oper-state, ipv4/address, vlan/encap
+GET  /interface[name=ethernet-1/1]/subinterface[index=0]/ipv4/address  # explicit IP address leaf
+GET  /interface[name=ethernet-1/1]/transceiver  # oper-state, form-factor, vendor, serial-number, channel[index=1]/output-power, channel[index=1]/input-power
+
+--- S3: NETWORK INSTANCES ---
+CLI  show network-instance                 # all NIs with type and oper-state (bare command, no subcommand)
+CLI  show network-instance summary         # all NIs: type, admin/oper-state, router-id, interface count
+GET  /network-instance[name=default]       # type, admin-state, oper-state, router-id, description
+GET  /network-instance[name=default]/oper-state  # specific oper-state leaf
+GET  /network-instance[name=*]
+GET  /network-instance[name=*]/oper-state  # bulk oper-state all NIs
+GET  /network-instance[name=default]/interface[name=*]   # interfaces assigned: name, oper-state, index
+GET  /network-instance[name=default]/arp-nd/arp-entry[ipv4-address=*]   # mac-address, interface, expiry-time, origin. NOTE: ARP lives under arp-nd (shared with NDP)
+GET  /network-instance[name=default]/arp-nd/arp-entry[ipv4-address=192.168.1.1]
+GET  /network-instance[name=default]/arp-nd/nbr-entry[ipv6-address=*]   # NDP: mac-address, interface, current-state, origin
+CLI  show arpnd arp-entries network-instance <name>  # CLI alternative for ARP table
+CLI  show network-instance <mac-vrf> bridge-table mac-table all     # MAC table, mac-vrf only
+CLI  show network-instance <mac-vrf> bridge-table mac-table summary
+CLI  show network-instance default route-table                       # IPv4 FIB+RIB, no single YANG path
+CLI  show network-instance default route-table all
+CLI  show network-instance default route-table ipv4-unicast summary
+GET  /network-instance[name=default]/route-table/ipv4-unicast/route[ipv4-prefix=10.0.0.0/24][route-type=bgp][route-owner=bgp_mgr]  # NOTE: route-type+route-owner are key — if unknown use CLI
+CLI  show network-instance default route-table ipv4-unicast prefix 10.0.0.0/24  # alt to GET above
+CLI  show network-instance default route-table ipv6-unicast summary
+
+--- S4: BGP ---
+# All BGP scoped per network-instance
+CLI  show network-instance default protocols bgp summary             # peer count, paths, AFI/SAFI overview — CLI plugin
+CLI  show network-instance default protocols bgp neighbor            # all peers with state column
+GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=10.0.0.1]/session-state  # Established/Active/Connect/Idle/OpenSent/OpenConfirm
+GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=10.0.0.1]/peer-as
+GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=10.0.0.1]/last-established
+GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=10.0.0.1]/failure-uptime
+GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=*]/session-state  # bulk all peers
+GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=*]
+CLI  show network-instance default protocols bgp neighbor 10.0.0.1 detail  # capabilities, timers, AFI/SAFI negotiated
+CLI  show network-instance default protocols bgp neighbor 10.0.0.1 received-routes ipv4-unicast
+CLI  show network-instance default protocols bgp neighbor 10.0.0.1 advertised-routes ipv4-unicast
+CLI  show network-instance default protocols bgp routes ipv4-unicast summary
+CLI  show network-instance default protocols bgp routes ipv6-unicast summary
+CLI  show network-instance default protocols bgp routes ipv4-unicast prefix 10.0.0.0/24 detail
+
+
+
+--- S5: ACL ---
+GET  /acl/ipv4-filter[name=*]
+GET  /acl/ipv4-filter[name=FILTER-IN]/entry[sequence-id=*]          # sequence-id, match(protocol/src/dst/port), action(accept/drop)
+GET  /acl/ipv4-filter[name=FILTER-IN]/entry[sequence-id=10]/statistics  # match-packets, match-octets
+GET  /acl/ipv6-filter[name=*]
+GET  /acl/ipv6-filter[name=FILTER6-IN]/entry[sequence-id=*]
+GET  /interface[name=ethernet-1/1]/subinterface[index=0]/acl/input/ipv4-filter
+GET  /interface[name=ethernet-1/1]/subinterface[index=0]/acl/output/ipv4-filter
+
+--- S6: SYSTEM ---
+CLI  show system lldp neighbor             # all LLDP neighbors tabular — CLI plugin
+GET  /system/lldp/interface[name=ethernet-1/1]/neighbor  # all neighbors on interface (bare container)
+GET  /system/lldp/interface[name=ethernet-1/1]/neighbor[id=*]  # system-name, chassis-id, port-id, system-description, last-update
+GET  /system/ntp/server[address=*]         # oper-state, stratum, reach, offset
+GET  /system/clock
+GET  /system/dns
+GET  /system/aaa/server-group[name=*]
+GET  /system/aaa/server-group[name=TACACS]/server[address=*]    # oper-state, connection-attempts, connection-failures
+GET  /bfd                                  # all BFD state
+GET  /bfd/subinterface[id=*]               # status(up/down), remote-address, local-address, protocol-sessions
+CLI  show bfd session all
+GET  /system/logging/remote-server[host=*]
+
+--- S7: PING / TRACEROUTE ---
+# CLI method only. Always specify network-instance.
+# !!! WARNING: ALWAYS pass -c <N>. Omitting -c = unbounded ping = JSON-RPC connection hangs
+# !!! indefinitely. Surfaces as transport timeout, NOT a command error. No exceptions. !!!
+CLI  ping <dst> -c <N> network-instance <ni>
+CLI  ping 10.0.0.1 -c 3 network-instance default
+CLI  ping 8.8.8.8 -c 5 -s 1400 network-instance mgmt
+CLI  ping 8.8.8.8 -c 5 -I 192.168.0.1 network-instance mgmt
+# Flags: -c count(MANDATORY) -s packet-size -I source-ip
+CLI  traceroute <dst> network-instance <ni>
+CLI  tcptraceroute <dst> network-instance <ni>
+
+--- S8: TROUBLESHOOTING PATTERNS ---
+# INTERFACE DOWN
+GET  /interface[name=X]/oper-state         # up?
+GET  /interface[name=X]/admin-state        # intentionally disabled?
+GET  /interface[name=X]/transceiver        # optics present/valid?
+GET  /interface[name=X]/statistics         # error counters?
+CLI  show interface ethernet-1/X           # reason string
+
+# BGP PEER DOWN
+GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=X]/session-state
+CLI  show network-instance default protocols bgp neighbor X detail
+GET  /interface[name=<uplink>]/oper-state
+CLI  ping X -c 3 network-instance default
+
+# ROUTING PROBLEM
+CLI  show network-instance default route-table ipv4-unicast summary
+CLI  show network-instance default route-table ipv4-unicast prefix X.X.X.X/YY
+GET  /network-instance[name=default]/arp-nd/arp-entry[ipv4-address=<next-hop>]
+CLI  ping <dst> -c 3 network-instance default
+
+# TOPOLOGY DISCOVERY
+CLI  show system lldp neighbor
+GET  /system/lldp/interface[name=ethernet-1/X]/neighbor[id=*]
+
+--- S9: INVALID — NEVER GENERATE ---
+# Wrong SR Linux syntax / wrong method:
+show system information                -> GET /system/information
+show network-instance protocols all    -> specify protocol: bgp/ospf/isis/pim/igmp/mld
+info from state /interface[name=X]     -> GET /interface[name=X] datastore:state
+info detail /network-instance[name=X]  -> GET /network-instance[name=X] datastore:state|running
+ping <dst> network-instance <ni>       -> MISSING -c: hangs JSON-RPC transport
+ping <dst> count <N> size <B>          -> ping <dst> -c <N> -s <B>  (use Linux flags)
+show system cpu|memory|uptime          -> CLI show platform control A detail
+show interface ethernet-1/1 statistics -> GET /interface[name=ethernet-1/1]/statistics
+show interface ethernet-1/1 transceiver-> GET /interface[name=ethernet-1/1]/transceiver
+show network-instance <ni> interface   -> interfaces (plural)
+show network-instance <ni> dhcp-relay  -> GET /network-instance[name=<ni>]/dhcp-relay datastore:state
+show system network-instance ethernet-segments -> GET /system/network-instance datastore:state
+show system lldp statistics            -> GET /system/lldp datastore:state
+show bfd session|summary               -> GET /bfd datastore:state
+show qos interface                     -> GET /interface[name=X]/subinterface[index=I]/qos datastore:state
+show mirroring mirror-instance         -> GET /mirror-instance datastore:state
+show platform redundancy               -> INVALID on 7220 IXR fixed chassis
+# IOS/NX-OS — do not exist on SR Linux:
+show ip interface brief                -> show interface brief
+show ip route                          -> show network-instance default route-table
+show ip bgp summary                    -> show network-instance default protocols bgp summary
+show bgp neighbors                     -> show network-instance default protocols bgp neighbor
+show arp                               -> GET /network-instance[name=default]/arp-nd/arp-entry[ipv4-address=*]
+show mac address-table                 -> show network-instance <name> bridge-table mac-table all
+show lldp neighbors                    -> show system lldp neighbor
+# Write operations — NOT PERMITTED (read-only agent):
+configure terminal | enter candidate | set / ... | commit
