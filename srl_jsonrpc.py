@@ -39,7 +39,21 @@ _client: httpx.AsyncClient | None = None
 # ---------------------------------------------------------------------------
 
 class SrlJsonRpcError(Exception):
-    """Raised on any JSON-RPC failure: transport, HTTP, or JSON-RPC error field."""
+    """Raised when the device rejects a request: a JSON-RPC `error` field in an
+    HTTP-200 body (bad command/path content — i.e. the caller's fault).
+
+    Stays the base class so existing `except SrlJsonRpcError` catch sites keep
+    catching transport failures too.
+    """
+
+
+class SrlTransportError(SrlJsonRpcError):
+    """Raised on infrastructure failures that are NOT the caller's fault:
+    connection/transport errors, non-200 HTTP, or a non-JSON response body.
+
+    Kept distinct so experiment metrics can exclude lab/connection flakiness from
+    the 'invalid command' count (see mcp_server.py log sites).
+    """
 
 
 @dataclass(frozen=True)
@@ -152,7 +166,7 @@ async def _call(
                 method=method,
                 error=str(exc),
             )
-            raise SrlJsonRpcError(
+            raise SrlTransportError(
                 f'Transport error to {conn.host}: {exc}'
             ) from exc
 
@@ -164,14 +178,14 @@ async def _call(
                 status=response.status_code,
                 body=response.text[:500],
             )
-            raise SrlJsonRpcError(
+            raise SrlTransportError(
                 f'HTTP {response.status_code} from {conn.host}: {response.text[:300]}'
             )
 
         try:
             body = response.json()
         except ValueError as exc:
-            raise SrlJsonRpcError(
+            raise SrlTransportError(
                 f'Non-JSON response from {conn.host}: {response.text[:300]}'
             ) from exc
 

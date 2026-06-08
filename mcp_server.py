@@ -6,9 +6,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 import logfire
 from fastmcp import FastMCP  # , Context
-from failure_log import log_command_failure
+from failure_log import log_command_failure, log_transport_failure
 from session_dedup import CallTracker
-from srl_jsonrpc import SrlJsonRpcError, get_connection, jrpc_cli, jrpc_get
+from srl_jsonrpc import SrlJsonRpcError, SrlTransportError, get_connection, jrpc_cli, jrpc_get
 
 env_file = Path(__file__).parent / ".env"
 if env_file.exists():
@@ -108,6 +108,14 @@ async def execute_show_command(device_name: str, command: str) -> str:
             results = await jrpc_cli(conn, [command], output_format='text')
             raw = results[0] if results else ''
             output = raw if isinstance(raw, str) else str(raw)
+        except SrlTransportError as exc:
+            log_transport_failure(
+                agent='network-agent',
+                device=device_name,
+                command=command,
+                error_text=str(exc),
+            )
+            return f"Error executing command on {device_name}: {exc}"
         except SrlJsonRpcError as exc:
             log_command_failure(
                 agent='network-agent',
@@ -161,6 +169,14 @@ async def get_state_path(device_name: str, path: str) -> str:
 
     try:
         results = await jrpc_get(conn, [path], datastore='state')
+    except SrlTransportError as exc:
+        log_transport_failure(
+            agent='network-agent',
+            device=device_name,
+            command=f'GET state {path}',
+            error_text=str(exc),
+        )
+        return f"Error reading {path} on {device_name}: {exc}"
     except SrlJsonRpcError as exc:
         log_command_failure(
             agent='network-agent',
@@ -204,6 +220,14 @@ async def get_config_path(device_name: str, path: str) -> str:
 
     try:
         results = await jrpc_get(conn, [path], datastore='running')
+    except SrlTransportError as exc:
+        log_transport_failure(
+            agent='network-agent',
+            device=device_name,
+            command=f'GET running {path}',
+            error_text=str(exc),
+        )
+        return f"Error reading {path} on {device_name}: {exc}"
     except SrlJsonRpcError as exc:
         log_command_failure(
             agent='network-agent',

@@ -49,10 +49,11 @@ GET  /network-instance[name=default]/oper-state  # specific oper-state leaf
 GET  /network-instance[name=*]
 GET  /network-instance[name=*]/oper-state  # bulk oper-state all NIs
 GET  /network-instance[name=default]/interface[name=*]   # interfaces assigned: name, oper-state, index
-GET  /network-instance[name=default]/arp-nd/arp-entry[ipv4-address=*]   # mac-address, interface, expiry-time, origin. NOTE: ARP lives under arp-nd (shared with NDP)
-GET  /network-instance[name=default]/arp-nd/arp-entry[ipv4-address=192.168.1.1]
-GET  /network-instance[name=default]/arp-nd/nbr-entry[ipv6-address=*]   # NDP: mac-address, interface, current-state, origin
-CLI  show arpnd arp-entries network-instance <name>  # CLI alternative for ARP table
+# ARP/ND live under the interface subinterface (ipv4/arp), NOT under network-instance.
+GET  /interface[name=*]/subinterface[index=*]/ipv4/arp/neighbor[ipv4-address=*]   # all ARP entries: link-layer-address (MAC), origin (dynamic/static), expiry-time
+GET  /interface[name=ethernet-1/1]/subinterface[index=0]/ipv4/arp/neighbor[ipv4-address=192.168.1.1]  # single entry
+GET  /interface[name=*]/subinterface[index=*]/ipv6/neighbor-discovery/neighbor[ipv6-address=*]   # IPv6 ND: link-layer-address, origin, is-router
+CLI  show arpnd arp-entries                 # all ARP entries (bare command — no network-instance arg)
 CLI  show network-instance <mac-vrf> bridge-table mac-table all     # MAC table, mac-vrf only
 CLI  show network-instance <mac-vrf> bridge-table mac-table summary
 CLI  show network-instance default route-table                       # IPv4 FIB+RIB, no single YANG path
@@ -133,7 +134,7 @@ CLI  ping X -c 3 network-instance default
 # ROUTING PROBLEM
 CLI  show network-instance default route-table ipv4-unicast summary
 CLI  show network-instance default route-table ipv4-unicast prefix X.X.X.X/YY
-GET  /network-instance[name=default]/arp-nd/arp-entry[ipv4-address=<next-hop>]
+GET  /interface[name=*]/subinterface[index=*]/ipv4/arp/neighbor[ipv4-address=<next-hop>]  # resolve next-hop MAC
 CLI  ping <dst> -c 3 network-instance default
 
 # TOPOLOGY DISCOVERY
@@ -164,7 +165,7 @@ show ip interface brief                -> show interface brief
 show ip route                          -> show network-instance default route-table
 show ip bgp summary                    -> show network-instance default protocols bgp summary
 show bgp neighbors                     -> show network-instance default protocols bgp neighbor
-show arp                               -> GET /network-instance[name=default]/arp-nd/arp-entry[ipv4-address=*]
+show arp                               -> GET /interface[name=*]/subinterface[index=*]/ipv4/arp/neighbor[ipv4-address=*]  (or CLI: show arpnd arp-entries)
 show mac address-table                 -> show network-instance <name> bridge-table mac-table all
 show lldp neighbors                    -> show system lldp neighbor
 # Write operations — NOT PERMITTED (read-only agent):

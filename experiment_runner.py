@@ -50,7 +50,7 @@ from pydantic_ai.settings import ModelSettings
 
 load_dotenv(Path(__file__).parent / '.env')
 
-from failure_log import FAILURE_LOG_PATH
+from failure_log import FAILURE_LOG_PATH, TRANSPORT_LOG_PATH
 
 from client_agent import (
     DEFAULT_AGENT_MODEL,
@@ -235,8 +235,9 @@ async def run(
     _active_model_name.set(model_name)
     model = _build_model(model_name)
 
-    # Clear the failure log so counts only reflect this run.
+    # Clear both logs so counts only reflect this run.
     FAILURE_LOG_PATH.write_text('')
+    TRANSPORT_LOG_PATH.write_text('')
 
     run_id = uuid.uuid4().hex
 

@@ -53,6 +53,19 @@ mcp_server = MCPServerStdio(
     timeout=30,
 )
 
+# A/B experiment toggle: when NETWORK_AGENT_CMDREF=1, the SR Linux read-command
+# reference cheat-sheet is appended to the system prompt (always in context).
+# Default (unset/0) = no reference, matching current production behaviour. Used to
+# measure whether the reference reduces invalid-command (syntax) rates.
+_CMDREF_PATH = Path(__file__).parent / 'srlinux-read-command-reference.txt'
+_cmdref_block = ''
+if os.getenv('NETWORK_AGENT_CMDREF') == '1':
+    _cmdref_block = (
+        '\n\nSR LINUX READ-COMMAND REFERENCE (authoritative — use this exact syntax; '
+        'do NOT invent commands or YANG paths from memory):\n'
+        + _CMDREF_PATH.read_text()
+    )
+
 network_agent = Agent(
     model=llm,
     name='network_agent',
@@ -85,7 +98,7 @@ WORKFLOW:
   do NOT guess. Say so explicitly and list the specific questions you need
   answered.
 - IF the request is clear use the provided tools to fulfill it.
-""",
+{_cmdref_block}""",
 )
 
 
