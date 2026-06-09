@@ -14,14 +14,15 @@ Typical usage:
     record_agent_run(session, "network_agent", "z-ai/glm-5", result, gen_ids)
     finish_session(session, success=True)
 
-Cost, tokens, and duration come from the OpenRouter Generation API (actual billed values).
+Tokens and duration come from the OpenRouter Generation API (actual billed values).
+Cost is caching-normalized (total_cost + cache_discount) so models with automatic
+server-side prompt caching aren't favored over models without it — see finalize_costs.
 duration_s is summed from generation_time across all LLM round-trips for the run.
 """
 
 import contextlib
 import json
 import os
-import time
 import uuid
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
@@ -65,7 +66,10 @@ def make_tracked_http_client() -> httpx.AsyncClient:
 
 @dataclass
 class GenerationData:
-    """Actual billing data from the OpenRouter Generation API, summed across all LLM requests."""
+    """Billing data from the OpenRouter Generation API, summed across all LLM requests.
+
+    cost_usd is caching-normalized (total_cost + cache_discount), not raw billed cost.
+    """
     cost_usd: float = 0.0
     input_tokens: int = 0
     output_tokens: int = 0
@@ -96,7 +100,7 @@ async def fetch_generation_data(api_key: str, generation_ids: list[str]) -> Gene
     """Fetch actual cost and token counts from the OpenRouter Generation API.
 
     Calls GET /api/v1/generation?id=... for each ID and sums:
-      total_cost        → cost_usd
+      total_cost + cache_discount → cost_usd   (caching-normalized; see finalize_costs)
       tokens_prompt     → input_tokens
       tokens_completion → output_tokens
 
@@ -135,7 +139,7 @@ async def fetch_generation_data(api_key: str, generation_ids: list[str]) -> Gene
                 try:
                     data = await _fetch_one(client, gen_id)
                     if data.get('tokens_prompt') is not None:
-                        result.cost_usd += float(data.get('total_cost', 0.0) or 0.0)
+                        result.cost_usd += float(data.get('total_cost', 0.0) or 0.0) + float(data.get('cache_discount', 0.0) or 0.0)
                         result.input_tokens += int(data.get('native_tokens_prompt') or data.get('tokens_prompt', 0) or 0)
                         result.output_tokens += int(data.get('native_tokens_completion') or data.get('tokens_completion', 0) or 0)
                     else:
@@ -170,7 +174,7 @@ class AgentRunRecord:
     llm_requests: int = 0   # number of LLM API round-trips (>1 when tool loops occur)
     tool_calls: int = 0     # number of MCP/tool call invocations
     duration_s: float = 0.0
-    cost_usd: float = 0.0   # actual billed cost from OpenRouter Generation API (0.0 if unavailable)
+    cost_usd: float = 0.0   # caching-normalized cost = total_cost + cache_discount (0.0 if unavailable)
 
 
 @dataclass
@@ -183,8 +187,8 @@ class ExperimentSession:
     agent_runs: list[AgentRunRecord] = field(default_factory=list)
     run_id: str = ''        # UUID shared by every session in one experiment_runner invocation
     output: str = ''        # orchestrator's final natural-language answer
-    # Filled by finish_session()
-    duration_s: float = 0.0
+    # Filled by finalize_costs() / finish_session()
+    duration_s: float = 0.0   # summed LLM generation_time across all runs (seconds)
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_cost_usd: float = 0.0
@@ -195,7 +199,6 @@ class ExperimentSession:
     error: str = ''
 
 
-_session_start_times: dict[str, float] = {}
 # Maps id(AgentRunRecord) → generation IDs for that run, populated by record_agent_run.
 # Consumed and cleared by finalize_costs().
 _run_gen_ids: dict[int, list[str]] = {}
@@ -209,7 +212,6 @@ def begin_session(
 ) -> ExperimentSession:
     """Start a new experiment session. Call before running the orchestrator."""
     session_id = uuid.uuid4().hex
-    _session_start_times[session_id] = time.monotonic()
     if not scenario:
         scenario = os.getenv('EXPERIMENT_SCENARIO', '')
     return ExperimentSession(
@@ -258,10 +260,9 @@ def finish_session(
 ) -> None:
     """Aggregate token totals, persist to JSONL, and emit a Logfire span.
 
-    Call finalize_costs() before this to populate total_cost_usd from OpenRouter.
+    Call finalize_costs() before this to populate total_cost_usd and duration_s
+    (summed generation_time) from OpenRouter.
     """
-    t0 = _session_start_times.pop(session.session_id, None)
-    session.duration_s = round(time.monotonic() - t0, 3) if t0 else 0.0
     session.success = success
     session.error = error
 
@@ -351,9 +352,16 @@ async def finalize_costs(sessions: list[ExperimentSession], api_key: str) -> Non
             records = [id_to_data[gid] for gid in run_ids if gid in id_to_data]
             run.input_tokens  = sum(int(d.get('native_tokens_prompt') or d.get('tokens_prompt', 0) or 0) for d in records)
             run.output_tokens = sum(int(d.get('native_tokens_completion') or d.get('tokens_completion', 0) or 0) for d in records)
-            run.cost_usd      = round(sum(float(d.get('total_cost', 0.0) or 0.0) for d in records), 8)
+            # Caching-normalized "fair" cost: total_cost + cache_discount recovers the
+            # un-cached base cost (positive discount on cache reads, negative on writes),
+            # so models with automatic server-side caching aren't unfairly favored.
+            run.cost_usd      = round(sum(float(d.get('total_cost', 0.0) or 0.0) + float(d.get('cache_discount', 0.0) or 0.0) for d in records), 8)
             run.duration_s    = round(sum(int(d.get('generation_time', 0) or 0) for d in records) / 1000, 3)
 
         session.total_input_tokens  = sum(r.input_tokens for r in session.agent_runs)
         session.total_output_tokens = sum(r.output_tokens for r in session.agent_runs)
         session.total_cost_usd      = round(sum(r.cost_usd for r in session.agent_runs), 8)
+        # Session latency = summed LLM generation_time across all runs (pure inference
+        # time, model-attributable). Replaces wall-clock, which was contaminated by the
+        # cost-polling sleeps above and by batch ordering in multi-turn runs.
+        session.duration_s          = round(sum(r.duration_s for r in session.agent_runs), 3)
