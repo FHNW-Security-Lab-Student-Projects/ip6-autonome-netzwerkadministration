@@ -15,9 +15,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from pydantic_ai import Agent
+from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
+from agent_history import compact_tool_history
 from model_config import agent_model_settings
 
 
@@ -67,6 +69,9 @@ network_agent = Agent(
     model=llm,
     name='network_agent',
     toolsets=[mcp_server],
+    # Stub older oversized tool returns once the run nears the model's context
+    # window so they aren't re-sent verbatim every loop (see agent_history.py).
+    capabilities=[ProcessHistory(processor=compact_tool_history)],
     output_type=str,
     # output_type=NetworkAgentResult,  # disabled: tool_choice='required' not supported by all OpenRouter providers
     instructions=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.

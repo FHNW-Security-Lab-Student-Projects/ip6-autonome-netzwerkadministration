@@ -27,9 +27,11 @@ import uvicorn
 from dotenv import dotenv_values, load_dotenv
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelMessagesTypeAdapter
+from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
+from agent_history import compact_tool_history
 from model_config import agent_model_settings
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -230,6 +232,11 @@ syslog_investigator = Agent(
     model=llm,
     name='syslog_investigator',
     toolsets=[network_mcp_server, syslog_mcp_server],
+    # Stub older oversized tool returns once the run nears the model's context
+    # window so they aren't re-sent verbatim each loop (see agent_history.py).
+    # NOTE: this means persisted investigation history (investigations.json) stores
+    # the stubbed older payloads; the agent can re-call any tool whose body it needs.
+    capabilities=[ProcessHistory(processor=compact_tool_history)],
 )
 
 

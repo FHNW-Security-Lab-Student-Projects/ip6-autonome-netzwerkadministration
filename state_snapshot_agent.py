@@ -28,8 +28,10 @@ from pathlib import Path
 import logfire
 from dotenv import load_dotenv
 from pydantic_ai import Agent
+from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
+from agent_history import compact_tool_history
 from model_config import agent_model_settings
 
 from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli, list_devices
@@ -232,6 +234,9 @@ llm = OpenRouterModel(
 snapshot_agent = Agent(
     model=llm,
     name='snapshot_agent',
+    # Stub older oversized tool returns once the run nears the model's context
+    # window so they aren't re-sent verbatim each loop (see agent_history.py).
+    capabilities=[ProcessHistory(processor=compact_tool_history)],
     output_type=str,
     instructions="""You are a network state history agent for Nokia SR Linux devices.
 
