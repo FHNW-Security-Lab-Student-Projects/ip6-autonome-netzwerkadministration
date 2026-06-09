@@ -21,9 +21,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStdio
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
-from pydantic_ai.settings import ModelSettings
+from model_config import agent_model_settings
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -31,10 +31,10 @@ OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if not OPENROUTER_API_KEY:
     raise ValueError('OPENROUTER_API_KEY not found. Copy .env.example to .env and add your key.')
 
-llm = OpenAIChatModel(
+llm = OpenRouterModel(
     'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
-    settings=ModelSettings(parallel_tool_calls=True, timeout=180),  # Sequential — safety for config changes
+    settings=agent_model_settings(parallel_tool_calls=True),  # Sequential — safety for config changes
 )
 
 config_mcp = MCPServerStdio(

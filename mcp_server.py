@@ -36,12 +36,19 @@ SHOW_FAILURE_PATTERNS = (
     "Error:",
 )
 
-# Hard cap on the serialized body of a JSON-RPC `get` response. A bare container
-# path (e.g. `/interface`) can return tens of KB and flood the LLM context, so we
-# truncate and nudge the model toward a narrower query instead. Kept deliberately
-# tight: these payloads are re-sent on every loop of the agent, so a smaller cap
-# compounds across the whole run (see agent_history.py for the history-side trim).
-_MAX_GET_CHARS = 3000
+# Hard cap on the body of any tool response (a JSON-RPC `get` payload or a show-command
+# output). A bare container path (e.g. `/interface`) or a broad show command can return
+# tens of KB and flood the LLM context, so we truncate and nudge the model toward a
+# narrower query instead. These payloads are re-sent on every loop of the agent, so the
+# cap compounds across the whole run.
+_MAX_RESPONSE_CHARS = 15000
+
+
+def _truncate(body: str, overflow_note: str) -> str:
+    """Return `body` unchanged if within the size cap, else truncated with `overflow_note`."""
+    if len(body) <= _MAX_RESPONSE_CHARS:
+        return body
+    return body[:_MAX_RESPONSE_CHARS] + overflow_note
 
 
 def _detect_show_failure(output: str) -> str | None:
@@ -64,12 +71,10 @@ def _format_get_body(payload, path: str) -> str:
         body = payload
     else:
         body = json.dumps(payload, separators=(",", ":"))
-    if len(body) <= _MAX_GET_CHARS:
-        return body
-    return (
-        body[:_MAX_GET_CHARS]
-        + f"\n\n…[truncated: response for {path!r} exceeded {_MAX_GET_CHARS} chars. "
-        "Re-query a narrower path or a specific leaf, e.g. '<container>[name=*]/<leaf>'.]"
+    return _truncate(
+        body,
+        f"\n\n…[truncated: response for {path!r} exceeded {_MAX_RESPONSE_CHARS} chars. "
+        "Re-query a narrower path or a specific leaf, e.g. '<container>[name=*]/<leaf>'.]",
     )
 
 
@@ -136,7 +141,12 @@ async def execute_show_command(device_name: str, command: str) -> str:
             error_text=output.strip(),
         )
 
-    return f"Command: {command}\nDevice: {device_name}\n\n{output}"
+    body = _truncate(
+        output,
+        f"\n\n…[truncated: output for {command!r} exceeded {_MAX_RESPONSE_CHARS} chars. "
+        "Re-run a narrower command, e.g. add an interface or context filter.]",
+    )
+    return f"Command: {command}\nDevice: {device_name}\n\n{body}"
 
 
 @mcp.tool()
@@ -149,7 +159,7 @@ async def get_state_path(device_name: str, path: str) -> str:
 
     ALWAYS query the narrowest path that answers your question. Do NOT request a
     bare container like '/interface' — it returns every item with every counter
-    and will be truncated at 6000 chars. For an overview across many items, query
+    and will be truncated at 15000 chars. For an overview across many items, query
     a specific leaf with a wildcard key (the YANG equivalent of a `brief` show),
     e.g. '/interface[name=*]/oper-state' rather than '/interface'.
 
@@ -160,7 +170,7 @@ async def get_state_path(device_name: str, path: str) -> str:
               Avoid bare containers like '/interface' or '/network-instance'.
 
     Returns:
-        Compact JSON result (truncated past 6000 chars), or an error message.
+        Compact JSON result (truncated past 15000 chars), or an error message.
     """
     try:
         conn = get_connection(device_name)
@@ -202,7 +212,7 @@ async def get_config_path(device_name: str, path: str) -> str:
 
     ALWAYS query the narrowest path that answers your question. Do NOT request a
     bare container like '/interface' — it returns every item and will be
-    truncated at 6000 chars. For an overview across many items, query a specific
+    truncated at 15000 chars. For an overview across many items, query a specific
     leaf with a wildcard key, e.g. '/interface[name=*]/admin-state'.
 
     Args:
@@ -211,7 +221,7 @@ async def get_config_path(device_name: str, path: str) -> str:
               Avoid bare containers like '/interface' or '/network-instance'.
 
     Returns:
-        Compact JSON result (truncated past 6000 chars), or an error message.
+        Compact JSON result (truncated past 15000 chars), or an error message.
     """
     try:
         conn = get_connection(device_name)

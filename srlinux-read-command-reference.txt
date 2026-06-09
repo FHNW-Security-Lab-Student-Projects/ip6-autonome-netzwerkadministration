@@ -7,18 +7,17 @@ CLI  = JSON-RPC method:"cli" commands:["<show cmd>"] — use for CLI plugins tha
 RULE: YANG path listed → prefer GET. No path listed → use CLI.
 
 --- S1: PLATFORM ---
-CLI  show platform chassis [detail]
+CLI  show platform chassis                  # no 'detail' option exists
 CLI  show platform environment
 CLI  show platform control * detail         # cpu / memory / uptime here, not show system cpu/memory
 CLI  show platform linecard * detail
-CLI  show platform fabric * detail
+# NOTE: no 'show platform fabric' on 7220 IXR fixed chassis
 GET  /platform/fan-tray[id=*]              # speed, oper-state
 GET  /platform/power-supply[id=*]          # oper-state, capacity, used-capacity
-GET  /platform/environment/temperature
 GET  /platform/control[slot=A]/cpu[index=*]
 GET  /platform/control[slot=A]/cpu[index=all]/total/instant  # single instant CPU% reading
 GET  /platform/control[slot=A]/memory
-GET  /platform/control[slot=A]/memory/utilized  # specific utilized memory leaf
+GET  /platform/control[slot=A]/memory/utilization  # utilization leaf (NOT 'utilized')
 GET  /system/information                   # version, hostname, chassis-type, last-booted
 CLI  show version                          # brief version string (less detail than GET /system/information)
 
@@ -42,8 +41,7 @@ GET  /interface[name=ethernet-1/1]/subinterface[index=0]/ipv4/address  # explici
 GET  /interface[name=ethernet-1/1]/transceiver  # oper-state, form-factor, vendor, serial-number, channel[index=1]/output-power, channel[index=1]/input-power
 
 --- S3: NETWORK INSTANCES ---
-CLI  show network-instance                 # all NIs with type and oper-state (bare command, no subcommand)
-CLI  show network-instance summary         # all NIs: type, admin/oper-state, router-id, interface count
+CLI  show network-instance summary         # all NIs: type, admin/oper-state, router-id, interface count (bare 'show network-instance' only prints usage help — always use 'summary')
 GET  /network-instance[name=default]       # type, admin-state, oper-state, router-id, description
 GET  /network-instance[name=default]/oper-state  # specific oper-state leaf
 GET  /network-instance[name=*]
@@ -70,26 +68,24 @@ CLI  show network-instance default protocols bgp neighbor            # all peers
 GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=10.0.0.1]/session-state  # Established/Active/Connect/Idle/OpenSent/OpenConfirm
 GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=10.0.0.1]/peer-as
 GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=10.0.0.1]/last-established
-GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=10.0.0.1]/failure-uptime
 GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=*]/session-state  # bulk all peers
 GET  /network-instance[name=default]/protocols/bgp/neighbor[peer-address=*]
 CLI  show network-instance default protocols bgp neighbor 10.0.0.1 detail  # capabilities, timers, AFI/SAFI negotiated
-CLI  show network-instance default protocols bgp neighbor 10.0.0.1 received-routes ipv4-unicast
-CLI  show network-instance default protocols bgp neighbor 10.0.0.1 advertised-routes ipv4-unicast
-CLI  show network-instance default protocols bgp routes ipv4-unicast summary
-CLI  show network-instance default protocols bgp routes ipv6-unicast summary
-CLI  show network-instance default protocols bgp routes ipv4-unicast prefix 10.0.0.0/24 detail
+# NOTE: BGP route subcommands use 'ipv4' / 'ipv6' (NOT 'ipv4-unicast' / 'ipv6-unicast')
+CLI  show network-instance default protocols bgp neighbor 10.0.0.1 received-routes ipv4
+CLI  show network-instance default protocols bgp neighbor 10.0.0.1 advertised-routes ipv4
+CLI  show network-instance default protocols bgp routes ipv4 summary
+CLI  show network-instance default protocols bgp routes ipv6 summary
+CLI  show network-instance default protocols bgp routes ipv4 prefix 10.0.0.0/24 detail
 
 
 
 --- S5: ACL ---
-GET  /acl/ipv4-filter[name=*]
-GET  /acl/ipv4-filter[name=FILTER-IN]/entry[sequence-id=*]          # sequence-id, match(protocol/src/dst/port), action(accept/drop)
-GET  /acl/ipv4-filter[name=FILTER-IN]/entry[sequence-id=10]/statistics  # match-packets, match-octets
-GET  /acl/ipv6-filter[name=*]
-GET  /acl/ipv6-filter[name=FILTER6-IN]/entry[sequence-id=*]
-GET  /interface[name=ethernet-1/1]/subinterface[index=0]/acl/input/ipv4-filter
-GET  /interface[name=ethernet-1/1]/subinterface[index=0]/acl/output/ipv4-filter
+# NOTE: filters live under /acl/acl-filter (NOT ipv4-filter/ipv6-filter); distinguish v4/v6 with the 'type' key
+GET  /acl/acl-filter[name=*]                                              # all ACL filters (ipv4 and ipv6)
+GET  /acl/acl-filter[name=FILTER-IN][type=ipv4]/entry[sequence-id=*]      # sequence-id, match(protocol/src/dst/port), action(accept/drop)
+GET  /acl/acl-filter[name=FILTER-IN][type=ipv4]/entry[sequence-id=10]/statistics  # match-packets, match-octets
+GET  /acl/acl-filter[name=FILTER6-IN][type=ipv6]/entry[sequence-id=*]
 
 --- S6: SYSTEM ---
 CLI  show system lldp neighbor             # all LLDP neighbors tabular — CLI plugin
@@ -101,8 +97,7 @@ GET  /system/dns
 GET  /system/aaa/server-group[name=*]
 GET  /system/aaa/server-group[name=TACACS]/server[address=*]    # oper-state, connection-attempts, connection-failures
 GET  /bfd                                  # all BFD state
-GET  /bfd/subinterface[id=*]               # status(up/down), remote-address, local-address, protocol-sessions
-CLI  show bfd session all
+GET  /bfd/subinterface[id=*]               # status(up/down), remote-address, local-address, protocol-sessions  (no 'show bfd' CLI — use GET /bfd)
 GET  /system/logging/remote-server[host=*]
 
 --- S7: PING / TRACEROUTE ---

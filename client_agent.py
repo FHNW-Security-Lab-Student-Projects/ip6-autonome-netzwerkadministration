@@ -9,9 +9,9 @@ import logfire
 from dotenv import load_dotenv
 from openai import APITimeoutError
 from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
-from pydantic_ai.settings import ModelSettings
+from model_config import agent_model_settings
 
 from config_agent import config_agent, config_lifespan
 from experiment_tracker import (
@@ -55,10 +55,10 @@ if not OPENROUTER_API_KEY:
 # All OpenRouterProvider instances use this so that capture_generation_ids() works.
 _tracked_http_client = make_tracked_http_client()
 
-llm = OpenAIChatModel(
+llm = OpenRouterModel(
     'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
-    settings=ModelSettings(timeout=180),
+    settings=agent_model_settings(),
 )
 
 # Additional models offered in the web UI dropdown (label → OpenRouter model name).
@@ -72,8 +72,8 @@ AVAILABLE_OPENROUTER_MODELS: dict[str, str] = {
 }
 
 # Pre-built Model objects for the web UI (imported by web_ui.py for to_web(models=...)).
-UI_EXTRA_MODELS: dict[str, OpenAIChatModel] = {
-    label: OpenAIChatModel(name, provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client), settings=ModelSettings(timeout=180))
+UI_EXTRA_MODELS: dict[str, OpenRouterModel] = {
+    label: OpenRouterModel(name, provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client), settings=agent_model_settings())
     for label, name in AVAILABLE_OPENROUTER_MODELS.items()
 }
 
@@ -94,19 +94,19 @@ def _effective_model() -> str:
 
 # Cache of Model objects keyed by model_name to avoid re-creating
 # HTTP clients on every tool call.
-_model_cache: dict[tuple[str, bool], OpenAIChatModel] = {}
+_model_cache: dict[tuple[str, bool], OpenRouterModel] = {}
 
 
-def _get_agent_model() -> OpenAIChatModel | None:
+def _get_agent_model() -> OpenRouterModel | None:
     """Return an override model for sub-agent calls, or None to use the sub-agent's default."""
     name = _active_model_name.get()
     if not name:
         return None
     if name not in _model_cache:
-        _model_cache[name] = OpenAIChatModel(
+        _model_cache[name] = OpenRouterModel(
             name,
             provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
-            settings=ModelSettings(timeout=180),
+            settings=agent_model_settings(),
         )
     return _model_cache[name]
 

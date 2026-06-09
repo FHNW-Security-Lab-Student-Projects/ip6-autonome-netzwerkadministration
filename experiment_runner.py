@@ -44,9 +44,9 @@ SCENARIOS_DIR = Path(__file__).parent / 'scenarios'
 
 from dotenv import load_dotenv
 from openai import APITimeoutError
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
-from pydantic_ai.settings import ModelSettings
+from model_config import agent_model_settings
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -79,11 +79,11 @@ def _count_failure_log_lines() -> int:
         return 0
 
 
-def _build_model(model_name: str) -> OpenAIChatModel:
-    return OpenAIChatModel(
+def _build_model(model_name: str) -> OpenRouterModel:
+    return OpenRouterModel(
         model_name,
         provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
-        settings=ModelSettings(timeout=180),
+        settings=agent_model_settings(),
     )
 
 
@@ -194,7 +194,7 @@ def _print_results(
 async def _run_turn(
     query: str,
     model_name: str,
-    model: OpenAIChatModel,
+    model: OpenRouterModel,
     scenario: str,
     run_id: str,
     message_history: list,
