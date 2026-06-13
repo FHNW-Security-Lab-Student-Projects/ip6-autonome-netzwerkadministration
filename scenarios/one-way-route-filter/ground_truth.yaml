@@ -1,4 +1,3 @@
-# scenario: one-way-route-filter  (tier: hard)
 root_cause: >
   router1 has a BGP import policy (block-client3) that rejects the 10.10.10.0/24 prefix
   advertised by router2. As a result router1's route table has no route to client3's

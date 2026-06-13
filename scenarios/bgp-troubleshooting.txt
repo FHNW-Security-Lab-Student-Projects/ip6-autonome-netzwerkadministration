@@ -1,8 +1,0 @@
-# Scenario: bgp-troubleshooting
-# Tests root-cause analysis for a BGP-related problem.
-# Run with:
-#   uv run python experiment_runner.py --model <model-id> --scenario bgp-troubleshooting --file scenarios/bgp-troubleshooting.txt
-
-Check the BGP session state on all routers and report any sessions that are not established.
-Are there any recent BGP-related syslog events? Summarise what happened and on which device.
-What routes is router1 advertising to its BGP peers?

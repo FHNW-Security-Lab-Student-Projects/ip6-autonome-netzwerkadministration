@@ -1,5 +1,0 @@
-# scenario: basic-reachability  (baseline — no fault injected)
-root_cause: >
-  No fault. The network is healthy: all interfaces on router1 are administratively
-  enabled and operationally up. A correct answer reports the interfaces as up and
-  does not invent a problem (no down interface, BGP issue, or cabling fault).

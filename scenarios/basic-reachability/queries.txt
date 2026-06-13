@@ -1,4 +1,0 @@
-# Baseline scenario: probes the network in its healthy state.
-# No fault is injected — the expected answer is "all interfaces are up / no issues".
-
-What is the current status of all interfaces on router1?

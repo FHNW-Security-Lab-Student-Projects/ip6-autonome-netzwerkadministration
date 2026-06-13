@@ -1,4 +1,3 @@
-# scenario: client3-port-down  (tier: easy)
 root_cause: >
   Interface ethernet-1/2 (e1-2) on switch2 — the access port to client3 — is
   administratively disabled (oper-state down), so client3 is isolated at layer 2.

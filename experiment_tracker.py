@@ -11,15 +11,19 @@ Typical usage:
     session = begin_session(user_query="...", model="z-ai/glm-5", scenario="bgp-flap")
     with capture_generation_ids() as gen_ids:
         result = await some_agent.run(request)
-    record_agent_run(session, "network_agent", "z-ai/glm-5", result, gen_ids)
+    await record_agent_run(session, "network_agent", "z-ai/glm-5", result, gen_ids)
     finish_session(session, success=True)
 
-Tokens and duration come from the OpenRouter Generation API (actual billed values).
-Cost is caching-normalized (total_cost + cache_discount) so models with automatic
-server-side prompt caching aren't favored over models without it — see finalize_costs.
+Tokens and duration come from the OpenRouter Generation API (actual native counts).
+Cost is *modeled*: native_tokens × the model's advertised per-token rate (from the
+OpenRouter model catalog — see model_config.pricing_for). This makes cost
+independent of which provider OpenRouter routed to and of any prompt-cache
+discount, so it's reproducible and comparable across models. It is therefore a
+list-price estimate, not the dollar amount actually billed — see finalize_costs.
 duration_s is summed from generation_time across all LLM round-trips for the run.
 """
 
+import asyncio
 import contextlib
 import json
 import os
@@ -34,6 +38,8 @@ import httpx
 import logfire
 from pydantic_ai import AgentRunResult
 from pydantic_ai.messages import ModelResponse, ToolCallPart
+
+from model_config import ModelPricing, pricing_for
 
 EXPERIMENT_LOG = Path(__file__).parent / 'experiment_log.jsonl'
 
@@ -64,29 +70,14 @@ def make_tracked_http_client() -> httpx.AsyncClient:
     )
 
 
-@dataclass
-class GenerationData:
-    """Billing data from the OpenRouter Generation API, summed across all LLM requests.
-
-    cost_usd is caching-normalized (total_cost + cache_discount), not raw billed cost.
-    """
-    cost_usd: float = 0.0
-    input_tokens: int = 0
-    output_tokens: int = 0
-
-    @property
-    def available(self) -> bool:
-        return self.input_tokens > 0 or self.output_tokens > 0 or self.cost_usd > 0.0
-
-
 @contextlib.contextmanager
 def capture_generation_ids() -> Generator[list[str], None, None]:
-    """Sync context manager — collects OpenRouter X-Request-Id values during an agent run.
+    """Sync context manager — collects OpenRouter generation IDs during an agent run.
 
     Usage:
         with capture_generation_ids() as gen_ids:
             result = await agent.run(...)
-        gen_data = await fetch_generation_data(api_key, gen_ids)
+        # later, pass gen_ids to finalize_costs() to attach token/cost data.
     """
     ids: list[str] = []
     token = _capturing_ids.set(ids)
@@ -94,64 +85,6 @@ def capture_generation_ids() -> Generator[list[str], None, None]:
         yield ids
     finally:
         _capturing_ids.reset(token)
-
-
-async def fetch_generation_data(api_key: str, generation_ids: list[str]) -> GenerationData:
-    """Fetch actual cost and token counts from the OpenRouter Generation API.
-
-    Calls GET /api/v1/generation?id=... for each ID and sums:
-      total_cost + cache_discount → cost_usd   (caching-normalized; see finalize_costs)
-      tokens_prompt     → input_tokens
-      tokens_completion → output_tokens
-
-    Waits 2 seconds before the first attempt (OpenRouter's backend needs a moment
-    to write generation records after a request completes), then retries once after
-    another 3 seconds if data is still missing.
-
-    Returns an empty GenerationData if no IDs provided or all fetches fail.
-    """
-    import asyncio
-
-    if not generation_ids:
-        return GenerationData()
-
-    async def _fetch_one(client: httpx.AsyncClient, gen_id: str) -> dict:
-        resp = await client.get(
-            _OPENROUTER_GENERATION_URL,
-            params={'id': gen_id},
-            headers={'Authorization': f'Bearer {api_key}'},
-            timeout=10.0,
-        )
-        if resp.status_code == 200:
-            return resp.json().get('data', {})
-        return {}
-
-    # OpenRouter's backend can take up to ~30s to write the generation record after
-    # the request completes. Poll with increasing delays until all IDs resolve.
-    result = GenerationData()
-    pending = list(generation_ids)
-
-    async with httpx.AsyncClient() as client:
-        for delay in (3, 7, 15, 30):
-            await asyncio.sleep(delay)
-            still_pending = []
-            for gen_id in pending:
-                try:
-                    data = await _fetch_one(client, gen_id)
-                    if data.get('tokens_prompt') is not None:
-                        result.cost_usd += float(data.get('total_cost', 0.0) or 0.0) + float(data.get('cache_discount', 0.0) or 0.0)
-                        result.input_tokens += int(data.get('native_tokens_prompt') or data.get('tokens_prompt', 0) or 0)
-                        result.output_tokens += int(data.get('native_tokens_completion') or data.get('tokens_completion', 0) or 0)
-                    else:
-                        still_pending.append(gen_id)
-                except Exception:
-                    still_pending.append(gen_id)
-            pending = still_pending
-            if not pending:
-                break
-
-    result.cost_usd = round(result.cost_usd, 8)
-    return result
 
 
 def _count_tool_calls(result: AgentRunResult) -> int:
@@ -174,7 +107,7 @@ class AgentRunRecord:
     llm_requests: int = 0   # number of LLM API round-trips (>1 when tool loops occur)
     tool_calls: int = 0     # number of MCP/tool call invocations
     duration_s: float = 0.0
-    cost_usd: float = 0.0   # caching-normalized cost = total_cost + cache_discount (0.0 if unavailable)
+    cost_usd: float = 0.0   # modeled cost = native_tokens × advertised rate (0.0 if pricing unavailable)
 
 
 @dataclass
@@ -203,6 +136,11 @@ class ExperimentSession:
 # Consumed and cleared by finalize_costs().
 _run_gen_ids: dict[int, list[str]] = {}
 
+# Serializes mutations of the shared ExperimentSession when sub-agents run
+# concurrently. Today the body has no awaits so it's already atomic; the lock
+# keeps it correct even if a future edit introduces an await mid-update.
+_session_lock = asyncio.Lock()
+
 
 def begin_session(
     user_query: str,
@@ -224,7 +162,7 @@ def begin_session(
     )
 
 
-def record_agent_run(
+async def record_agent_run(
     session: ExperimentSession,
     agent_name: str,
     model: str,
@@ -249,8 +187,9 @@ def record_agent_run(
         duration_s=0.0,
         cost_usd=0.0,
     )
-    session.agent_runs.append(record)
-    _run_gen_ids[id(record)] = list(gen_ids) if gen_ids else []
+    async with _session_lock:
+        session.agent_runs.append(record)
+        _run_gen_ids[id(record)] = list(gen_ids) if gen_ids else []
 
 
 def finish_session(
@@ -298,10 +237,14 @@ def finish_session(
 
 
 async def finalize_costs(sessions: list[ExperimentSession], api_key: str) -> None:
-    """Fetch tokens and cost from OpenRouter for every agent run across all sessions.
+    """Fetch native token counts and duration from OpenRouter, then model the cost.
 
     Called once after all turns complete so generation records have had time to be
     indexed. Retries with backoff, then sets per-run and session-level totals.
+
+    Cost is *not* taken from OpenRouter's billed `total_cost`; instead it's modeled
+    as native_tokens × the model's advertised per-token rate (model_config.pricing_for).
+    See the module docstring for why.
     """
     import asyncio
 
@@ -345,6 +288,14 @@ async def finalize_costs(sessions: list[ExperimentSession], api_key: str) -> Non
             if not pending:
                 break
 
+    # Advertised pricing per model, fetched once per unique model id (cached upstream).
+    pricing_cache: dict[str, ModelPricing | None] = {}
+
+    async def _get_pricing(model_name: str) -> ModelPricing | None:
+        if model_name not in pricing_cache:
+            pricing_cache[model_name] = await pricing_for(model_name)
+        return pricing_cache[model_name]
+
     # Apply fetched data to each agent run, then compute session totals.
     for session in sessions:
         for run in session.agent_runs:
@@ -352,11 +303,15 @@ async def finalize_costs(sessions: list[ExperimentSession], api_key: str) -> Non
             records = [id_to_data[gid] for gid in run_ids if gid in id_to_data]
             run.input_tokens  = sum(int(d.get('native_tokens_prompt') or d.get('tokens_prompt', 0) or 0) for d in records)
             run.output_tokens = sum(int(d.get('native_tokens_completion') or d.get('tokens_completion', 0) or 0) for d in records)
-            # Caching-normalized "fair" cost: total_cost + cache_discount recovers the
-            # un-cached base cost (positive discount on cache reads, negative on writes),
-            # so models with automatic server-side caching aren't unfairly favored.
-            run.cost_usd      = round(sum(float(d.get('total_cost', 0.0) or 0.0) + float(d.get('cache_discount', 0.0) or 0.0) for d in records), 8)
+            reasoning_tokens  = sum(int(d.get('native_tokens_reasoning') or 0) for d in records)
             run.duration_s    = round(sum(int(d.get('generation_time', 0) or 0) for d in records) / 1000, 3)
+            # Modeled cost: native tokens × the model's advertised per-token rate.
+            # Provider-independent (ignores which provider OpenRouter routed to) and
+            # cache-independent (every native prompt token charged at the full rate).
+            pricing = await _get_pricing(run.model)
+            run.cost_usd = round(
+                pricing.cost_for(run.input_tokens, run.output_tokens, reasoning_tokens, len(records)), 8
+            ) if pricing else 0.0
 
         session.total_input_tokens  = sum(r.input_tokens for r in session.agent_runs)
         session.total_output_tokens = sum(r.output_tokens for r in session.agent_runs)

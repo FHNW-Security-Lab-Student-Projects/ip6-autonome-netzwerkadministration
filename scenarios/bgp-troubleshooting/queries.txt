@@ -1,6 +1,3 @@
-# Baseline scenario: probes BGP state in the healthy network.
-# No fault is injected — the expected answer is "all BGP sessions established, no anomalies".
-
 Check the BGP session state on all routers and report any sessions that are not established.
 Are there any recent BGP-related syslog events? Summarise what happened and on which device.
 What routes is router1 advertising to its BGP peers?

@@ -1,6 +1,0 @@
-# Scenario: basic-reachability
-# Tests how the model identifies a simple network reachability problem.
-# Run with:
-#   uv run python experiment_runner.py --model <model-id> --scenario basic-reachability --file scenarios/basic-reachability.txt
-
-What is the current status of all interfaces on router1?

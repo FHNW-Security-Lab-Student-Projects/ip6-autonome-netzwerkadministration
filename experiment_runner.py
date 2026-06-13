@@ -46,7 +46,7 @@ from dotenv import load_dotenv
 from openai import APITimeoutError
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
-from model_config import agent_model_settings
+from model_config import ModelPricing, agent_model_settings, pricing_for
 
 load_dotenv(Path(__file__).parent / '.env')
 
@@ -131,12 +131,16 @@ def _print_results(
     outputs: list[str],
     model: str,
     scenario: str,
+    pricing: ModelPricing | None = None,
 ) -> None:
     W = 72
     successful = [s for s in sessions if s.success]
 
     print(f'\n{"═" * W}')
     print(f'  RESULTS  |  model: {model}  |  scenario: {scenario or "(none)"}')
+    if pricing is not None:
+        print(f'  Rate (OpenRouter): ${pricing.prompt_per_mtok:.4f}/Mtok in'
+              f'  /  ${pricing.completion_per_mtok:.4f}/Mtok out')
     print(f'{"═" * W}')
 
     for i, (session, output) in enumerate(zip(sessions, outputs), 1):
@@ -178,6 +182,9 @@ def _print_results(
     print(f'\n{"═" * W}')
     print(f'  SUMMARY  |  {len(sessions)} turns  ({len(successful)} successful)')
     print(f'{"─" * W}')
+    if pricing is not None:
+        print(f'  Rate (OpenRouter):  ${pricing.prompt_per_mtok:.4f}/Mtok in'
+              f'  /  ${pricing.completion_per_mtok:.4f}/Mtok out')
     if successful:
         print(f'  Avg duration:  {sum(s.duration_s for s in successful) / len(successful):.1f}s')
         print(f'  Total tokens:  {sum(s.total_input_tokens for s in successful):,} in'
@@ -212,7 +219,7 @@ async def _run_turn(
     try:
         with capture_generation_ids() as gen_ids:
             result = await orchestrator.run(query, model=model, message_history=message_history)
-        record_agent_run(session, 'orchestrator', model_name, result, gen_ids)
+        await record_agent_run(session, 'orchestrator', model_name, result, gen_ids)
         session.invalid_commands = _count_failure_log_lines() - failures_before
         session.output = result.output
         return session, True, '', result.output, result.all_messages()
@@ -291,12 +298,13 @@ async def run(
     print('Fetching costs from OpenRouter...')
     sessions = [s for s, _, _, _ in pending]
     await finalize_costs(sessions, OPENROUTER_API_KEY)
+    pricing = await pricing_for(model_name)
 
     for session, success, error, _ in pending:
         finish_session(session, success=success, error=error)
 
     outputs = [o for _, _, _, o in pending]
-    _print_results(sessions, outputs, model_name, scenario)
+    _print_results(sessions, outputs, model_name, scenario, pricing)
 
 
 def main() -> None:

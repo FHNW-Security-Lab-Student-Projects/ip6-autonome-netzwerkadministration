@@ -1,4 +1,3 @@
-# scenario: bgp-peer-shutdown  (tier: medium)
 root_cause: >
   The eBGP neighbor 10.0.0.2 on router1 is administratively disabled (admin-state
   disable), so the session to router2 is not Established even though interface

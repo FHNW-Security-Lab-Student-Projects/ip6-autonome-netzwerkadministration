@@ -58,7 +58,7 @@ _tracked_http_client = make_tracked_http_client()
 llm = OpenRouterModel(
     'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY, http_client=_tracked_http_client),
-    settings=agent_model_settings(),
+    settings=agent_model_settings(parallel_tool_calls=True),
 )
 
 # Additional models offered in the web UI dropdown (label → OpenRouter model name).
@@ -161,6 +161,14 @@ INSTRUCTIONS = (
     '  NEVER call call_config_agent with APPLY intent without prior user approval.\n'
     '  NEVER apply configuration changes based on inferred intent alone.\n\n'
     'Delegate requests to the appropriate sub-agent.\n\n'
+    'The read-only tools (call_network_agent, call_snapshot_agent, call_topology_agent, '
+    'list_syslog_investigations, get_syslog_investigation) are safe to call in parallel '
+    'in the same turn. This is optional — if a request happens to involve several '
+    'independent read-only lookups and parallelizing them makes sense to you, you are '
+    'free to do so to get results faster; otherwise just call them sequentially as '
+    'usual. Use your own judgment. The stateful tools (call_config_agent, '
+    'open_syslog_investigation, continue_syslog_investigation) must always be called '
+    'sequentially.\n\n'
     'When composing the `request` argument for any sub-agent call, write it as a '
     'self-contained message — the sub-agent has no access to the conversation history '
     'and depends entirely on what you include. Specifically:\n'
@@ -181,7 +189,7 @@ async def call_network_agent(request: str) -> str:
             result = await network_agent.run(request, model=_get_agent_model())
         session = _active_session.get()
         if session is not None:
-            record_agent_run(session, 'network_agent', _effective_model(), result, gen_ids)
+            await record_agent_run(session, 'network_agent', _effective_model(), result, gen_ids)
         return result.output
     except APITimeoutError:
         return 'The network agent timed out after 3 minutes.'
@@ -257,7 +265,7 @@ async def call_config_agent(request: str) -> str:
             result = await config_agent.run(request, model=_get_agent_model())
         session = _active_session.get()
         if session is not None:
-            record_agent_run(session, 'config_agent', _effective_model(), result, gen_ids)
+            await record_agent_run(session, 'config_agent', _effective_model(), result, gen_ids)
         return result.output
     except APITimeoutError:
         return 'The config agent timed out after 3 minutes.'
@@ -276,7 +284,7 @@ async def call_snapshot_agent(request: str) -> str:
             result = await snapshot_agent.run(request, model=_get_agent_model())
         session = _active_session.get()
         if session is not None:
-            record_agent_run(session, 'snapshot_agent', _effective_model(), result, gen_ids)
+            await record_agent_run(session, 'snapshot_agent', _effective_model(), result, gen_ids)
         return result.output
     except APITimeoutError:
         return 'The snapshot agent timed out after 3 minutes.'

@@ -1,4 +1,3 @@
-# scenario: intf-down  (tier: easy)
 root_cause: >
   Interface ethernet-1/2 (e1-2) on router1 — the link to router2 — is administratively
   disabled. Its oper-state is down, which tore down the eBGP session to router2 and

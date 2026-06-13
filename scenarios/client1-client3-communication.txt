@@ -1,1 +1,0 @@
-can client1 and client3 communicate with each other currently ?

@@ -1,4 +1,3 @@
-# scenario: bgp-troubleshooting  (baseline — no fault injected)
 root_cause: >
   No fault. The BGP session between router1 and router2 is Established, there are no
   recent BGP flap events, and router1 advertises its prefixes to router2 normally.

@@ -1,4 +1,3 @@
-# scenario: wrong-gateway-ip  (tier: hard)
 root_cause: >
   router1's VLAN10 routed sub-interface (ethernet-1/1.10) is configured with the wrong
   IP address — 192.168.1.2/24 instead of 192.168.1.1/24 — so the default gateway that

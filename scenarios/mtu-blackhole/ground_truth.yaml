@@ -1,4 +1,3 @@
-# scenario: mtu-blackhole  (tier: hard)
 root_cause: >
   router1's link to router2 (ethernet-1/2, subinterface 0) has its IP MTU lowered to 1280
   (the platform minimum), while the rest of the path carries larger frames. Small packets
