@@ -14,7 +14,12 @@ Typical usage:
     await record_agent_run(session, "network_agent", "z-ai/glm-5", result, gen_ids)
     finish_session(session, success=True)
 
-Tokens and duration come from the OpenRouter Generation API (actual native counts).
+Tokens come from two sources. NATIVE counts (provider tokenizer) come from
+result.usage() and are captured at run time, so they're always complete — this is
+what OpenRouter bills on and the basis for cost. NORMALIZED counts (model-agnostic
+GPT tokenizer) come from the OpenRouter Generation API and are used to compare
+"effort" across models; they can be invalid (None) when a generation lags behind
+OpenRouter's indexing. Duration also comes from the Generation API (generation_time).
 Cost is *modeled*: native_tokens × the model's advertised per-token rate (from the
 OpenRouter model catalog — see model_config.pricing_for). This makes cost
 independent of which provider OpenRouter routed to and of any prompt-cache
@@ -102,12 +107,30 @@ def _count_tool_calls(result: AgentRunResult) -> int:
 class AgentRunRecord:
     agent_name: str
     model: str
+    # NATIVE token counts (provider tokenizer) straight from result.usage() — the
+    # response-body usage field. Proven native, not normalized: response usage equals
+    # the Generation API's native_tokens_* (see git history / _map_usage). Captured at
+    # run time, so they are complete and immune to Generation-API indexing lag. This is
+    # what OpenRouter bills on, so it's the authoritative basis for cost. Always valid.
     input_tokens: int = 0
     output_tokens: int = 0
+    # NORMALIZED (model-agnostic, GPT-tokenizer) counts from the OpenRouter Generation
+    # API (tokens_prompt / tokens_completion). Use these to compare "effort" across
+    # models on a common token unit. None means INVALID: the Generation API didn't
+    # return one resolved record per LLM round-trip (indexing lag or a missing
+    # x-generation-id header), so the normalized sum is incomplete and must not be
+    # trusted. Native counts and cost above are unaffected.
+    normalized_input_tokens: int | None = 0
+    normalized_output_tokens: int | None = 0
+    # False ⇒ normalized_input/output_tokens above are None (invalid). See note above.
+    normalized_complete: bool = True
     llm_requests: int = 0   # number of LLM API round-trips (>1 when tool loops occur)
     tool_calls: int = 0     # number of MCP/tool call invocations
     duration_s: float = 0.0
-    cost_usd: float = 0.0   # modeled cost = native_tokens × advertised rate (0.0 if pricing unavailable)
+    cost_usd: float = 0.0   # modeled cost = native tokens × advertised rate (0.0 if pricing unavailable)
+    # True ⇒ native counts were unavailable (usage() returned nothing) and the price
+    # fell back to a normalized estimate. Normally False — native is always present.
+    cost_estimated: bool = False
 
 
 @dataclass
@@ -122,9 +145,17 @@ class ExperimentSession:
     output: str = ''        # orchestrator's final natural-language answer
     # Filled by finalize_costs() / finish_session()
     duration_s: float = 0.0   # summed LLM generation_time across all runs (seconds)
+    # Native session totals — from result.usage(). Always valid (the authoritative
+    # token count and the basis for cost).
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    # Normalized session totals — from the Generation API. None (invalid) if ANY run's
+    # normalized count is invalid, since a partial cross-agent sum would be wrong.
+    total_normalized_input_tokens: int | None = 0
+    total_normalized_output_tokens: int | None = 0
+    normalized_complete: bool = True         # False ⇒ normalized totals are None (invalid)
     total_cost_usd: float = 0.0
+    cost_estimated: bool = False             # True ⇒ price fell back to a normalized estimate
     total_tool_calls: int = 0
     total_llm_requests: int = 0
     invalid_commands: int = 0
@@ -180,8 +211,11 @@ async def record_agent_run(
     record = AgentRunRecord(
         agent_name=agent_name,
         model=model,
-        input_tokens=0,
-        output_tokens=0,
+        # Native counts from usage() are authoritative and available now — store them
+        # immediately. They're complete regardless of any later Generation-API lag.
+        input_tokens=usage.input_tokens or 0,
+        output_tokens=usage.output_tokens or 0,
+        # normalized_* filled in finalize_costs() from the Generation API.
         llm_requests=usage.requests or 0,
         tool_calls=tool_calls,
         duration_s=0.0,
@@ -208,8 +242,12 @@ def finish_session(
     for run in session.agent_runs:
         session.total_tool_calls += run.tool_calls
         session.total_llm_requests += run.llm_requests
-    # total_input_tokens, total_output_tokens, total_cost_usd are set by finalize_costs()
-    # from the OpenRouter Generation API — do not aggregate from per-run zeros here.
+    # Native token totals come from result.usage(), which is populated on every run, so
+    # aggregate them here — this keeps them correct even when finalize_costs() returns
+    # early (no generation IDs captured). finalize_costs() recomputes the same sums and
+    # additionally fills the normalized totals, cost, and duration from the Generation API.
+    session.total_input_tokens  = sum(r.input_tokens for r in session.agent_runs)
+    session.total_output_tokens = sum(r.output_tokens for r in session.agent_runs)
 
     EXPERIMENT_LOG.parent.mkdir(exist_ok=True)
     with open(EXPERIMENT_LOG, 'a') as f:
@@ -226,7 +264,11 @@ def finish_session(
         duration_s=session.duration_s,
         total_input_tokens=session.total_input_tokens,
         total_output_tokens=session.total_output_tokens,
+        total_normalized_input_tokens=session.total_normalized_input_tokens,
+        total_normalized_output_tokens=session.total_normalized_output_tokens,
+        normalized_complete=session.normalized_complete,
         total_cost_usd=session.total_cost_usd,
+        cost_estimated=session.cost_estimated,
         total_tool_calls=session.total_tool_calls,
         total_llm_requests=session.total_llm_requests,
         agent_count=len(session.agent_runs),
@@ -272,7 +314,10 @@ async def finalize_costs(sessions: list[ExperimentSession], api_key: str) -> Non
     pending = list(all_ids)
 
     async with httpx.AsyncClient() as client:
-        for delay in (5, 10, 20, 30):
+        # Poll with backoff. Loop exits as soon as every captured ID resolves; the
+        # extra later rounds only cost wall-time when a generation is genuinely
+        # lagging behind OpenRouter's indexing.
+        for delay in (5, 10, 20, 30, 30, 60):
             await asyncio.sleep(delay)
             still_pending = []
             for gen_id in pending:
@@ -301,21 +346,60 @@ async def finalize_costs(sessions: list[ExperimentSession], api_key: str) -> Non
         for run in session.agent_runs:
             run_ids = _run_gen_ids.pop(id(run), [])
             records = [id_to_data[gid] for gid in run_ids if gid in id_to_data]
-            run.input_tokens  = sum(int(d.get('native_tokens_prompt') or d.get('tokens_prompt', 0) or 0) for d in records)
-            run.output_tokens = sum(int(d.get('native_tokens_completion') or d.get('tokens_completion', 0) or 0) for d in records)
-            reasoning_tokens  = sum(int(d.get('native_tokens_reasoning') or 0) for d in records)
-            run.duration_s    = round(sum(int(d.get('generation_time', 0) or 0) for d in records) / 1000, 3)
-            # Modeled cost: native tokens × the model's advertised per-token rate.
-            # Provider-independent (ignores which provider OpenRouter routed to) and
-            # cache-independent (every native prompt token charged at the full rate).
+            # NORMALIZED counts come only from the Generation API. Enrichment too:
+            # reasoning split (for cost) and generation_time (for duration).
+            norm_input       = sum(int(d.get('tokens_prompt') or 0) for d in records)
+            norm_output      = sum(int(d.get('tokens_completion') or 0) for d in records)
+            reasoning_tokens = sum(int(d.get('native_tokens_reasoning') or 0) for d in records)
+            run.duration_s   = round(sum(int(d.get('generation_time', 0) or 0) for d in records) / 1000, 3)
+
+            # Reconcile against Pydantic AI's own round-trip counter: each LLM request
+            # should yield exactly one resolved generation. Fewer means a generation was
+            # dropped (indexing lag or a missing x-generation-id header), so the
+            # normalized sum is incomplete and can't be trusted — mark it invalid (None)
+            # rather than report a wrong number. Native counts (from usage()) and cost
+            # are unaffected: usage() is complete regardless of Generation-API lag.
+            run.normalized_complete = run.llm_requests > 0 and len(records) >= run.llm_requests
+            if run.normalized_complete:
+                run.normalized_input_tokens  = norm_input
+                run.normalized_output_tokens = norm_output
+            else:
+                run.normalized_input_tokens  = None  # invalid: a generation is missing
+                run.normalized_output_tokens = None
+
+            # Modeled cost from NATIVE tokens (what OpenRouter bills on) × the model's
+            # advertised per-token rate — provider-independent and cache-independent.
+            # Native is always present, so the price is accurate; only if usage()
+            # returned nothing do we fall back to a normalized estimate and flag it.
+            if run.input_tokens or run.output_tokens:
+                cost_in, cost_out, cost_reasoning = run.input_tokens, run.output_tokens, reasoning_tokens
+                run.cost_estimated = False
+            elif run.normalized_complete and (norm_input or norm_output):
+                cost_in, cost_out, cost_reasoning = norm_input, norm_output, 0
+                run.cost_estimated = True
+            else:
+                cost_in, cost_out, cost_reasoning = 0, 0, 0
+                run.cost_estimated = False
+
             pricing = await _get_pricing(run.model)
             run.cost_usd = round(
-                pricing.cost_for(run.input_tokens, run.output_tokens, reasoning_tokens, len(records)), 8
+                pricing.cost_for(cost_in, cost_out, cost_reasoning, run.llm_requests), 8
             ) if pricing else 0.0
 
+        # Native session totals are always valid (from usage()).
         session.total_input_tokens  = sum(r.input_tokens for r in session.agent_runs)
         session.total_output_tokens = sum(r.output_tokens for r in session.agent_runs)
-        session.total_cost_usd      = round(sum(r.cost_usd for r in session.agent_runs), 8)
+        session.cost_estimated = any(r.cost_estimated for r in session.agent_runs)
+        # Normalized session totals are valid only if every run's normalized count is
+        # valid; otherwise a cross-agent sum would be short, so report None (invalid).
+        session.normalized_complete = all(r.normalized_complete for r in session.agent_runs)
+        if session.normalized_complete:
+            session.total_normalized_input_tokens  = sum(r.normalized_input_tokens for r in session.agent_runs)
+            session.total_normalized_output_tokens = sum(r.normalized_output_tokens for r in session.agent_runs)
+        else:
+            session.total_normalized_input_tokens  = None
+            session.total_normalized_output_tokens = None
+        session.total_cost_usd = round(sum(r.cost_usd for r in session.agent_runs), 8)
         # Session latency = summed LLM generation_time across all runs (pure inference
         # time, model-attributable). Replaces wall-clock, which was contaminated by the
         # cost-polling sleeps above and by batch ordering in multi-turn runs.

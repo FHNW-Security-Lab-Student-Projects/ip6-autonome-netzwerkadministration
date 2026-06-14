@@ -122,6 +122,20 @@ def _make_record(session: dict, found_issue: bool, note: str) -> dict:
         'scenario': session.get('scenario', ''),
         'found_issue': found_issue,
         'note': note,
+        # Token effort, carried over so verdicts can be weighed against cost/effort.
+        # Native counts (from result.usage()) are the provider-tokenizer counts that
+        # OpenRouter bills on — always valid, and the basis for cost. Normalized counts
+        # (Generation API) are model-agnostic, so they make "effort" comparable across
+        # models that tokenize differently, but are null/INVALID when a generation was
+        # dropped (normalized_complete=False).
+        'input_tokens': session.get('total_input_tokens', 0),
+        'output_tokens': session.get('total_output_tokens', 0),
+        'normalized_input_tokens': session.get('total_normalized_input_tokens'),
+        'normalized_output_tokens': session.get('total_normalized_output_tokens'),
+        'normalized_complete': session.get('normalized_complete', True),
+        'total_cost_usd': session.get('total_cost_usd', 0.0),
+        # True ⇒ the price was estimated from normalized tokens (native was invalid).
+        'cost_estimated': session.get('cost_estimated', False),
         'evaluator': 'manual',
         'evaluated_at': datetime.now(timezone.utc).isoformat(),
     }

@@ -45,6 +45,18 @@ def load(path: Path, scenario: str = '') -> pd.DataFrame:
     df['scenario'] = df['scenario'].fillna('').replace('', '(none)')
     df['success'] = df['success'].fillna(True)
     df['invalid_commands'] = df['invalid_commands'].fillna(0).astype(int) if 'invalid_commands' in df.columns else 0
+
+    # Keep token totals numeric. Native totals (from result.usage()) are always valid;
+    # normalized totals (from the Generation API) go null (→ NaN) when a generation was
+    # dropped. The plots/averages use the normalized track because it's comparable
+    # across models that tokenize differently — at the cost that NaN sessions are
+    # silently skipped by mean()/seaborn. (No back-compat for pre-normalized records —
+    # those get deleted.)
+    for col in ('total_input_tokens', 'total_output_tokens',
+                'total_normalized_input_tokens', 'total_normalized_output_tokens'):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
     if scenario:
         df = df[df['scenario'] == scenario]
     return df
@@ -137,7 +149,9 @@ def agent_breakdown(df: pd.DataFrame) -> pd.DataFrame:
     breakdown = (
         details.groupby(['model', 'agent_name'], sort=True)
         .agg(
-            runs              = ('input_tokens',  'count'),
+            runs              = ('llm_requests', 'count'),
+            # Native tokens (from usage()) — always present, so no run is dropped from
+            # the per-agent average.
             avg_input_tokens  = ('input_tokens',  'mean'),
             avg_output_tokens = ('output_tokens', 'mean'),
             avg_tool_calls    = ('tool_calls',    'mean'),

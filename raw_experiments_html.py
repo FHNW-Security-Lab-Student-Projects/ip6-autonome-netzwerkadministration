@@ -25,6 +25,7 @@ COLUMNS = [
     'session_id', 'started_at', 'model', 'scenario', 'user_query',
     'verdict',  # from evaluation_log.jsonl — '—' when not evaluated
     'duration_s', 'total_input_tokens', 'total_output_tokens',
+    'total_normalized_input_tokens', 'total_normalized_output_tokens',
     'total_cost_usd', 'total_tool_calls', 'total_llm_requests',
     'invalid_commands', 'success',
 ]
@@ -37,7 +38,18 @@ def _format(df: pd.DataFrame) -> pd.DataFrame:
         .dt.strftime('%Y-%m-%d %H:%M')
     out['user_query'] = out['user_query'].astype(str).str.slice(0, 60)
     out['duration_s'] = out['duration_s'].round(1)
-    out['total_cost_usd'] = out['total_cost_usd'].map(lambda v: f'${v:.4f}')
+    # Native counts (from usage()) are always valid. Normalized counts (Generation API)
+    # are null/INVALID when a generation was dropped — show INVALID, not blank.
+    for col in ('total_input_tokens', 'total_output_tokens'):
+        out[col] = out[col].map(lambda v: '' if pd.isna(v) else f'{int(v):,}')
+    for col in ('total_normalized_input_tokens', 'total_normalized_output_tokens'):
+        out[col] = out[col].map(lambda v: 'INVALID' if pd.isna(v) else f'{int(v):,}')
+    # Flag estimated prices (priced from normalized tokens because native was invalid).
+    est = out['cost_estimated'] if 'cost_estimated' in out.columns else pd.Series(False, index=out.index)
+    out['total_cost_usd'] = [
+        f'${v:.4f}{" (est)" if bool(e) else ""}'
+        for v, e in zip(out['total_cost_usd'], est.fillna(False))
+    ]
     out['success'] = out['success'].map(lambda v: 'yes' if v else 'no')
     def _verdict_label(v) -> str:
         if pd.isna(v):

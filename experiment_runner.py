@@ -149,7 +149,7 @@ def _print_results(
         print(f'\n  [{i}] {q_preview}')
         print(f'  {"─" * (W - 2)}')
 
-        # Per-agent run breakdown
+        # Per-agent run breakdown. Native counts (from usage()) are always valid.
         for run in session.agent_runs:
             print(
                 f'  {run.agent_name:<20}'
@@ -159,18 +159,30 @@ def _print_results(
                 f'  {run.duration_s:.1f}s'
             )
 
-        # Session totals (tokens + cost from OpenRouter)
+        # Session totals. Native (from usage()) is the authoritative count and the
+        # basis for cost — always valid. Normalized (Generation API) is the
+        # cross-model-comparable count and can be INVALID if a generation was dropped.
         status = 'OK' if session.success else f'ERROR: {session.error[:40]}'
         cost_str = f'${session.total_cost_usd:.6f}' if session.total_cost_usd else '$ -.------'
+        cost_label = f'{cost_str} (est)' if session.cost_estimated else cost_str
         print(f'  {"─" * (W - 2)}')
         print(
-            f'  {session.total_input_tokens:,} in / {session.total_output_tokens:,} out'
+            f'  {session.total_input_tokens:,} in / {session.total_output_tokens:,} out (native)'
             f'  |  {session.total_tool_calls} tools'
             f'  |  {session.invalid_commands} invalid cmds'
             f'  |  {session.duration_s:.1f}s'
-            f'  |  {cost_str}'
+            f'  |  {cost_label}'
             f'  |  {status}'
         )
+        if session.normalized_complete:
+            print(
+                f'  {session.total_normalized_input_tokens:,} in /'
+                f' {session.total_normalized_output_tokens:,} out (normalized)'
+            )
+        else:
+            print('  normalized in/out: INVALID (a generation was dropped)')
+            print('  * native counts and cost above are unaffected — they come from '
+                  'result.usage(), which is complete regardless of Generation-API lag')
 
         # LLM response
         if output:
@@ -188,11 +200,20 @@ def _print_results(
     if successful:
         print(f'  Avg duration:  {sum(s.duration_s for s in successful) / len(successful):.1f}s')
         print(f'  Total tokens:  {sum(s.total_input_tokens for s in successful):,} in'
-              f'  /  {sum(s.total_output_tokens for s in successful):,} out')
+              f'  /  {sum(s.total_output_tokens for s in successful):,} out  (native)')
+        norm_ok = all(s.normalized_complete for s in successful)
+        if norm_ok:
+            print(f'  Normalized:    {sum(s.total_normalized_input_tokens for s in successful):,} in'
+                  f'  /  {sum(s.total_normalized_output_tokens for s in successful):,} out')
+        else:
+            n_bad = sum(1 for s in successful if not s.normalized_complete)
+            print(f'  Normalized:    INVALID — {n_bad} turn(s) dropped a generation (native/cost unaffected)')
         print(f'  Total tools:   {sum(s.total_tool_calls for s in successful):,}')
         print(f'  Invalid cmds:  {sum(s.invalid_commands for s in sessions):,}')
         total_cost = sum(s.total_cost_usd for s in successful)
-        print(f'  Total cost:    {"$" + f"{total_cost:.6f}" if total_cost else "unavailable"}')
+        cost_est_suffix = '  (est — some turns priced from normalized tokens)' \
+            if any(s.cost_estimated for s in successful) else ''
+        print(f'  Total cost:    {"$" + f"{total_cost:.6f}" if total_cost else "unavailable"}{cost_est_suffix}')
     print(f'{"═" * W}')
     print(f'  Logged to: experiment_log.jsonl')
     print()

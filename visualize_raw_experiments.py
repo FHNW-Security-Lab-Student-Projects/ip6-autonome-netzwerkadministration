@@ -103,13 +103,14 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
     ax.barh(y, df['total_cost_usd'], color=bar_colors)
     ax.set_xlabel('Cost (USD)')
 
-    # 3. Tokens (stacked input + output)
+    # 3. Tokens (stacked input + output). Native counts (from usage()) — always valid,
+    # so every session has a bar; fillna(0) just guards the left= stack defensively.
     ax = axes[2]
-    ax.barh(y, df['total_input_tokens'], color=bar_colors,
-            label='input')
-    ax.barh(y, df['total_output_tokens'], left=df['total_input_tokens'],
-            color=bar_colors, alpha=0.45, label='output')
-    ax.set_xlabel('Tokens (input + output)')
+    tok_in  = df['total_input_tokens'].fillna(0)
+    tok_out = df['total_output_tokens'].fillna(0)
+    ax.barh(y, tok_in, color=bar_colors, label='input')
+    ax.barh(y, tok_out, left=tok_in, color=bar_colors, alpha=0.45, label='output')
+    ax.set_xlabel('Tokens (native, input + output)')
 
     # 4. Tool calls
     ax = axes[3]

@@ -68,17 +68,21 @@ def plot_model_comparison(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Pat
         _rotate_xticks(ax)
         written.append(_save(fig, out_dir, name, ext))
 
-    tokens = df[['model', 'total_input_tokens', 'total_output_tokens']].melt(
+    # Normalized tokens (from the Generation API) — comparable across models that
+    # tokenize differently, unlike native counts. The trade-off: normalized counts go
+    # NaN when a generation is dropped, so those sessions are silently omitted from
+    # these bars (native counts, by contrast, are always valid).
+    tokens = df[['model', 'total_normalized_input_tokens', 'total_normalized_output_tokens']].melt(
         id_vars='model', var_name='kind', value_name='tokens',
     )
     tokens['kind'] = tokens['kind'].map({
-        'total_input_tokens':  'Input',
-        'total_output_tokens': 'Output',
+        'total_normalized_input_tokens':  'Input',
+        'total_normalized_output_tokens': 'Output',
     })
     fig, ax = plt.subplots()
     sns.barplot(data=tokens, x='model', y='tokens', hue='kind', ax=ax, errorbar='sd')
     ax.set_xlabel('Model')
-    ax.set_ylabel('Tokens')
+    ax.set_ylabel('Tokens (normalized)')
     ax.legend(title='')
     _rotate_xticks(ax)
     written.append(_save(fig, out_dir, 'model_comparison_tokens', ext))
@@ -139,7 +143,7 @@ def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
     written: list[Path] = []
     metrics = [
         ('duration_s',         'Duration (s)',  'distribution_duration'),
-        ('total_input_tokens', 'Input tokens',  'distribution_tokens'),
+        ('total_normalized_input_tokens', 'Input tokens (normalized)',  'distribution_tokens'),
         ('total_cost_usd',     'Cost (USD)',    'distribution_cost'),
     ]
     for column, ylabel, name in metrics:
