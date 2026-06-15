@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import logfire
 from fastmcp import FastMCP  # , Context
 from failure_log import log_command_failure, log_transport_failure
+from response_limits import MAX_RESPONSE_CHARS, truncate
 from session_dedup import CallTracker
 from srl_jsonrpc import SrlJsonRpcError, SrlTransportError, get_connection, jrpc_cli, jrpc_get
 
@@ -36,21 +37,6 @@ SHOW_FAILURE_PATTERNS = (
     "Error:",
 )
 
-# Hard cap on the body of any tool response (a JSON-RPC `get` payload or a show-command
-# output). A bare container path (e.g. `/interface`) or a broad show command can return
-# tens of KB and flood the LLM context, so we truncate and nudge the model toward a
-# narrower query instead. These payloads are re-sent on every loop of the agent, so the
-# cap compounds across the whole run.
-_MAX_RESPONSE_CHARS = 15000
-
-
-def _truncate(body: str, overflow_note: str) -> str:
-    """Return `body` unchanged if within the size cap, else truncated with `overflow_note`."""
-    if len(body) <= _MAX_RESPONSE_CHARS:
-        return body
-    return body[:_MAX_RESPONSE_CHARS] + overflow_note
-
-
 def _detect_show_failure(output: str) -> str | None:
     """Return the matched pattern if `output` contains a show-command failure signal, else None."""
     lowered = output.lower()
@@ -71,9 +57,9 @@ def _format_get_body(payload, path: str) -> str:
         body = payload
     else:
         body = json.dumps(payload, separators=(",", ":"))
-    return _truncate(
+    return truncate(
         body,
-        f"\n\n…[truncated: response for {path!r} exceeded {_MAX_RESPONSE_CHARS} chars. "
+        f"\n\n…[truncated: response for {path!r} exceeded {MAX_RESPONSE_CHARS} chars. "
         "Re-query a narrower path or a specific leaf, e.g. '<container>[name=*]/<leaf>'.]",
     )
 
@@ -141,9 +127,9 @@ async def execute_show_command(device_name: str, command: str) -> str:
             error_text=output.strip(),
         )
 
-    body = _truncate(
+    body = truncate(
         output,
-        f"\n\n…[truncated: output for {command!r} exceeded {_MAX_RESPONSE_CHARS} chars. "
+        f"\n\n…[truncated: output for {command!r} exceeded {MAX_RESPONSE_CHARS} chars. "
         "Re-run a narrower command, e.g. add an interface or context filter.]",
     )
     return f"Command: {command}\nDevice: {device_name}\n\n{body}"

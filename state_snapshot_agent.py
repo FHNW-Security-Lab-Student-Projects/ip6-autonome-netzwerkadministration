@@ -33,6 +33,7 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from agent_history import compact_tool_history
 from model_config import agent_model_settings
+from response_limits import MAX_RESPONSE_CHARS, truncate
 
 from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli, list_devices
 
@@ -301,7 +302,12 @@ def state_before(device: str, table: str, timestamp_iso: str) -> str:
     if not candidates:
         return f'No snapshot found before {timestamp_iso} for {device}/{table}.'
     snap = candidates[-1]
-    return f'Snapshot at {snap["ts"]}:\n\n{_format_output(snap["output"])}'
+    body = truncate(
+        _format_output(snap['output']),
+        f"\n\n…[truncated: snapshot for {device}/{table} exceeded {MAX_RESPONSE_CHARS} chars. "
+        "Use state_diff to see only what changed, or query a more specific table.]",
+    )
+    return f'Snapshot at {snap["ts"]}:\n\n{body}'
 
 
 @snapshot_agent.tool_plain
@@ -343,7 +349,11 @@ def state_diff(device: str, table: str, t1_iso: str, t2_iso: str) -> str:
     ))
     if not diff_lines:
         return f'No changes in {device}/{table} between {s1["ts"]} and {s2["ts"]}.'
-    return ''.join(diff_lines)
+    return truncate(
+        ''.join(diff_lines),
+        f"\n\n…[truncated: diff for {device}/{table} exceeded {MAX_RESPONSE_CHARS} chars. "
+        "Narrow the time window (closer timestamps) or diff a single table at a time.]",
+    )
 
 
 # ---------------------------------------------------------------------------

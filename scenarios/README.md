@@ -1,8 +1,15 @@
 # Fault-injection scenario catalog
 
 Each folder is one experiment for the multi-agent troubleshooter, in the format the
-runner expects (`queries.txt`, `ground_truth.yaml`, `setup.sh`, `teardown.sh`) —
-see [../docs/running-experiments.md](../docs/running-experiments.md).
+runner expects (`queries.txt`, `ground_truth.yaml`, and — for fault scenarios —
+`setup.sh` / `teardown.sh`) — see
+[../docs/running-experiments.md](../docs/running-experiments.md).
+
+There are **9 fault scenarios** (table below) plus **2 no-fault baselines**
+(`basic-client-communication`, `bgp-troubleshooting`) that check the agent doesn't
+invent problems in a healthy network. The baselines have no `setup.sh` / `teardown.sh`.
+For what each scenario tests and why it sits in its tier, see
+[scenario-guide.md](scenario-guide.md).
 
 All faults are injected against a **working baseline** where client1 ↔ client3
 communication succeeds. The baseline is the per-node SR Linux startup configs in

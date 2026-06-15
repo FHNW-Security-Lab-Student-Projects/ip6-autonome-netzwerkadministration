@@ -41,25 +41,19 @@ hard `ground_truth.yaml` explicitly marks that giving-up answer as a MISS.
 
 ## Baseline scenarios (no fault — sanity checks)
 
-These verify the agent doesn't *invent* problems in a healthy network.
+These verify the agent doesn't *invent* problems in a healthy network. They have **no
+`setup.sh` / `teardown.sh`** — only `queries.txt` + `ground_truth.yaml` — so the runner
+just sends the queries against the unbroken topology.
 
-### `basic-reachability`
-- **Fault:** none. All router1 interfaces are admin-enabled and operationally up.
-- **Tests:** the agent reports interfaces as up and does not fabricate a down link or BGP fault.
+### `basic-client-communication`
+- **Fault:** none. The network is healthy; client1, client2 and client3 can all
+  communicate with each other.
+- **Tests:** the agent confirms full reachability between clients and does not fabricate a down link,
+  VLAN, or BGP fault. 
 
 ### `bgp-troubleshooting`
 - **Fault:** none. eBGP is Established, no flaps, router1 advertises normally.
 - **Tests:** the agent reports BGP healthy and doesn't claim a session is down or flapping.
-
-> Note: `client1-client3-communication` is a third baseline-style probe, but its
-> `ground_truth.yaml` currently states there is **no** L2/L3 config and communication is
-> not possible — which contradicts the "healthy baseline" framing of the other two and
-> the README. This looks like a stale ground-truth file; flag it before relying on it.
-
-> The top-level `*.txt` files (`basic-reachability.txt`, `bgp-troubleshooting.txt`,
-> `client1-client3-communication.txt`) are the older flat-file query format. The
-> per-folder versions (`queries.txt` + `ground_truth.yaml` + `setup.sh`/`teardown.sh`)
-> are the current runner format.
 
 ---
 
