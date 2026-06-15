@@ -16,6 +16,7 @@ import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import pandas as pd
 import seaborn as sns
 
@@ -111,6 +112,11 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
     ax.barh(y, tok_in, color=bar_colors, label='input')
     ax.barh(y, tok_out, left=tok_in, color=bar_colors, alpha=0.45, label='output')
     ax.set_xlabel('Tokens (native, input + output)')
+    # Abbreviate large token counts (e.g. 100000 -> 100k) so adjacent x-tick
+    # labels don't collide.
+    ax.xaxis.set_major_formatter(
+        FuncFormatter(lambda x, _: f'{x / 1000:g}k' if x else '0')
+    )
 
     # 4. Tool calls
     ax = axes[3]
@@ -138,14 +144,14 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
                 + ['label: found', 'label: missed', 'label: unevaluated', 'crashed (*)']),
         loc='lower center',
         ncol=min(6, len(models) + 2),
-        bbox_to_anchor=(0.5, -0.02),
+        bbox_to_anchor=(0.5, -0.10),
         frameon=False,
         fontsize=8,
     )
 
     fig.suptitle('Raw experiment sessions (one row per session)', y=1.0,
                  fontsize=10)
-    fig.tight_layout(rect=(0, 0.08, 1, 0.98))
+    fig.tight_layout(rect=(0, 0.14, 1, 0.98))
 
     return _save(fig, out_dir, 'raw_sessions_overview', ext)
 
