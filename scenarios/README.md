@@ -5,11 +5,19 @@ runner expects (`queries.txt`, `ground_truth.yaml`, and — for fault scenarios 
 `setup.sh` / `teardown.sh`) — see
 [../docs/running-experiments.md](../docs/running-experiments.md).
 
-There are **9 fault scenarios** (table below) plus **2 no-fault baselines**
+There are **10 fault scenarios** (table below) plus **2 no-fault baselines**
 (`basic-client-communication`, `bgp-troubleshooting`) that check the agent doesn't
 invent problems in a healthy network. The baselines have no `setup.sh` / `teardown.sh`.
 For what each scenario tests and why it sits in its tier, see
 [scenario-guide.md](scenario-guide.md).
+
+> One of the hard scenarios (`duplicate-ip-arp`) is **history-required**: `setup.sh` first
+> records a healthy baseline snapshot, then injects a fault in *dynamic runtime state* (an ARP
+> binding) that **persists** through the whole investigation. The faulty value looks valid in
+> isolation and is in neither config nor syslog, so confirming it's wrong needs the recorded
+> baseline. This is the scenario that
+> actually requires `state_snapshot_agent` — see
+> [the history-required tier](scenario-guide.md#history-required-tier--persistent-fault-recorded-baseline).
 
 All faults are injected against a **working baseline** where client1 ↔ client3
 communication succeeds. The baseline is the per-node SR Linux startup configs in
@@ -44,12 +52,18 @@ means the fault raises an error event the agent can spot via Loki without probin
 | `acl-silent-drop` | hard | router2 ACL silently drops client1's ICMP | ❌ |
 | `one-way-route-filter` | hard | router1 import policy drops 10.10.10.0/24 (route-table asymmetry) | ❌ |
 | `mtu-blackhole` | hard | router1↔router2 IP MTU lowered to 1280 → PMTU blackhole | ❌ |
+| `duplicate-ip-arp` | hard (history) | duplicate-IP event leaves router2's ARP for 10.10.10.10 bound to client4's MAC; persists, traffic blackholed | ❌ |
 
 - **easy** — one device, one show command, and it shows up in syslog.
 - **medium** — the obvious signal lies: links are up but BGP is down, or BGP is up but
   no routes are advertised, or L2 membership is wrong. The agent must look one layer deeper.
 - **hard** — silent (no syslog), the config *looks* complete, and the symptom needs active,
   multi-signal probing (route-table comparison, ACL counters, packet-size testing).
+- **hard (history)** — a fault in *dynamic runtime state* (an ARP binding, the active route's
+  next-hop) that **persists** through the investigation. The faulty value is valid-looking in
+  isolation and is in neither config nor syslog, so the agent can only confirm it's wrong by
+  comparing against the healthy baseline `setup.sh` recorded into the **snapshot history**.
+  These are the scenarios that require `state_snapshot_agent`.
 
 ## How the scripts inject faults
 

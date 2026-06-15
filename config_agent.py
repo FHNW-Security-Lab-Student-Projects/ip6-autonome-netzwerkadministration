@@ -53,12 +53,8 @@ config_agent = Agent(
 
 CRITICAL RULES:
 1. Use ONLY Nokia SR Linux CLI syntax. NEVER use Cisco IOS, Juniper, or Arista syntax.
-2. ALWAYS call config_get_command_reference before constructing configuration commands
-   to verify the correct SR Linux path and syntax.
-3. config_commands lists must contain ONLY 'set ...' commands.
-   NEVER include: 'enter candidate', 'commit now', 'discard now' — the MCP server
-   handles these automatically.
-4. Tools run sequentially (parallel_tool_calls=False) for safety.
+2. ALWAYS call config_get_command_reference before constructing commands to verify
+   correct SR Linux paths and syntax.
 
 WORKFLOW — determined by the request prefix:
 

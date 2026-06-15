@@ -241,21 +241,12 @@ snapshot_agent = Agent(
     output_type=str,
     instructions="""You are a network state history agent for Nokia SR Linux devices.
 
-You have access to periodic snapshots of device state captured every 2 minutes.
-Available tables per device:
-  - route_table_<ni> : IP routing table per network-instance (e.g. route_table_default, route_table_mgmt)
-  - arp              : ARP entries       (show arpnd arp-entries)
-  - interfaces       : Interface status  (show interface brief)
-
-Call snapshot_status to discover which route_table_<ni> keys exist for each device.
-
-Available devices: router1, router2, switch1, switch2.
+You have access to periodic snapshots of device state captured every 2 minutes, covering
+ARP entries, interface status, and per-network-instance routing tables. Available devices:
+router1, router2, switch1, switch2. Call snapshot_status to discover what is available
+(devices, tables, and time range) — do this first if asked what data exists.
 
 WORKFLOW:
-- If asked what data is available, call snapshot_status first.
-- To retrieve historical state, call state_before with the relevant device, table,
-  and a timestamp close to the moment of interest.
-- To detect what changed between two points in time, call state_diff.
 - When the request covers multiple devices or tables, call the tools in parallel.
 - Summarise findings clearly: highlight added/removed routes, ARP changes,
   or interface state transitions. Do not dump raw output unless asked.
@@ -287,7 +278,9 @@ def state_before(device: str, table: str, timestamp_iso: str) -> str:
 
     Args:
         device: Device name (e.g. 'router1', 'switch1').
-        table: One of 'route_table', 'arp', 'interfaces'.
+        table: 'arp', 'interfaces', or a per-network-instance routing table named
+               'route_table_<ni>' (e.g. 'route_table_default'). Call snapshot_status
+               to see which keys exist for a device.
         timestamp_iso: ISO 8601 timestamp (e.g. '2026-05-11T14:00:00+00:00').
     """
     try:
@@ -316,7 +309,9 @@ def state_diff(device: str, table: str, t1_iso: str, t2_iso: str) -> str:
 
     Args:
         device: Device name (e.g. 'router1').
-        table: One of 'route_table', 'arp', 'interfaces'.
+        table: 'arp', 'interfaces', or a per-network-instance routing table named
+               'route_table_<ni>' (e.g. 'route_table_default'). Call snapshot_status
+               to see which keys exist for a device.
         t1_iso: Earlier timestamp in ISO 8601.
         t2_iso: Later timestamp in ISO 8601.
     """
@@ -375,3 +370,43 @@ async def snapshot_lifespan():
         except asyncio.CancelledError:
             pass
         print('[snapshot-agent] Stopped.', flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Standalone capture (used by history-required scenarios to record a baseline)
+# ---------------------------------------------------------------------------
+
+async def capture_once() -> None:
+    """Append one snapshot of every device to the on-disk history, then exit.
+
+    The background _refresh_loop only runs while the orchestrator process is alive
+    (i.e. *after* a scenario's setup.sh has finished). History-required scenarios
+    (scenarios/duplicate-ip-arp) need to record a healthy baseline *before* injecting
+    a persistent fault, so their setup.sh calls this right before the fault:
+
+        uv run python state_snapshot_agent.py --capture-once
+
+    It loads the existing history first so each call appends rather than overwrites;
+    snapshot_lifespan later reloads the same file, preserving the recorded baseline so
+    the agent can diff it against the (still-broken) live state.
+    """
+    _load_from_disk()
+    await _snapshot_all()
+
+
+if __name__ == '__main__':
+    import sys
+
+    if '--capture-once' in sys.argv:
+        asyncio.run(capture_once())
+        print('[snapshot-agent] Captured one snapshot for all devices.', flush=True)
+    else:
+        async def _run_daemon() -> None:
+            async with snapshot_lifespan():
+                while True:
+                    await asyncio.sleep(3600)
+
+        try:
+            asyncio.run(_run_daemon())
+        except KeyboardInterrupt:
+            pass

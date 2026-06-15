@@ -1,0 +1,7 @@
+# Persistent wrong ARP binding: router2's ARP entry for client3 (10.10.10.10) points
+# at client4's MAC (the aftermath of a duplicate-IP event on VLAN30), so client3 traffic
+# is blackholed. The fault is live during the whole investigation; the snapshot history
+# holds the correct prior MAC, which is the only record of what the binding SHOULD be.
+client1 can no longer reach client3 (10.10.10.10), but routing and BGP look healthy. Investigate the root cause.
+Compare client3's current ARP entry on its gateway router2 against the state history -- has the MAC for 10.10.10.10 changed from what it used to be?
+Summarise the root cause: which device has the wrong ARP entry, for which IP, and how do you know the MAC is wrong?

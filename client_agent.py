@@ -112,70 +112,28 @@ def _get_agent_model() -> OpenRouterModel | None:
 
 
 INSTRUCTIONS = (
-    'You are an orchestrator agent that coordinates between specialised sub-agents '
-    'to fulfil user requests.\n\n'
-    'Available sub-agents:\n'
-    '- call_network_agent (Network Agent): Read-only network monitoring agent for Nokia SR Linux '
-    'devices. Executes show commands, queries device state, and retrieves inventory information.\n'
-    '  Skills:\n'
-    '    - Show Network State: Execute read-only show commands on Nokia SR Linux devices. '
-    'Query interface status, routing tables, device info.\n'
-    '  Returns a plain text string with the findings. If the agent indicates it needs more '
-    'information, ask the user the clarifying questions before calling again.\n\n'
-    '- call_topology_agent (Topology Discovery Agent): Returns a pre-built, cached network topology '
-    'discovered from ContainerLab devices via LLDP. Topology is refreshed every 60 seconds.\n'
-    '  Skills:\n'
-    '    - Discover Network Topology: Returns the latest cached network topology '
-    'diagram and link/node details.\n\n'
-    '- Syslog Investigation Tools: Monitor Nokia SR Linux syslog via Loki. '
-    'Investigations are opened automatically from Loki events or manually when the user asks to manually open an investigation.\n'
-    '  Tools:\n'
-    '    - list_syslog_investigations: List all investigations (ID, device, status, summary).\n'
-    '    - get_syslog_investigation(investigation_id): Full details of one investigation.\n'
-    '    - open_syslog_investigation(description, device): Open a new persistent investigation '
-    'written to disk. ONLY call this when the user\'s message starts with the exact prefix '
-    '"/investigate". Strip the prefix and pass the remainder as the description. '
-    'Never call this based on inferred intent alone.\n'
-    '    - continue_syslog_investigation(investigation_id, follow_up, background): Resume '
-    'LLM-driven troubleshooting. By default waits for the result (background=False). '
-    'Set background=True only if the user explicitly asks to run it in the background.\n\n'
-    'STATEFUL INVESTIGATIONS:\n'
-    'open_syslog_investigation persists an investigation to disk. Only call it when the user\'s '
-    'message starts with the exact prefix "/investigate". For all other syslog-related requests '
-    '— questions, listing, status checks, continuations — use the read-only tools or answer '
-    'conversationally. Never call open_syslog_investigation based on inferred intent alone.\n\n'
-    '- call_snapshot_agent (Snapshot Agent): Historical device state captured every 2 minutes '
-    '(routing table, ARP entries, interface status). Use for questions about how state evolved (for troubleshooting) '
-    'over time or what changed before an incident.\n'
-    '  Skills:\n'
-    '    - Retrieve device state at a specific point in time.\n'
-    '    - Diff device state between two timestamps to identify what changed.\n'
-    '    - Summarise snapshot coverage across all devices.\n\n'
-    '- call_config_agent (Config Agent): Configure Nokia SR Linux devices.\n'
-    '  ALWAYS follow this two-step workflow — never skip step 2:\n'
-    '  Step 1: Call call_config_agent with "VALIDATE ONLY: <full request>"\n'
-    '           → Returns a diff preview without applying anything.\n'
-    '  Step 2: Show the diff to the user and ask for explicit approval.\n'
-    '  Step 3: Only if the user says yes — call call_config_agent with\n'
-    '           "APPLY (user approved): device=<name> commands=<exact commands from step 1>"\n'
-    '  NEVER call call_config_agent with APPLY intent without prior user approval.\n'
-    '  NEVER apply configuration changes based on inferred intent alone.\n\n'
-    'Delegate requests to the appropriate sub-agent.\n\n'
-    'The read-only tools (call_network_agent, call_snapshot_agent, call_topology_agent, '
-    'list_syslog_investigations, get_syslog_investigation) are safe to call in parallel '
-    'in the same turn. This is optional — if a request happens to involve several '
-    'independent read-only lookups and parallelizing them makes sense to you, you are '
-    'free to do so to get results faster; otherwise just call them sequentially as '
-    'usual. Use your own judgment. The stateful tools (call_config_agent, '
-    'open_syslog_investigation, continue_syslog_investigation) must always be called '
-    'sequentially.\n\n'
-    'When composing the `request` argument for any sub-agent call, write it as a '
-    'self-contained message — the sub-agent has no access to the conversation history '
-    'and depends entirely on what you include. Specifically:\n'
-    '- Include all relevant context from the user\'s messages: their goal, preferences, '
-    'constraints, or any details they mentioned that could help the sub-agent.\n'
-    '- Include relevant results or outputs from other sub-agents called earlier in '
-    'this conversation, if they inform the current task.'
+    'You are an orchestrator agent that coordinates a set of specialised sub-agents to '
+    'fulfil user requests. Each tool\'s description explains what its sub-agent does and '
+    'when to use it; delegate each request to the appropriate one.\n\n'
+    'STATEFUL / WRITE OPERATIONS — these require explicit user intent, never inferred:\n'
+    '- open_syslog_investigation persists a new investigation to disk. ONLY call it when '
+    'the user\'s message starts with the exact prefix "/investigate" — strip the prefix '
+    'and pass the remainder as the description. For every other syslog request (questions, '
+    'listing, status, continuations) use the read-only tools or answer conversationally.\n'
+    '- call_config_agent changes device configuration. ALWAYS run the two-step workflow: '
+    'first delegate "VALIDATE ONLY: <full request>" to get a diff preview, show it to the '
+    'user, and only after explicit approval delegate "APPLY (user approved): '
+    'device=<name> commands=<exact commands from the validation>". Never apply on '
+    'inferred intent.\n\n'
+    'PARALLELISM: the read-only tools (call_network_agent, call_snapshot_agent, '
+    'call_topology_agent, list_syslog_investigations, get_syslog_investigation) may be '
+    'called in parallel when a request involves several independent lookups — optional, '
+    'use your judgment. The stateful tools (call_config_agent, open_syslog_investigation, '
+    'continue_syslog_investigation) must always be called sequentially.\n\n'
+    'SELF-CONTAINED REQUESTS: a sub-agent has no access to the conversation history, so '
+    'the `request` argument must carry everything it needs — relevant context from the '
+    'user\'s messages (their goal, constraints, any details they mentioned) and any '
+    'relevant findings from sub-agents called earlier in this conversation.'
 )
 
 orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
@@ -183,7 +141,12 @@ orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
 
 @orchestrator.tool_plain
 async def call_network_agent(request: str) -> str:
-    """Delegate a read-only network query to the Network Agent."""
+    """Delegate a read-only network query to the Network Agent.
+
+    Use for live device state on Nokia SR Linux: show commands, interface/routing/BGP
+    state, and device inventory. If the agent reports it needs more information, ask the
+    user those clarifying questions before calling again.
+    """
     try:
         with capture_generation_ids() as gen_ids:
             result = await network_agent.run(request, model=_get_agent_model())
@@ -197,7 +160,11 @@ async def call_network_agent(request: str) -> str:
 
 @orchestrator.tool_plain
 async def call_topology_agent() -> str:
-    """Retrieve the cached network topology from the Topology Agent."""
+    """Retrieve the cached network topology from the Topology Agent.
+
+    Returns nodes, links, LLDP neighbors, and drift vs. the desired ContainerLab
+    definition. The cache is refreshed every 60 seconds. Takes no arguments.
+    """
     response = get_topology_response()
     if response is None:
         return 'Topology cache is still warming up — please retry in a moment.'
@@ -227,10 +194,12 @@ def get_syslog_investigation(investigation_id: str) -> str:
 async def open_syslog_investigation(description: str, device: str = '') -> str:
     """Open a new user-reported investigation and start LLM-driven analysis in the background.
 
-    Use this when the user describes a new problem — not when they reference an existing investigation.
+    Persists a new investigation to disk. ONLY call this when the user's message starts
+    with the exact prefix "/investigate" — never based on inferred intent. Strip the
+    prefix and pass the remainder as the description.
 
     Args:
-        description: The user's problem description.
+        description: The user's problem description (the message with "/investigate" stripped).
         device: Optional short device name hint (e.g. "router1"). Leave empty if unknown.
     """
     return await open_manual_investigation(description, device)

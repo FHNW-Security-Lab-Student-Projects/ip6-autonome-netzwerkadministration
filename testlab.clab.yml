@@ -107,6 +107,15 @@ topology:
         - ip addr add 10.10.10.10/24 dev eth1
         - ip route replace default via 10.10.10.1
 
+    client4:
+      kind: linux
+      image: ghcr.io/srl-labs/network-multitool:latest
+      labels:
+        role: client
+      exec:
+        - ip addr add 10.10.10.11/24 dev eth1
+        - ip route replace default via 10.10.10.1
+
   links:
     # Switch1 to clients
     - endpoints: ["switch1:e1-1", "client1:eth1"]
@@ -121,5 +130,6 @@ topology:
     # Router2 to switch2
     - endpoints: ["router2:e1-2", "switch2:e1-1"]
 
-    # Switch2 to client
+    # Switch2 to clients
     - endpoints: ["switch2:e1-2", "client3:eth1"]
+    - endpoints: ["switch2:e1-3", "client4:eth1"]

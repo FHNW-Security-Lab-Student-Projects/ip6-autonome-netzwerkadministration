@@ -31,6 +31,7 @@ Three properties drive the difficulty rating, in order of impact:
 | **Syslog visibility** | Fault raises an error event the agent can find in Loki without probing | Silent — nothing logged; the agent must actively probe to see it |
 | **Honesty of the obvious signal** | The first thing you check *is* the fault | The obvious signal lies: link up but BGP down; BGP up but no routes; port up but wrong VLAN |
 | **Number of signals to correlate** | One device, one `show` command | Must compare two outputs (route tables, ACL counters) or vary an input (packet size) |
+| **Where the "correct" value lives** | In the config the agent reads, or obvious from current state | Only in the recorded **snapshot history** — the faulty runtime value looks valid in isolation (the *history-required* tier) |
 
 A secondary factor is **how many plausible wrong answers exist**. Easy faults have one
 obvious culprit. Hard faults look healthy at every layer the agent normally checks, so
@@ -142,6 +143,53 @@ just sends the queries against the unbroken topology.
 
 ---
 
+## History-required tier — persistent fault, recorded baseline
+
+> The hard tier above is solvable from current state + config + syslog (compare two RIBs,
+> read ACL counters, vary packet size). This one adds a different axis: **the fault is in
+> dynamic runtime state — an ARP binding — and the wrong value looks perfectly valid in
+> isolation.** The fault is fully PRESENT during the investigation
+> (connectivity stays broken; this is *not* a self-healed flap), but nothing in current state
+> or syslog says the value is wrong. The only record of the *correct* value is a healthy
+> baseline that `setup.sh` recorded into the snapshot history before injecting the fault.
+> This is the *only* tier that genuinely requires `state_snapshot_agent`.
+
+### How the timing works (different from every other scenario)
+
+The snapshot agent's background refresh loop only runs *while the orchestrator is alive*, i.e.
+**after** `setup.sh`. So `setup.sh` records the healthy baseline itself, by calling the snapshot
+agent's one-shot capture *before* injecting the persistent fault:
+
+```
+state_snapshot_agent.py --capture-once   # 1. healthy baseline  (the correct value)
+<inject persistent fault>                # 2. fault stays in place for the whole run
+state_snapshot_agent.py --capture-once   # 3. faulted state      (clean good->bad diff)
+```
+
+`--capture-once` loads the existing history, appends one snapshot of every device, and saves.
+When the experiment starts, `snapshot_lifespan` reloads that file (and keeps appending the
+still-broken live state every 2 min). The agent then has both the recorded healthy value and
+the current broken value, and localizes the fault by diffing them: `snapshot_status` for the
+timestamps, then `state_before` / `state_diff`. `teardown.sh` removes the persistent fault.
+
+### `duplicate-ip-arp`
+- **Fault:** a **real duplicate-IP event** on VLAN30. client4 (normally `10.10.10.11`)
+  briefly also claims `10.10.10.10` and announces it (gratuitous ARP) while client3's switch
+  port is down, so router2 (client3's gateway, `ethernet-1/2.30` = 10.10.10.1) relearns
+  `10.10.10.10` → **client4's real MAC**. client3 is brought back and client4 drops the
+  duplicate, but router2's neighbor cache stays poisoned: frames to client3 go to client4's
+  MAC (which does not own `.10`) → blackholed. **Persists** (a live, non-expired dynamic
+  neighbor; no static entry, so it is invisible in config).
+- **Why history-required:** the poisoned MAC is client4's genuine, live MAC on the same
+  segment, so a live `show arpnd arp-entries` shows a dynamic entry that seems fine; routing
+  and BGP are healthy. Nothing in current state or syslog says the MAC is wrong. The tell is
+  the `arp` snapshot history: `10.10.10.10` used to resolve to client3's real MAC and now
+  resolves to client4's.
+- **Distractors to reject:** routing/BGP (healthy), interface/port down (all up in the final
+  state), VLAN-membership or gateway-IP misconfig (clean), and "an ARP entry exists, looks fine".
+
+---
+
 ## Quick reference
 
 | Scenario | Tier | Device | Layer | In syslog? | What localizes it |
@@ -155,3 +203,4 @@ just sends the queries against the unbroken topology.
 | `acl-silent-drop` | hard | router2 ACL | data plane | ❌ | ACL drop counters |
 | `one-way-route-filter` | hard | router1 import-policy | L3 | ❌ | route-table asymmetry (2 RIBs) |
 | `mtu-blackhole` | hard | router1 e1-2 | data plane | ❌ | packet-size probing + MTU |
+| `duplicate-ip-arp` | hard (history) | router2 ARP | L2/L3 | ❌ | ARP **history** (MAC vs recorded baseline) |

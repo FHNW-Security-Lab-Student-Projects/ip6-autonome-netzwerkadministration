@@ -46,8 +46,10 @@ async def query_loki(
     """Query Nokia SR Linux syslog entries from Loki around a specific point in time.
 
     Args:
-        device: Short device name ("router1", "switch1") or "all" for all devices.
-                Do NOT include the "clab-testlab-" prefix.
+        device: Short inventory device name ("router1", "switch1") or "all" for all
+                devices. Syslog lines and triggering events show the host as the full
+                container name (e.g. "clab-testlab-router1") — strip the
+                "clab-testlab-" prefix and pass only the short name here.
         time_anchor: ISO 8601 datetime string marking the center of the time window.
                      Use the triggering event timestamp from the investigation prompt.
                      Example: "2026-04-14T14:30:00Z"

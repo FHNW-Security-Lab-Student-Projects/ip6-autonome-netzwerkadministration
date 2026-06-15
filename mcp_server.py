@@ -78,8 +78,12 @@ async def execute_show_command(device_name: str, command: str) -> str:
     """
     Execute a show command on a network device.
 
+    The CLI parser does NOT accept `[name=<value>]` bracket syntax or slash-joined YANG
+    paths — use get_state_path / get_config_path for those. For ping, ALWAYS bound it
+    with `-c <N>` (e.g. 'ping 10.0.0.2 -c 3') or the RPC will time out.
+
     Args:
-        device_name: Device name from inventory (e.g., 'Node1', 'Node2')
+        device_name: Device name from inventory (e.g., 'router1', 'switch1')
         command: CLI command to execute (e.g., 'show version', 'show interface brief')
 
     Returns:
@@ -248,7 +252,7 @@ def get_device_info(device_name: str) -> str:
     Get information about a network device from inventory.
 
     Args:
-        device_name: Device name from inventory (e.g., 'Node1', 'Node2')
+        device_name: Device name from inventory (e.g., 'router1', 'switch1')
 
     Returns:
         Device information as string

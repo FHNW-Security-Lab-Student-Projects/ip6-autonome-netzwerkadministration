@@ -26,13 +26,8 @@ import logfire
 import uvicorn
 from dotenv import dotenv_values, load_dotenv
 from pydantic import BaseModel
-from pydantic_ai import Agent, ModelMessagesTypeAdapter
-from pydantic_ai.capabilities import ProcessHistory
-from pydantic_ai.mcp import MCPServerStdio
-from pydantic_ai.models.openrouter import OpenRouterModel
-from pydantic_ai.providers.openrouter import OpenRouterProvider
-from agent_history import compact_tool_history
-from model_config import agent_model_settings
+from pydantic_ai import ModelMessagesTypeAdapter
+from investigation_orchestrator import investigation_orchestrator
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -162,83 +157,36 @@ def _load_investigations() -> None:
 _load_investigations()
 
 # ---------------------------------------------------------------------------
-# LLM + MCP agent
+# Investigation instructions (per-run; combined with the investigation
+# orchestrator's base instructions at run time)
 # ---------------------------------------------------------------------------
 
-llm = OpenRouterModel(
-    'z-ai/glm-5',
-    provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
-    settings=agent_model_settings(parallel_tool_calls=True),
-)
-
-network_mcp_server = MCPServerStdio(
-    command='uv',
-    args=['run', 'mcp_server.py'],
-    timeout=30,
-)
-
-syslog_mcp_server = MCPServerStdio(
-    command='uv',
-    args=['run', 'syslog_mcp_server.py'],
-    timeout=30,
-)
-
 INVESTIGATOR_INSTRUCTIONS_CONTINUATION = (
-    'You are a network investigator for Nokia SR Linux devices performing a further '
+    'You are a network investigator for Nokia SR Linux devices performing a deeper '
     'analysis of a prior triage. The conversation history contains initial findings — '
-    'do NOT repeat queries or commands already executed.\n\n'
-    'INVESTIGATION STRATEGY:\n'
-    '1. Review the prior findings in the conversation history.\n'
-    '2. Expand log coverage: query_loki on neighboring/related devices and widen the time window if needed.\n'
-    '3. Run execute_show_command to verify live device state for any suspected component.\n'
-    '4. Correlate log evidence with live state to identify the root cause.\n'
-    '5. Provide a definitive conclusion: confirmed root cause, affected scope, and concrete remediation steps.\n\n'
-    'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
-    'The syslog host label uses the full container name (clab-testlab-router1). '
-    'Strip the "clab-testlab-" prefix when calling tools.\n'
+    'build on them and do NOT repeat queries or commands already executed.\n\n'
+    'Expand the investigation as the evidence warrants — widen log coverage to '
+    'neighboring devices or larger time windows, verify live device state, and '
+    'correlate logs with state. Conclude with a definitive root cause, the affected '
+    'scope, and concrete remediation steps.\n'
 )
 
 INVESTIGATOR_INSTRUCTIONS_USER_INITIATED = (
-    'You are a network investigator for Nokia SR Linux devices. '
-    'A user has reported a problem — there is no prior triage context.\n\n'
-    'INVESTIGATION STRATEGY:\n'
-    '1. Infer the relevant device(s) and approximate timeframe from the user description. '
-    'If the device is ambiguous, call list_all_devices and query the most likely candidates.\n'
-    '2. Call query_loki for the relevant device(s) covering the suspected timeframe '
-    '(default to the last 30 minutes if no timeframe is given).\n'
-    '3. Run execute_show_command to verify current live device state for any suspected component.\n'
-    '4. Correlate log evidence with live state to identify the root cause.\n'
-    '5. Provide a definitive conclusion: confirmed root cause, affected scope, and concrete remediation steps.\n\n'
-    'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
-    'The syslog host label uses the full container name (clab-testlab-router1). '
-    'Strip the "clab-testlab-" prefix when calling tools.\n'
+    'You are a network investigator for Nokia SR Linux devices. A user has reported a '
+    'problem — there is no prior triage context.\n\n'
+    'Infer the relevant device(s) and timeframe from the user description (default to '
+    'the last 30 minutes if none is given), gathering logs and verifying live device '
+    'state as needed, and correlate the two to find the root cause. Conclude with a '
+    'definitive root cause, the affected scope, and concrete remediation steps.\n'
 )
 
 INVESTIGATOR_INSTRUCTIONS_TRIAGE = (
     'You are an automated network triager for Nokia SR Linux devices. '
-    'Your job is a QUICK initial assessment only — DO NOT try to do a full root-cause analysis.\n\n'
-    'TRIAGE STRATEGY (just do a quick initial assessment there is a HARD STOP implemented after 90 seconds):\n'
-    '1. Call query_loki once for the triggering device (±5 min around the event timestamp).\n'
-    '2. Optionally run one execute_show_command if the log context clearly points to a live state check.\n'
-    '3. Write a 2-3 sentence summary: what happened, likely cause, suggested next step.\n'
-    'Do NOT query neighboring devices or run multiple show commands. '
-    'A human can trigger a deeper investigation if needed.\n\n'
-    'NOTE: Device names in the inventory use short names (e.g. router1, switch1). '
-    'The syslog host label uses the full container name (clab-testlab-router1). '
-    'Strip the "clab-testlab-" prefix when calling tools.\n'
+    'Your job is a QUICK initial assessment only — DO NOT attempt a full root-cause analysis.\n\n'
+    'A HARD STOP is enforced after 180 seconds, so stay within that budget. Write a '
+    '2-3 sentence summary: what happened, likely cause, and a suggested next step. '
+    'A human can trigger a deeper investigation later if needed.\n'
 )
-
-syslog_investigator = Agent(
-    model=llm,
-    name='syslog_investigator',
-    toolsets=[network_mcp_server, syslog_mcp_server],
-    # Stub older oversized tool returns once the run nears the model's context
-    # window so they aren't re-sent verbatim each loop (see agent_history.py).
-    # NOTE: this means persisted investigation history (investigations.json) stores
-    # the stubbed older payloads; the agent can re-call any tool whose body it needs.
-    capabilities=[ProcessHistory(processor=compact_tool_history)],
-)
-
 
 # ---------------------------------------------------------------------------
 # Loki polling
@@ -348,8 +296,8 @@ async def _run_troubleshooting(inv: Investigation) -> None:
     )
     try:
         with logfire.span('investigation', investigation_id=inv.investigation_id, device=inv.device):
-            async with asyncio.timeout(90):
-                result = await syslog_investigator.run(prompt, message_history=inv.message_history, instructions=INVESTIGATOR_INSTRUCTIONS_TRIAGE)
+            async with asyncio.timeout(180):
+                result = await investigation_orchestrator.run(prompt, message_history=inv.message_history, instructions=INVESTIGATOR_INSTRUCTIONS_TRIAGE)
         inv.investigation_log.append(('auto_investigation', str(result.output)))
         inv.message_history = result.all_messages()
         inv.summary = str(result.output)
@@ -358,7 +306,7 @@ async def _run_troubleshooting(inv: Investigation) -> None:
         logfire.info('Investigation complete', investigation_id=inv.investigation_id)
         print(f'[syslog-agent] Investigation {inv.investigation_id[:8]} complete.', flush=True)
     except TimeoutError:
-        inv.investigation_log.append(('error', 'Auto-investigation timed out after 90 s'))
+        inv.investigation_log.append(('error', 'Auto-investigation timed out after 180 s'))
         inv.summary = 'Triage timed out — trigger a manual continuation for deeper analysis.'
         inv.status = InvestigationStatus.waiting
         _persist_investigations()
@@ -483,7 +431,7 @@ async def _run_manual_investigation(inv: Investigation, prompt: str) -> None:
     """LLM-driven manual investigation launched as a background asyncio task."""
     try:
         with logfire.span('manual_investigation', investigation_id=inv.investigation_id):
-            result = await syslog_investigator.run(
+            result = await investigation_orchestrator.run(
                 prompt,
                 instructions=INVESTIGATOR_INSTRUCTIONS_USER_INITIATED,
             )
@@ -507,7 +455,7 @@ async def _run_continuation(inv: Investigation, follow_up_text: str) -> None:
     """LLM-driven continuation launched as a background asyncio task."""
     try:
         with logfire.span('investigation_user_continuation', investigation_id=inv.investigation_id):
-            result = await syslog_investigator.run(
+            result = await investigation_orchestrator.run(
                 follow_up_text,
                 message_history=inv.message_history,
                 instructions=INVESTIGATOR_INSTRUCTIONS_CONTINUATION,
@@ -632,7 +580,7 @@ async def syslog_lifespan():
     api_config = uvicorn.Config(_agent_api, host='127.0.0.1', port=AGENT_API_PORT, log_level='warning')
     api_server = uvicorn.Server(api_config)
     api_server.install_signal_handlers = lambda: None  # signal handling owned by the main process
-    async with syslog_investigator:
+    async with investigation_orchestrator:
         async with httpx.AsyncClient(timeout=30) as http_client:
             poll_task = asyncio.create_task(_loki_poll_loop(http_client))
             api_task = asyncio.create_task(api_server.serve())
