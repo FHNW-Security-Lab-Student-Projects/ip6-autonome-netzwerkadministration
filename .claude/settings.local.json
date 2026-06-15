@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebSearch"
+      "WebSearch",
+      "mcp__logfire__query_run"
     ]
   }
 }

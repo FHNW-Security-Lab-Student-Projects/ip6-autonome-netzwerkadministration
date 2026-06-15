@@ -172,21 +172,17 @@ async def call_topology_agent() -> str:
 
 
 @orchestrator.tool_plain
-async def sleep_test(seconds: int) -> str:
-    """Sleep for the given number of seconds and return a confirmation. Used to test timeout behaviour."""
-    await asyncio.sleep(seconds)
-    return f'Slept {seconds}s successfully.'
-
-
-@orchestrator.tool_plain
 def list_syslog_investigations() -> str:
-    """List all syslog investigations (ID, device, status, created, summary)."""
+    """List all syslog investigations (ID, device, status, created, summary).
+    ONLY call this when the user's message starts
+    with the exact prefix "/investigate" — never based on inferred intent."""
     return list_investigations()
 
 
 @orchestrator.tool_plain
 def get_syslog_investigation(investigation_id: str) -> str:
-    """Get full details of a specific syslog investigation by ID or unique prefix."""
+    """Get full details of a specific syslog investigation by ID or unique prefix. ONLY call this when the user's message starts
+    with the exact prefix "/investigate" — never based on inferred intent."""
     return get_investigation_detail(investigation_id)
 
 
@@ -212,6 +208,8 @@ async def continue_syslog_investigation(
     background: bool = False,
 ) -> str:
     """Resume LLM-driven troubleshooting for an existing investigation.
+    ONLY call this when the user's message starts
+    with the exact prefix "/investigate" — never based on inferred intent.
 
     Args:
         investigation_id: Full ID or unique prefix of the investigation.
@@ -242,7 +240,8 @@ async def call_config_agent(request: str) -> str:
 
 @orchestrator.tool_plain
 async def call_snapshot_agent(request: str) -> str:
-    """Delegate a historical state query to the Snapshot Agent.
+    """This agent provides historical "runtime" information which are not present in the syslog or currently visible on the device. The agent does snapshots of device state captured every 2 minutes, covering
+    ARP entries, interface status, and per-network-instance routing tables.
 
     Use for questions about how device state evolved over time, e.g.:
     'how did the routing table on router1 change before the incident?'

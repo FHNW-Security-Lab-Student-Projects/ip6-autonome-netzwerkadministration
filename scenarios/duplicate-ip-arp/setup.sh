@@ -5,10 +5,10 @@
 # client4 (10.10.10.11) are both normal hosts on the VLAN30 segment. We stage a *real*
 # duplicate-IP event: client4 briefly also claims 10.10.10.10 and announces it (gratuitous
 # ARP) while client3's switch port is down, so router2 relearns 10.10.10.10 -> client4's
-# REAL MAC. client3 is then brought back and client4 drops the duplicate address. The
-# duplicate is gone, but router2's neighbor cache stays poisoned: it frames all
-# client3-bound traffic to client4's MAC. client4 owns that MAC but not the .10 address, so
-# the frames are blackholed -- client1 <-> client3 fails and STAYS failed.
+# REAL MAC. client3 is then brought back, but client4 KEEPS the duplicate address. router2's
+# neighbor cache stays poisoned: it frames all client3-bound traffic to client4's MAC, and
+# 10.10.10.10 remains a live duplicate on the segment -- client1 <-> client3 fails and
+# STAYS failed.
 #
 # Why this is hard:
 #   * The fault lives in runtime ARP state -- it is NOT in any device config the agent would
@@ -20,10 +20,19 @@
 #     provides.
 set -euo pipefail
 
+# Clear snapshot history so the evaluation starts from a fresh state.
+rm -f "$(cd "$(dirname "$0")" && pwd)/../../state_snapshots.json"
+
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CAPTURE=(uv run python "$HERE/../../state_snapshot_agent.py" --capture-once)
 DUP_IP="10.10.10.10"      # client3's address, which client4 will transiently steal
 DUP_CIDR="10.10.10.10/24"
+
+# 0. start the real service on client3 (port 1111). client4 will steal the IP but NOT run
+#    this service, so ping to 10.10.10.10 still succeeds (client4 answers) while the actual
+#    service is unreachable -- that mismatch is the reportable symptom.
+echo "[dup-ip-arp] starting http.server :1111 on client3 (the real service)"
+sudo docker exec -d clab-testlab-client3 python3 -m http.server 1111
 
 # 1. make sure router2 has dynamically learned client3's REAL MAC, then snapshot the
 #    healthy baseline (10.10.10.10 -> client3's MAC, origin dynamic)
@@ -50,11 +59,10 @@ sudo docker exec clab-testlab-client4 arping -c 3 -U -I eth1 "$DUP_IP" >/dev/nul
 sudo docker exec clab-testlab-client4 ping -c 2 -W1 -I "$DUP_IP" 10.10.10.1 >/dev/null 2>&1 || true
 sleep 3
 
-# 4. bring client3 back up and have client4 drop the duplicate address. The duplicate is
-#    now gone from the segment, but router2's poisoned 10.10.10.10 -> client4-MAC entry
-#    remains (a valid, non-expired dynamic neighbor), so client3 stays unreachable.
-echo "[dup-ip-arp] client4 releases $DUP_IP; bringing client3's port back up"
-sudo docker exec clab-testlab-client4 ip addr del "$DUP_CIDR" dev eth1 || true
+# 4. bring client3 back up, but client4 KEEPS the duplicate address. The conflicting
+#    10.10.10.10 stays live on client4, and router2's poisoned 10.10.10.10 -> client4-MAC
+#    entry remains (a valid, non-expired dynamic neighbor), so client3 stays unreachable.
+echo "[dup-ip-arp] client4 keeps $DUP_IP; bringing client3's port back up"
 sudo docker exec -i clab-testlab-switch2 sr_cli <<'SRL'
 enter candidate
 set / interface ethernet-1/2 admin-state enable
