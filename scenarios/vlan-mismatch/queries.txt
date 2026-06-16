@@ -1,3 +1,1 @@
 client1 cannot reach anything beyond its own segment, but client2 (same switch) is fine. Investigate.
-Check L2 forwarding / VLAN membership on switch1 and whether client1 can ARP its gateway.
-Summarise the single root cause: name the device, the port, and the VLAN misconfiguration.

@@ -3,5 +3,4 @@ root_cause: >
   domain — VLAN20/mac-vrf vlan20 instead of VLAN10 — so client1 is now in client2's L2
   segment and cannot reach its default gateway 192.168.1.1 (which lives on VLAN10).
   client1's ARP for the gateway fails. A correct answer names switch1 e1-1 being in the
-  wrong VLAN/mac-vrf. Reject answers blaming the routers, BGP, client1's IP config, or a
-  physical interface being down (the port is up).
+  wrong VLAN/mac-vrf.

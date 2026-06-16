@@ -2,5 +2,4 @@ root_cause: >
   Interface ethernet-1/2 (e1-2) on router1 — the link to router2 — is administratively
   disabled. Its oper-state is down, which tore down the eBGP session to router2 and
   removed the cross-router routes, so client1 cannot reach client3. A correct answer
-  pins it to router1 e1-2 being admin-disabled (down). Reject answers blaming router2,
-  a switch/VLAN issue, BGP policy, or the clients.
+  pins it to router1 e1-2 being admin-disabled (down).

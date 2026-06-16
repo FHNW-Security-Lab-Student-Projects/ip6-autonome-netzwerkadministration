@@ -112,10 +112,10 @@ For a **baseline (healthy) scenario**, describe the expected healthy state — a
 answer reports the network as fine and invents no problem:
 
 ```yaml
-# scenario: bgp-troubleshooting  (baseline — no fault)
+# scenario: basic-client-communication  (baseline — no fault)
 root_cause: >
-  No fault. The BGP session between router1 and router2 is Established and there are
-  no recent flap events. A correct answer reports BGP as healthy.
+  No fault. The network is healthy and client1, client2 and client3 can all reach
+  each other. A correct answer reports full reachability and invents no fault.
 ```
 
 Write the `root_cause` to be specific enough that *you* can tell a real diagnosis from

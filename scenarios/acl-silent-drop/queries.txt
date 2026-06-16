@@ -1,3 +1,1 @@
-Pings from client1 to client3 fail, but BGP is Established and the routes are present everywhere. Investigate.
-Look beyond reachability/routing: check for traffic filters (ACLs) and their drop counters on the routers.
-Summarise the single root cause: name the device, the filter, and exactly what it drops.
+Pings from client1 to client3 fail. Investigate the root cause.

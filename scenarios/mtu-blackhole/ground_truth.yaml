@@ -4,5 +4,3 @@ root_cause: >
   pass, but larger packets with DF set are silently dropped, producing a path-MTU
   blackhole -- default-size ping works yet bulk transfers / big packets stall. A correct
   answer pins it to the reduced IP MTU on router1's e1-2 (the router-to-router link).
-  Reject answers blaming BGP, routing, an ACL, or a down interface -- connectivity exists
-  for small packets, so "no problem found" is a MISS.

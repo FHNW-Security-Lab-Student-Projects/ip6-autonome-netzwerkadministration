@@ -40,7 +40,7 @@ See [experiment-runner.md](experiment-runner.md) for the full usage guide.
 ### Quick start
 
 ```bash
-uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-01 --file scenarios/bgp-troubleshooting.txt
+uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-01 --file path/to/queries.txt
 ```
 
 ### Tagging a scenario
@@ -48,7 +48,7 @@ uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenari
 Set `EXPERIMENT_SCENARIO` before starting the runner to label all sessions in a batch. This is the primary way to group sessions by experiment name for comparison.
 
 ```bash
-EXPERIMENT_SCENARIO=bgp-flap-01 uv run python experiment_runner.py --model z-ai/glm-5 --file scenarios/bgp-troubleshooting.txt
+EXPERIMENT_SCENARIO=bgp-flap-01 uv run python experiment_runner.py --model z-ai/glm-5 --file path/to/queries.txt
 ```
 
 Run the same command with a different `--model` to produce a second batch with the same `scenario`. Repeat for each LLM you want to compare.

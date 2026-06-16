@@ -91,7 +91,7 @@ If `model_pricing.json` does not exist (e.g. on a fresh clone before the first s
 uv run python sync_pricing.py
 
 # 2. Run experiments
-uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-01 --file scenarios/bgp-troubleshooting.txt
+uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-01 --file path/to/queries.txt
 
 # 3. Analyse results
 uv run python analyze_experiments.py --scenario bgp-01

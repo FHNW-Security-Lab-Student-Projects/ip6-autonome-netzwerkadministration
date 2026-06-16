@@ -1,3 +1,0 @@
-Check the BGP session state on all routers and report any sessions that are not established.
-Are there any recent BGP-related syslog events? Summarise what happened and on which device.
-What routes is router1 advertising to its BGP peers?

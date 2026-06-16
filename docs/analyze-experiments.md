@@ -97,9 +97,9 @@ These can be opened directly in Excel, Numbers, or a Jupyter notebook for furthe
 
 ```bash
 # 1. Run the same scenario with multiple models
-uv run python experiment_runner.py -m z-ai/glm-5                  -s bgp-01 -f scenarios/bgp-troubleshooting.txt
-uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6 -s bgp-01 -f scenarios/bgp-troubleshooting.txt
-uv run python experiment_runner.py -m google/gemini-2.0-flash-001 -s bgp-01 -f scenarios/bgp-troubleshooting.txt
+uv run python experiment_runner.py -m z-ai/glm-5                  -s bgp-01 -f path/to/queries.txt
+uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6 -s bgp-01 -f path/to/queries.txt
+uv run python experiment_runner.py -m google/gemini-2.0-flash-001 -s bgp-01 -f path/to/queries.txt
 
 # 2. Generate the comparison report
 uv run python analyze_experiments.py --scenario bgp-01

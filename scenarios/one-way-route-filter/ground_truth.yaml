@@ -6,5 +6,4 @@ root_cause: >
   the ROUTE TABLES, not the pings: router2 has learned 192.168.1.0/24 from router1, but
   router1 is missing 10.10.10.0/24 from router2 -- even though the eBGP session is
   Established. A correct answer identifies router1's BGP import policy dropping
-  10.10.10.0/24. Reject answers blaming a down link, a dead BGP session (it is up), a
-  missing export on router2, or a problem on switch2/client3.
+  10.10.10.0/24.

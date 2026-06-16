@@ -1,13 +1,19 @@
 root_cause: >
   router2's ARP/neighbor entry for 10.10.10.10 (client3) is bound to the WRONG MAC -- it
   points at client4's MAC instead of client3's real MAC. This is the aftermath of a
-  duplicate-IP event on the VLAN30 segment: client4 (normally 10.10.10.11) briefly also
-  claimed 10.10.10.10 and announced it, so router2 relearned the address to client4's MAC
-  and won the binding. router2 is client3's gateway (ethernet-1/2.30 = 10.10.10.1), so it
-  now frames all client3-bound traffic to client4's MAC; client4 owns that MAC but not the
-  .10 address, so the packets are blackholed and client1 <-> client3 fails. The fault is
-  STILL PRESENT during the investigation (this is not a self-healed flap) -- pings keep
-  failing -- yet routing and BGP are perfectly healthy, which are the distractors.
+  duplicate-IP event on the VLAN30 segment: client4 (normally 10.10.10.11) also claimed
+  10.10.10.10 and announced it while client3 was briefly off the segment, so router2 relearned
+  the address to client4's MAC and won the binding. client4 then KEEPS 10.10.10.10 -- the
+  duplicate address stays live on the segment and is NOT released, so client3 and client4 are
+  both configured with 10.10.10.10 simultaneously and router2's poisoned binding persists.
+  router2 is client3's gateway (ethernet-1/2.30 = 10.10.10.1), so it
+  now frames all client3-bound traffic to client4's MAC. client4 owns that MAC and is live on
+  the segment, so it answers for 10.10.10.10 -- which makes the symptom deceptive: a ping to
+  10.10.10.10 still SUCCEEDS (client4 replies), yet the real service that runs on client3
+  (http.server on TCP 1111) is unreachable, because client4 holds the address but does not run
+  the service. The reportable symptom is therefore this mismatch -- 10.10.10.10 is pingable but
+  client3's actual service is dead -- not a hard ping failure. The fault is STILL PRESENT
+  during the investigation.
 
   Why the snapshot history is needed: the poisoned MAC is client4's genuine, live MAC on
   the same segment, so a live `show arpnd arp-entries` shows a dynamic entry for 10.10.10.10
@@ -21,7 +27,3 @@ root_cause: >
   A correct answer identifies router2's ARP entry for 10.10.10.10 as bound to the wrong MAC
   (client4's MAC rather than client3's) and uses the recorded baseline to establish that the
   MAC changed -- recognising the duplicate-IP / ARP-poisoning nature on the VLAN30 segment.
-  Reject: blaming routing or BGP (both healthy); an interface or port down (all up in the
-  final state); a VLAN-membership or gateway-IP misconfig (config is clean); or stopping at
-  "an ARP entry exists for 10.10.10.10, it looks fine". An answer that never consults the ARP
-  history (or otherwise establishes the correct MAC) cannot conclusively localise the fault.

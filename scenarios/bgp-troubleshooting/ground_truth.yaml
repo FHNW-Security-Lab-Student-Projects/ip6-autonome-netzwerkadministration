@@ -1,5 +1,0 @@
-root_cause: >
-  No fault. The BGP session between router1 and router2 is Established, there are no
-  recent BGP flap events, and router1 advertises its prefixes to router2 normally.
-  A correct answer reports BGP as healthy and does not claim a session is down or
-  that recent flapping occurred.

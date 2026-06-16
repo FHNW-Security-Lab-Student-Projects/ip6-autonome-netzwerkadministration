@@ -36,13 +36,15 @@ Three properties drive the difficulty rating, in order of impact:
 A secondary factor is **how many plausible wrong answers exist**. Easy faults have one
 obvious culprit. Hard faults look healthy at every layer the agent normally checks, so
 "routing looks fine, no problem found" is a tempting — and wrong — conclusion. Each
-hard `ground_truth.yaml` explicitly marks that giving-up answer as a MISS.
+`ground_truth.yaml` states the single true root cause; the queries are deliberately
+open-ended ("investigate the root cause"), giving no hints about where to look, so the
+giving-up answer counts as a MISS when scored against that root cause.
 
 ---
 
-## Baseline scenarios (no fault — sanity checks)
+## Baseline scenario (no fault — sanity check)
 
-These verify the agent doesn't *invent* problems in a healthy network. They have **no
+This verifies the agent doesn't *invent* problems in a healthy network. It has **no
 `setup.sh` / `teardown.sh`** — only `queries.txt` + `ground_truth.yaml` — so the runner
 just sends the queries against the unbroken topology.
 
@@ -51,10 +53,6 @@ just sends the queries against the unbroken topology.
   communicate with each other.
 - **Tests:** the agent confirms full reachability between clients and does not fabricate a down link,
   VLAN, or BGP fault. 
-
-### `bgp-troubleshooting`
-- **Fault:** none. eBGP is Established, no flaps, router1 advertises normally.
-- **Tests:** the agent reports BGP healthy and doesn't claim a session is down or flapping.
 
 ---
 
@@ -109,14 +107,6 @@ just sends the queries against the unbroken topology.
 > **Silent** (nothing in syslog), the config *looks* complete at every layer the agent
 > normally checks, and the symptom needs **active, multi-signal probing**. "No problem
 > found" is the trap.
-
-### `wrong-gateway-ip`
-- **Fault:** router1's VLAN10 sub-interface (`ethernet-1/1.10`) has IP `192.168.1.2/24`
-  instead of `.1/24` — a one-digit typo. client1's gateway (`.1`) simply doesn't exist, so
-  ARP fails.
-- **Why hard:** every interface is up, BGP is fine, routing is fine — nothing is "broken,"
-  the address is just *wrong*. The agent must compare client1's **configured gateway**
-  against the **actual IP** on the sub-interface and spot a value mismatch. Silent.
 
 ### `acl-silent-drop`
 - **Fault:** an ingress ACL on router2 (`block-icmp` on `ethernet-1/1.0`) silently drops
@@ -174,12 +164,15 @@ timestamps, then `state_before` / `state_diff`. `teardown.sh` removes the persis
 
 ### `duplicate-ip-arp`
 - **Fault:** a **real duplicate-IP event** on VLAN30. client4 (normally `10.10.10.11`)
-  briefly also claims `10.10.10.10` and announces it (gratuitous ARP) while client3's switch
+  also claims `10.10.10.10` and announces it (gratuitous ARP) while client3's switch
   port is down, so router2 (client3's gateway, `ethernet-1/2.30` = 10.10.10.1) relearns
-  `10.10.10.10` → **client4's real MAC**. client3 is brought back and client4 drops the
-  duplicate, but router2's neighbor cache stays poisoned: frames to client3 go to client4's
-  MAC (which does not own `.10`) → blackholed. **Persists** (a live, non-expired dynamic
-  neighbor; no static entry, so it is invisible in config).
+  `10.10.10.10` → **client4's real MAC**. client3 is brought back but client4 **keeps** the
+  duplicate address, so `10.10.10.10` stays live on both hosts and router2's neighbor cache
+  stays poisoned: frames to client3 go to client4's MAC. **Deceptive symptom:** because client4
+  is live and owns that MAC, a ping to `10.10.10.10` still **succeeds** (client4 replies), yet
+  client3's real service (`http.server` on TCP 1111) is **unreachable** — the reportable tell is
+  this mismatch (pingable IP, dead service), not a hard ping failure. **Persists** (a live,
+  non-expired dynamic neighbor; no static entry, so it is invisible in config).
 - **Why history-required:** the poisoned MAC is client4's genuine, live MAC on the same
   segment, so a live `show arpnd arp-entries` shows a dynamic entry that seems fine; routing
   and BGP are healthy. Nothing in current state or syslog says the MAC is wrong. The tell is
@@ -199,7 +192,6 @@ timestamps, then `state_before` / `state_diff`. `teardown.sh` removes the persis
 | `bgp-peer-shutdown` | medium | router1 neighbor | L3 | ✅ | BGP session state (links lie) |
 | `missing-export-policy` | medium | router1 export-policy | L3 | ❌ | RIB-out (session state lies) |
 | `vlan-mismatch` | medium | switch1 e1-1 | L2 | ❌ | VLAN membership + ARP |
-| `wrong-gateway-ip` | hard | router1 e1-1.10 | L3 | ❌ | configured vs. actual gateway IP |
 | `acl-silent-drop` | hard | router2 ACL | data plane | ❌ | ACL drop counters |
 | `one-way-route-filter` | hard | router1 import-policy | L3 | ❌ | route-table asymmetry (2 RIBs) |
 | `mtu-blackhole` | hard | router1 e1-2 | data plane | ❌ | packet-size probing + MTU |

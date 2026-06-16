@@ -1,7 +1,1 @@
-# Persistent wrong ARP binding from a duplicate-IP event on VLAN30: client4 still holds
-# client3's IP (10.10.10.10), and router2's ARP entry for 10.10.10.10 points at client4's
-# MAC, so traffic lands on client4 instead of client3. ping to 10.10.10.10 still succeeds
-# (client4 answers), but client3's real service is unreachable because client4 is not
-# running it. The fault is live during the whole investigation; the snapshot history holds
-# the correct prior MAC, which is the only record of what the binding SHOULD be.
-client1 can reach 10.10.10.10 (client3) by ping, but client3's HTTP service on port 1111 (http://10.10.10.10:1111) is unreachable from client1, investigate the root cause.
+client1 can reach 10.10.10.10 (client3) by ping, but client3's HTTP service on port 1111 (http://10.10.10.10:1111) is unreachable from client1, investigate the root cause. I checked the service on client3 and the service is up and running.

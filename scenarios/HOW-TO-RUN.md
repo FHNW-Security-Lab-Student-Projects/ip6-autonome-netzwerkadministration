@@ -8,7 +8,7 @@ scenario in this folder. For the catalog of scenarios and difficulty tiers see
 ## TL;DR
 
 ```bash
-uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-troubleshooting
+uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario intf-down
 ```
 
 Run it from the repo root, inside the **devcontainer** where the lab lives (the runner

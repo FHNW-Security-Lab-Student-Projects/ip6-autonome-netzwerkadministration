@@ -1,3 +1,0 @@
-client1 cannot reach its default gateway or anything beyond its subnet. Everything looks configured. Investigate.
-Compare client1's configured gateway (192.168.1.1) against the actual IP on router1's VLAN10 sub-interface.
-Summarise the single root cause: name the device, the sub-interface, and the exact misconfiguration.

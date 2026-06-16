@@ -1,5 +1,4 @@
 root_cause: >
   Interface ethernet-1/2 (e1-2) on switch2 — the access port to client3 — is
   administratively disabled (oper-state down), so client3 is isolated at layer 2.
-  A correct answer names switch2 e1-2 as down. Reject answers blaming the routers,
-  BGP, client3's own config, or router2's gateway.
+  A correct answer names switch2 e1-2 as down.

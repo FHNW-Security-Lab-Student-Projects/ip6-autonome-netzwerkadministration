@@ -1,3 +1,1 @@
-Client1 cannot reach client3, but all interfaces appear to be up. Investigate.
-Check the BGP session state between router1 and router2, and the route tables.
-Summarise the single root cause: name the device, the protocol/peer, and what is wrong.
+Client1 cannot reach client3, but all interfaces appear to be up. Investigate the root cause.

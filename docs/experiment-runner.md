@@ -40,13 +40,13 @@ Steps 2–4 are decoupled — running an experiment never evaluates it, re-evalu
 ```bash
 # Folder-based scenario (recommended) — runner loads scenarios/<name>/queries.txt,
 # runs setup.sh before the queries, runs teardown.sh after (best-effort).
-uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario bgp-troubleshooting
+uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario basic-client-communication
 
 # Multi-turn — carry conversation history between queries in the same run
-uv run python experiment_runner.py --model z-ai/glm-5 --scenario bgp-troubleshooting --multi-turn
+uv run python experiment_runner.py --model z-ai/glm-5 --scenario basic-client-communication --multi-turn
 
 # Skip setup/teardown — sanity run against the unbroken topology
-uv run python experiment_runner.py --model z-ai/glm-5 --scenario bgp-troubleshooting --no-fault
+uv run python experiment_runner.py --model z-ai/glm-5 --scenario basic-client-communication --no-fault
 
 # Legacy flat file (still works for ad-hoc query lists outside scenarios/)
 uv run python experiment_runner.py --model z-ai/glm-5 --scenario adhoc --file path/to/queries.txt
@@ -69,9 +69,9 @@ uv run python experiment_runner.py --model z-ai/glm-5 --scenario adhoc --file pa
 Run the same scenario with each model you want to compare:
 
 ```bash
-uv run python experiment_runner.py -m z-ai/glm-5                   -s bgp-troubleshooting
-uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6  -s bgp-troubleshooting
-uv run python experiment_runner.py -m google/gemini-2.0-flash-001  -s bgp-troubleshooting
+uv run python experiment_runner.py -m z-ai/glm-5                   -s basic-client-communication
+uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6  -s basic-client-communication
+uv run python experiment_runner.py -m google/gemini-2.0-flash-001  -s basic-client-communication
 ```
 
 All three runs share the same `scenario` label (and the same setup.sh / teardown.sh,
@@ -245,10 +245,10 @@ root_cause: >
 For a baseline (healthy) scenario, describe the expected healthy state instead:
 
 ```yaml
-# scenario: bgp-troubleshooting  (baseline — no fault)
+# scenario: basic-client-communication  (baseline — no fault)
 root_cause: >
-  No fault. The BGP session between router1 and router2 is Established and there are
-  no recent flap events. A correct answer reports BGP as healthy.
+  No fault. The network is healthy and client1, client2 and client3 can all reach
+  each other. A correct answer reports full reachability and invents no fault.
 ```
 
 You evaluate only the final answer of each run (the concluding turn of a multi-turn
@@ -262,12 +262,12 @@ the reference printed alongside the answer.
 
 | Folder | Fault | Description |
 |---|---|---|
-| `scenarios/basic-reachability/` | none | Probes router1 interface state in the healthy topology |
-| `scenarios/bgp-troubleshooting/` | none | Probes BGP session state in the healthy topology |
-| `scenarios/client1-client3-communication/` | none | Probes end-to-end reachability client1 ↔ client3 |
+| `scenarios/basic-client-communication/` | none | Probes end-to-end reachability between client1, client2 and client3 in the healthy topology |
 
-These are baseline (no-fault) scenarios. Author new fault scenarios by creating
-a folder with all four files above.
+This is the baseline (no-fault) scenario. The 10 fault scenarios live alongside it in
+[../scenarios/](../scenarios/) — see [../scenarios/README.md](../scenarios/README.md) and
+[../scenarios/scenario-guide.md](../scenarios/scenario-guide.md). Author new fault scenarios
+by creating a folder with all four files above.
 
 ---
 

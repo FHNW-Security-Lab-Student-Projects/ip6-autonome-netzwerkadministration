@@ -2,6 +2,4 @@ root_cause: >
   An ingress ACL on router2 (filter "block-icmp" on ethernet-1/1.0) is silently dropping
   ICMP traffic sourced from 192.168.1.0/24, so pings from client1 to client3 fail even
   though BGP is Established and all routes are present. A correct answer identifies the
-  ACL/traffic filter on router2 dropping client1's ICMP (rising drop counters), NOT a
-  routing/BGP fault, a down interface, or a VLAN issue. Concluding "routing looks fine,
-  no problem found" is a MISS.
+  ACL/traffic filter on router2 dropping client1's ICMP (rising drop counters).

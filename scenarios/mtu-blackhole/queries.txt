@@ -1,3 +1,1 @@
-Small pings between client1 and client3 succeed, but large transfers and big packets fail or hang. Investigate.
-Test with different packet sizes (e.g. ping with a large size and DF set) and inspect interface MTU on the router-to-router link.
-Summarise the single root cause: name the device, the interface, and the MTU misconfiguration.
+Small pings between client1 and client3 succeed, but large transfers and big packets fail or hang. investigate the root cause.

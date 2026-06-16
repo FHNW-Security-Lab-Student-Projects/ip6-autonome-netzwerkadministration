@@ -5,9 +5,9 @@ runner expects (`queries.txt`, `ground_truth.yaml`, and — for fault scenarios 
 `setup.sh` / `teardown.sh`) — see
 [../docs/running-experiments.md](../docs/running-experiments.md).
 
-There are **10 fault scenarios** (table below) plus **2 no-fault baselines**
-(`basic-client-communication`, `bgp-troubleshooting`) that check the agent doesn't
-invent problems in a healthy network. The baselines have no `setup.sh` / `teardown.sh`.
+There are **10 fault scenarios** (table below) plus **1 no-fault baseline**
+(`basic-client-communication`) that checks the agent doesn't invent problems in a
+healthy network. The baseline has no `setup.sh` / `teardown.sh`.
 For what each scenario tests and why it sits in its tier, see
 [scenario-guide.md](scenario-guide.md).
 
@@ -48,7 +48,6 @@ means the fault raises an error event the agent can spot via Loki without probin
 | `bgp-peer-shutdown` | medium | router1 BGP neighbor admin-shutdown (links stay up) | ✅ |
 | `missing-export-policy` | medium | router1 advertises nothing (BGP up, RIB-out empty) | ❌ |
 | `vlan-mismatch` | medium | switch1 puts client1's port in the wrong VLAN | ❌ |
-| `wrong-gateway-ip` | hard | router1 VLAN10 gateway IP typo (.2 not .1) | ❌ |
 | `acl-silent-drop` | hard | router2 ACL silently drops client1's ICMP | ❌ |
 | `one-way-route-filter` | hard | router1 import policy drops 10.10.10.0/24 (route-table asymmetry) | ❌ |
 | `mtu-blackhole` | hard | router1↔router2 IP MTU lowered to 1280 → PMTU blackhole | ❌ |
