@@ -7,7 +7,7 @@ with a curated, READ-ONLY roster of sub-agents:
     - call_network_agent   -> network_agent (live show commands / device state)
     - call_snapshot_agent  -> snapshot_agent (historical state, what changed)
     - call_topology_agent  -> cached LLDP topology
-    - query_loki           -> direct syslog MCP tool (no agent wrapper exists)
+    - call_syslog_agent    -> syslog_agent (Loki syslog query + analysis)
 
 It deliberately EXCLUDES config_agent (write access) and the open/continue
 investigation tools (recursion risk) — those stay on the user orchestrator.
@@ -24,7 +24,6 @@ from dotenv import load_dotenv
 from openai import APITimeoutError
 from pydantic_ai import Agent
 from pydantic_ai.capabilities import ProcessHistory
-from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
@@ -32,6 +31,7 @@ from agent_history import compact_tool_history
 from model_config import agent_model_settings
 from network_agent import network_agent
 from state_snapshot_agent import snapshot_agent
+from syslog_agent import syslog_agent
 from topology_agent import get_topology_response
 
 
@@ -46,20 +46,10 @@ llm = OpenRouterModel(
     settings=agent_model_settings(parallel_tool_calls=True),
 )
 
-# This orchestrator owns direct Loki access (query_loki is a single MCP tool — no
-# agent wrapper exists for it). Network/snapshot/topology go through delegation tools.
-syslog_mcp_server = MCPServerStdio(
-    command='uv',
-    args=['run', 'syslog_mcp_server.py'],
-    timeout=30,
-)
-
-
 INSTRUCTIONS = (
     'You are an investigation orchestrator for Nokia SR Linux devices. You coordinate '
-    'a set of read-only sub-agents and a direct log-query tool (query_loki) to troubleshoot '
-    'network problems. The specific investigation task (triage / user-reported / continuation) '
-    'is provided in the run-specific instructions that follow.\n\n'
+    'a set of read-only sub-agents to troubleshoot network problems. The specific investigation task (triage / user-reported '
+    '/ continuation) is provided in the run-specific instructions that follow.\n\n'
     'Each tool\'s description explains when and how to use it. The read-only capabilities are '
     'safe to call in parallel when the lookups are independent.\n'
 )
@@ -67,7 +57,6 @@ INSTRUCTIONS = (
 investigation_orchestrator = Agent(
     model=llm,
     name='investigation_orchestrator',
-    toolsets=[syslog_mcp_server],
     # Stub older oversized tool returns once the run nears the model's context
     # window so they aren't re-sent verbatim each loop (see agent_history.py).
     capabilities=[ProcessHistory(processor=compact_tool_history)],
@@ -92,19 +81,30 @@ async def call_network_agent(request: str) -> str:
 
 @investigation_orchestrator.tool_plain
 async def call_snapshot_agent(request: str) -> str:
-    """Delegate a HISTORICAL state query to the Snapshot Agent.
-
-    Use for how device state evolved over time, e.g. 'how did router1's routing
-    table change before the incident?' or 'what ARP entries existed at 14:00?'.
-    State (routing table, ARP, interface status) is snapshotted every 2 minutes.
-    The sub-agent has no access to this conversation, so write a self-contained
-    request: include the device, the timeframe, and the symptom.
+    """This agent provides historical "runtime" information which are not present in the syslog or currently visible on the device. The agent does snapshots of device state captured every 2 minutes, covering
+    ARP entries, interface status, and per-network-instance routing tables.
     """
     try:
         result = await snapshot_agent.run(request)
         return result.output
     except APITimeoutError:
         return 'The snapshot agent timed out after 3 minutes.'
+
+
+@investigation_orchestrator.tool_plain
+async def call_syslog_agent(request: str) -> str:
+    """Delegate to the syslog agent for information from the syslog. This agent has access to the central syslog collection for the whole network.
+
+    Use to inspect Nokia SR Linux syslog from Loki around the incident, e.g. what
+    events fired on a device in a time window. Include the
+    device, the triggering-event timestamp (from the investigation prompt), and the
+    symptom so it can anchor the log window correctly.
+    """
+    try:
+        result = await syslog_agent.run(request)
+        return result.output
+    except APITimeoutError:
+        return 'The syslog agent timed out after 3 minutes.'
 
 
 @investigation_orchestrator.tool_plain

@@ -1,1 +1,1 @@
-Can client1, client2 and client3 communicate with each other ? (use multiple sug agents concurrently to split up the investigation)
+Can client1, client2 and client3 communicate with each other ?

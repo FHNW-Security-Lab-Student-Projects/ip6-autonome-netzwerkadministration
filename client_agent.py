@@ -25,6 +25,7 @@ from experiment_tracker import (
 from network_agent import network_agent, network_lifespan
 from topology_agent import get_topology_response, topology_lifespan
 from state_snapshot_agent import snapshot_agent, snapshot_lifespan
+from syslog_agent import syslog_agent
 from syslog_investigations import (
     syslog_lifespan,
     list_investigations,
@@ -115,22 +116,17 @@ INSTRUCTIONS = (
     'You are an orchestrator agent that coordinates a set of specialised sub-agents to '
     'fulfil user requests. Each tool\'s description explains what its sub-agent does and '
     'when to use it; delegate each request to the appropriate one.\n\n'
-    'STATEFUL / WRITE OPERATIONS — these require explicit user intent, never inferred:\n'
-    '- open_syslog_investigation persists a new investigation to disk. ONLY call it when '
-    'the user\'s message starts with the exact prefix "/investigate" — strip the prefix '
-    'and pass the remainder as the description. For every other syslog request (questions, '
-    'listing, status, continuations) use the read-only tools or answer conversationally.\n'
-    '- call_config_agent changes device configuration. ALWAYS run the two-step workflow: '
+    'Special notes for: "call_config_agent": changes device configuration. ALWAYS run the two-step workflow: '
     'first delegate "VALIDATE ONLY: <full request>" to get a diff preview, show it to the '
     'user, and only after explicit approval delegate "APPLY (user approved): '
     'device=<name> commands=<exact commands from the validation>". Never apply on '
     'inferred intent.\n\n'
-    'PARALLELISM: the read-only tools (call_network_agent, call_snapshot_agent, '
-    'call_topology_agent, list_syslog_investigations, get_syslog_investigation) may be '
-    'called in parallel when a request involves several independent lookups — optional, '
-    'use your judgment. The stateful tools (call_config_agent, open_syslog_investigation, '
-    'continue_syslog_investigation) must always be called sequentially.\n\n'
-    'SELF-CONTAINED REQUESTS: a sub-agent has no access to the conversation history, so '
+    'CONCURRENCY: the read-only tools (call_network_agent, call_snapshot_agent, '
+    'call_topology_agent, call_syslog_agent) may be called in parallel when a request involves several '
+    'independent lookups — optional, use your judgment. The stateful tools '
+    '(call_config_agent, open_syslog_investigation, continue_syslog_investigation) must '
+    'always be called sequentially.\n\n'
+    'IMPORTANT: SELF-CONTAINED REQUESTS: a sub-agent has no access to the conversation history, so '
     'the `request` argument must carry everything it needs — relevant context from the '
     'user\'s messages (their goal, constraints, any details they mentioned) and any '
     'relevant findings from sub-agents called earlier in this conversation.'
@@ -144,8 +140,7 @@ async def call_network_agent(request: str) -> str:
     """Delegate a read-only network query to the Network Agent.
 
     Use for live device state on Nokia SR Linux: show commands, interface/routing/BGP
-    state, and device inventory. If the agent reports it needs more information, ask the
-    user those clarifying questions before calling again.
+    state, and device inventory.
     """
     try:
         with capture_generation_ids() as gen_ids:
@@ -163,7 +158,7 @@ async def call_topology_agent() -> str:
     """Retrieve the cached network topology from the Topology Agent.
 
     Returns nodes, links, LLDP neighbors, and drift vs. the desired ContainerLab
-    definition. The cache is refreshed every 60 seconds. Takes no arguments.
+    definition. The cache is refreshed every 60 seconds.
     """
     response = get_topology_response()
     if response is None:
@@ -174,8 +169,7 @@ async def call_topology_agent() -> str:
 @orchestrator.tool_plain
 def list_syslog_investigations() -> str:
     """List all syslog investigations (ID, device, status, created, summary).
-    ONLY call this when the user's message starts
-    with the exact prefix "/investigate" — never based on inferred intent."""
+    ONLY call this when the user's message clearly indicates that he wants to show the investigations"""
     return list_investigations()
 
 
@@ -208,8 +202,7 @@ async def continue_syslog_investigation(
     background: bool = False,
 ) -> str:
     """Resume LLM-driven troubleshooting for an existing investigation.
-    ONLY call this when the user's message starts
-    with the exact prefix "/investigate" — never based on inferred intent.
+    ONLY call this when user wants to continue a persisted investigation.
 
     Args:
         investigation_id: Full ID or unique prefix of the investigation.
@@ -240,12 +233,8 @@ async def call_config_agent(request: str) -> str:
 
 @orchestrator.tool_plain
 async def call_snapshot_agent(request: str) -> str:
-    """This agent provides historical "runtime" information which are not present in the syslog or currently visible on the device. The agent does snapshots of device state captured every 2 minutes, covering
-    ARP entries, interface status, and per-network-instance routing tables.
-
-    Use for questions about how device state evolved over time, e.g.:
-    'how did the routing table on router1 change before the incident?'
-    'what ARP entries were present on switch1 at 14:00?'
+    """This agent provides historical "runtime" information which are not present in the syslog or currently visible on the device (config or state). The agent does snapshots of device state captured every 2 minutes, covering
+    ARP entries, interface status, and per-network-instance routing tables. This agent gives you insights which can't be provided by device config reads or syslog events.
     """
     try:
         with capture_generation_ids() as gen_ids:
@@ -256,6 +245,26 @@ async def call_snapshot_agent(request: str) -> str:
         return result.output
     except APITimeoutError:
         return 'The snapshot agent timed out after 3 minutes.'
+
+
+@orchestrator.tool_plain
+async def call_syslog_agent(request: str) -> str:
+    """Delegate to the syslog agent for information from the syslog. This agent has access to the central syslog collection for the whole network.
+
+    Use for questions about Nokia SR Linux device syslog: whether certain events
+    occurred, what a device logged around a given time, etc. The agent queries Loki and
+    returns a concise analysis. The sub-agent has no access to the
+    conversation, so include the device and information you want to retrieve / symptom you want to analyse + the relevant time window in the request.
+    """
+    try:
+        with capture_generation_ids() as gen_ids:
+            result = await syslog_agent.run(request, model=_get_agent_model())
+        session = _active_session.get()
+        if session is not None:
+            await record_agent_run(session, 'syslog_agent', _effective_model(), result, gen_ids)
+        return result.output
+    except APITimeoutError:
+        return 'The syslog agent timed out after 3 minutes.'
 
 
 @asynccontextmanager

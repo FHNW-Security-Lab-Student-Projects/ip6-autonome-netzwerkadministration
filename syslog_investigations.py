@@ -28,6 +28,7 @@ from dotenv import dotenv_values, load_dotenv
 from pydantic import BaseModel
 from pydantic_ai import ModelMessagesTypeAdapter
 from investigation_orchestrator import investigation_orchestrator
+from syslog_agent import syslog_agent
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -580,7 +581,11 @@ async def syslog_lifespan():
     api_config = uvicorn.Config(_agent_api, host='127.0.0.1', port=AGENT_API_PORT, log_level='warning')
     api_server = uvicorn.Server(api_config)
     api_server.install_signal_handlers = lambda: None  # signal handling owned by the main process
-    async with investigation_orchestrator:
+    # The investigation_orchestrator no longer owns an MCP toolset — it delegates
+    # syslog queries to syslog_agent, which owns the Loki MCP subprocess. Entering
+    # the syslog_agent context here starts that single subprocess for both the
+    # investigation_orchestrator and the user-facing orchestrator.
+    async with syslog_agent:
         async with httpx.AsyncClient(timeout=30) as http_client:
             poll_task = asyncio.create_task(_loki_poll_loop(http_client))
             api_task = asyncio.create_task(api_server.serve())

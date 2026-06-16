@@ -19,7 +19,7 @@
         <mxCell id="orch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#10243e;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;orchestrator&lt;/b&gt;&lt;br&gt;&lt;font&gt;client_agent.py · user-facing&lt;br&gt;delegates to sub-agents&lt;br&gt;&lt;/font&gt;" vertex="1">
           <mxGeometry height="84" width="280" x="120" y="250" as="geometry" />
         </mxCell>
-        <mxCell id="inv_orch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#cdb4f0;strokeColor=#7d5fb2;fontColor=#2e1a4d;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;investigation_orchestrator&lt;/b&gt;&lt;br&gt;&lt;font&gt;autonomous · READ-ONLY roster&lt;br&gt;excludes config_agent (no writes)&lt;br&gt;owns direct query_loki access&lt;/font&gt;" vertex="1">
+        <mxCell id="inv_orch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#cdb4f0;strokeColor=#7d5fb2;fontColor=#2e1a4d;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;investigation_orchestrator&lt;/b&gt;&lt;br&gt;&lt;font&gt;autonomous · READ-ONLY roster&lt;br&gt;excludes config_agent (no writes)&lt;br&gt;delegates syslog to syslog_agent&lt;/font&gt;" vertex="1">
           <mxGeometry height="84" width="340" x="1120" y="250" as="geometry" />
         </mxCell>
         <mxCell id="e_user_orch" edge="1" parent="1" source="user_entry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;strokeWidth=1.5;fontSize=13;" target="orch">
@@ -40,7 +40,7 @@
         <mxCell id="topology_cache" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#b0e3e6;strokeColor=#20a0a0;fontColor=#0b3d3d;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;topology agent&lt;/b&gt;&lt;br&gt;&lt;font&gt;not an LLM agent&lt;br&gt;nodes · links · LLDP · clab drift&lt;br&gt;&lt;/font&gt;" vertex="1">
           <mxGeometry height="74" width="220" x="940" y="430" as="geometry" />
         </mxCell>
-        <mxCell id="query_loki" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#3b1f52;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;query_loki&lt;/b&gt;&lt;br&gt;&lt;font&gt;direct MCP tool&lt;br&gt;(no agent wrapper)&lt;/font&gt;" vertex="1">
+        <mxCell id="syslog_agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1b3a1b;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;syslog_agent&lt;/b&gt;&lt;br&gt;&lt;font&gt;READ-ONLY · syslog analysis&lt;br&gt;query + interpret Loki logs&lt;/font&gt;" vertex="1">
           <mxGeometry height="74" width="200" x="1280" y="430" as="geometry" />
         </mxCell>
         <mxCell id="d_o_cfg" edge="1" parent="1" source="orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;labelBackgroundColor=#ffffff;" target="config_agent" value="">
@@ -66,6 +66,14 @@
         <mxCell id="d_o_topo" edge="1" parent="1" source="orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;labelBackgroundColor=#ffffff;" target="topology_cache" value="">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
+        <mxCell id="d_o_syslog" edge="1" parent="1" source="orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;labelBackgroundColor=#ffffff;" target="syslog_agent" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="360" />
+              <mxPoint x="1380" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
         <mxCell id="d_i_net" edge="1" parent="1" source="inv_orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" target="network_agent">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
@@ -88,7 +96,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="d_i_loki" edge="1" parent="1" source="inv_orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" target="query_loki">
+        <mxCell id="d_i_syslog" edge="1" parent="1" source="inv_orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" target="syslog_agent">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="config_mcp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;" value="&lt;b&gt;config_mcp_server.py&lt;/b&gt;&lt;br&gt;&lt;font&gt;validate and apply config&lt;/font&gt;" vertex="1">
@@ -120,7 +128,7 @@
         <mxCell id="t_topo" edge="1" parent="1" source="topology_cache" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;labelBackgroundColor=#ffffff;" target="topology_mcp" value="">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="t_loki" edge="1" parent="1" source="query_loki" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;labelBackgroundColor=#ffffff;" target="syslog_mcp" value="">
+        <mxCell id="t_loki" edge="1" parent="1" source="syslog_agent" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;labelBackgroundColor=#ffffff;" target="syslog_mcp" value="">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="devices" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#5a1410;shadow=1;verticalAlign=middle;fontSize=12;" value="&lt;b&gt;Nokia SR Linux testlab&lt;/b&gt;&lt;br&gt;router1 · router2 · switch1 · switch2  (+ clients)&lt;br&gt;reached over JSON-RPC (only network devices not clients) (:80 / :443)" vertex="1">
