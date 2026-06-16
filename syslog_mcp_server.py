@@ -17,6 +17,8 @@ import logfire
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 
+from model_config import resolve_time
+
 env_file = Path(__file__).parent / '.env'
 if env_file.exists():
     load_dotenv(env_file)
@@ -50,9 +52,16 @@ async def query_loki(
                 devices. Syslog lines and triggering events show the host as the full
                 container name (e.g. "clab-testlab-router1") — strip the
                 "clab-testlab-" prefix and pass only the short name here.
-        time_anchor: ISO 8601 datetime string marking the center of the time window.
-                     Use the triggering event timestamp from the investigation prompt.
-                     Example: "2026-04-14T14:30:00Z"
+        time_anchor: The center of the time window, resolved at query time. Accepts:
+                     - "now" for current/recent questions (e.g. "last 15 minutes" ->
+                       time_anchor="now", minutes_before=15, minutes_after=0);
+                     - a relative past offset like "15m", "2h", "1d" ("20 minutes ago"
+                       -> time_anchor="20m");
+                     - an absolute ISO 8601 timestamp (e.g. "2026-04-14T14:30:00Z") —
+                       use this for the triggering event timestamp from an
+                       investigation prompt.
+                     Do NOT compute timestamps yourself; pass the intent and the tool
+                     resolves "now" against the real clock.
         minutes_before: Minutes before time_anchor to include (default 5).
         minutes_after: Minutes after time_anchor to include (default 2).
         severities: Comma-separated severity levels to include.
@@ -70,7 +79,10 @@ async def query_loki(
     if text_filter:
         stream += f' |= "{text_filter}"'
 
-    anchor_dt = datetime.fromisoformat(time_anchor.replace('Z', '+00:00'))
+    try:
+        anchor_dt = resolve_time(time_anchor)
+    except ValueError as exc:
+        return f'Invalid time_anchor: {exc}'
     start_ns = int((anchor_dt.timestamp() - minutes_before * 60) * 1e9)
     end_ns = int((anchor_dt.timestamp() + minutes_after * 60) * 1e9)
     limit = min(limit, 500)

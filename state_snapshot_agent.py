@@ -32,7 +32,7 @@ from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from agent_history import compact_tool_history
-from model_config import agent_model_settings
+from model_config import agent_model_settings, resolve_time
 from response_limits import MAX_RESPONSE_CHARS, truncate
 
 from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli, list_devices
@@ -250,7 +250,7 @@ WORKFLOW:
 - When the request covers multiple devices or tables, call the tools in parallel.
 - Summarise findings clearly: highlight added/removed routes, ARP changes,
   or interface state transitions. Do not dump raw output unless asked.
-- If the request is ambiguous (e.g. no timestamp given), ask for clarification.
+- If the request is ambiguous (e.g. no timeframe given), ask for clarification.
 """,
 )
 
@@ -281,12 +281,15 @@ def state_before(device: str, table: str, timestamp_iso: str) -> str:
         table: 'arp', 'interfaces', or a per-network-instance routing table named
                'route_table_<ni>' (e.g. 'route_table_default'). Call snapshot_status
                to see which keys exist for a device.
-        timestamp_iso: ISO 8601 timestamp (e.g. '2026-05-11T14:00:00+00:00').
+        timestamp_iso: When to look. Accepts "now", a relative past offset like "15m"/
+                       "2h"/"1d", or an absolute ISO 8601 timestamp
+                       (e.g. '2026-05-11T14:00:00+00:00'). Resolved at query time —
+                       do not compute timestamps yourself.
     """
     try:
-        before = datetime.fromisoformat(timestamp_iso)
-    except ValueError:
-        return f"Invalid timestamp '{timestamp_iso}'. Use ISO 8601 format."
+        before = resolve_time(timestamp_iso)
+    except ValueError as exc:
+        return f'Invalid timestamp: {exc}'
     entries = _snapshots.get(device, {}).get(table, [])
     if not entries:
         return f'No snapshots found for {device}/{table}.'
@@ -312,14 +315,17 @@ def state_diff(device: str, table: str, t1_iso: str, t2_iso: str) -> str:
         table: 'arp', 'interfaces', or a per-network-instance routing table named
                'route_table_<ni>' (e.g. 'route_table_default'). Call snapshot_status
                to see which keys exist for a device.
-        t1_iso: Earlier timestamp in ISO 8601.
-        t2_iso: Later timestamp in ISO 8601.
+        t1_iso: Earlier point in time. Accepts "now", a relative past offset like
+                "15m"/"2h"/"1d", or an absolute ISO 8601 timestamp.
+        t2_iso: Later point in time, same accepted forms. E.g. "what changed in the
+                last 10 minutes" -> t1_iso="10m", t2_iso="now". Resolved at query
+                time — do not compute timestamps yourself.
     """
     try:
-        t1 = datetime.fromisoformat(t1_iso)
-        t2 = datetime.fromisoformat(t2_iso)
+        t1 = resolve_time(t1_iso)
+        t2 = resolve_time(t2_iso)
     except ValueError as exc:
-        return f'Invalid timestamp: {exc}. Use ISO 8601 format.'
+        return f'Invalid timestamp: {exc}'
 
     def _nearest(ts: datetime) -> dict | None:
         entries = _snapshots.get(device, {}).get(table, [])

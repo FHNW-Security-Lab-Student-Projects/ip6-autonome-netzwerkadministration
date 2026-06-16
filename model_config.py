@@ -19,11 +19,58 @@ agent and experiment run:
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import logfire
 from pydantic_ai.models.openrouter import OpenRouterModelSettings, OpenRouterReasoning
+
+
+# --- Time expression resolution --------------------------------------------
+
+# Relative past offset like "15m", "90s", "2h", "1d". Resolved against the real
+# clock at the moment the tool runs (see resolve_time).
+_RELATIVE_RE = re.compile(r'^\s*(\d+)\s*(s|m|h|d)\s*$', re.IGNORECASE)
+_UNIT_SECONDS = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}
+
+
+def resolve_time(value: str) -> datetime:
+    """Resolve a time expression to a timezone-aware UTC datetime.
+
+    Evaluated against the real clock on every call, so callers (Loki/snapshot
+    tools) get an accurate "now" no matter how stale the surrounding prompt is.
+    The model only ever supplies *intent* — it never computes timestamps itself.
+
+    Accepted forms:
+      - "now" or "" -> current UTC time
+      - a relative past offset "<n><unit>" (unit s|m|h|d), e.g. "90s", "15m",
+        "2h", "1d" -> now minus that duration
+      - an ISO 8601 string, with or without a trailing "Z" -> that absolute
+        instant (naive values are assumed UTC)
+
+    Raises:
+        ValueError: if the value matches none of the accepted forms.
+    """
+    text = value.strip()
+    if not text or text.lower() == 'now':
+        return datetime.now(timezone.utc)
+
+    match = _RELATIVE_RE.match(text)
+    if match:
+        amount = int(match.group(1))
+        seconds = amount * _UNIT_SECONDS[match.group(2).lower()]
+        return datetime.now(timezone.utc) - timedelta(seconds=seconds)
+
+    try:
+        dt = datetime.fromisoformat(text.replace('Z', '+00:00'))
+    except ValueError as exc:
+        raise ValueError(
+            f'Unrecognised time "{value}". Use "now", a relative offset like '
+            '"15m"/"2h"/"1d", or an ISO 8601 timestamp.'
+        ) from exc
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 # Fixed reasoning effort applied to every agent. One of:
 # 'xhigh' | 'high' | 'medium' | 'low' | 'minimal' | 'none'.

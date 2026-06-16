@@ -83,6 +83,9 @@ async def call_network_agent(request: str) -> str:
 async def call_snapshot_agent(request: str) -> str:
     """This agent provides historical "runtime" information which are not present in the syslog or currently visible on the device. The agent does snapshots of device state captured every 2 minutes, covering
     ARP entries, interface status, and per-network-instance routing tables.
+    Describe any time window in RELATIVE terms ("last 10 minutes", "around now"), or
+    pass through a specific incident timestamp if known — the sub-agent resolves the
+    actual time. Do not compute absolute timestamps yourself.
     """
     try:
         result = await snapshot_agent.run(request)
@@ -96,9 +99,11 @@ async def call_syslog_agent(request: str) -> str:
     """Delegate to the syslog agent for information from the syslog. This agent has access to the central syslog collection for the whole network.
 
     Use to inspect Nokia SR Linux syslog from Loki around the incident, e.g. what
-    events fired on a device in a time window. Include the
-    device, the triggering-event timestamp (from the investigation prompt), and the
-    symptom so it can anchor the log window correctly.
+    events fired on a device in a time window. Include the device and the symptom. For
+    the time window, pass through the triggering-event timestamp (from the
+    investigation prompt) when one is given, otherwise describe it relatively ("last 30
+    minutes", "around now") — the sub-agent resolves the actual time. Do not compute
+    absolute timestamps yourself.
     """
     try:
         result = await syslog_agent.run(request)

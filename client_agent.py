@@ -235,6 +235,9 @@ async def call_config_agent(request: str) -> str:
 async def call_snapshot_agent(request: str) -> str:
     """This agent provides historical "runtime" information which are not present in the syslog or currently visible on the device (config or state). The agent does snapshots of device state captured every 2 minutes, covering
     ARP entries, interface status, and per-network-instance routing tables. This agent gives you insights which can't be provided by device config reads or syslog events.
+    Describe any time window in RELATIVE terms ("last 10 minutes", "around now"), or
+    pass through a specific incident timestamp if known — the sub-agent resolves the
+    actual time. Do not compute absolute timestamps yourself.
     """
     try:
         with capture_generation_ids() as gen_ids:
@@ -255,6 +258,9 @@ async def call_syslog_agent(request: str) -> str:
     occurred, what a device logged around a given time, etc. The agent queries Loki and
     returns a concise analysis. The sub-agent has no access to the
     conversation, so include the device and information you want to retrieve / symptom you want to analyse + the relevant time window in the request.
+    Describe the time window in RELATIVE terms ("last 15 minutes", "around now",
+    "20 minutes ago"), or pass through a specific incident timestamp if one is known —
+    the sub-agent resolves the actual time. Do not compute absolute timestamps yourself.
     """
     try:
         with capture_generation_ids() as gen_ids:
