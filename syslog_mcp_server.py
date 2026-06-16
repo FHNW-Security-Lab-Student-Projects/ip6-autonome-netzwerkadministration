@@ -49,9 +49,10 @@ async def query_loki(
 
     Args:
         device: Short inventory device name ("router1", "switch1") or "all" for all
-                devices. Syslog lines and triggering events show the host as the full
-                container name (e.g. "clab-testlab-router1") — strip the
-                "clab-testlab-" prefix and pass only the short name here.
+                devices. This must match the syslog hostname stored in Loki, which is
+                the bare short name (e.g. "switch1"). If a triggering event or syslog
+                line shows a fuller container name like "clab-testlab-router1", strip
+                the "clab-testlab-" prefix and pass only the short name here.
         time_anchor: The center of the time window, resolved at query time. Accepts:
                      - "now" for current/recent questions (e.g. "last 15 minutes" ->
                        time_anchor="now", minutes_before=15, minutes_after=0);
@@ -72,10 +73,9 @@ async def query_loki(
     """
     severity_regex = '|'.join(s.strip() for s in severities.split(',') if s.strip())
     if device == 'all':
-        stream = f'{{vendor="nokia_srlinux", severity=~"{severity_regex}"}}'
+        stream = f'{{job="network-syslog", severity=~"{severity_regex}"}}'
     else:
-        host = f'clab-testlab-{device}'
-        stream = f'{{vendor="nokia_srlinux", host="{host}", severity=~"{severity_regex}"}}'
+        stream = f'{{host="{device}", severity=~"{severity_regex}"}}'
     if text_filter:
         stream += f' |= "{text_filter}"'
 
