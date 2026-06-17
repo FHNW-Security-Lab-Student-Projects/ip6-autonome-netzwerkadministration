@@ -82,37 +82,20 @@ async def _run_candidate_sequence(
     conn: SrlConnection,
     config_commands: list[str],
     finalize: str,
-) -> tuple[str, list[str], str]:
+) -> str:
     """Execute enter candidate → set ... → diff → <finalize> as one CLI batch.
 
     finalize is either 'discard now' (validation) or 'commit now' (apply).
 
-    Returns (diff_text, formatted_cmd_outputs, finalize_output).
+    The JSON-RPC `cli` method with output-format=text returns the WHOLE batch as a
+    single concatenated text blob (one result element, not one per command). The
+    diff lines and the finalize banner (e.g. 'All changes have been committed.')
+    all land in that blob, so we join everything and return it as one string rather
+    than trying to index per command.
     """
     commands = ['enter candidate', *config_commands, 'diff', finalize]
     results = await jrpc_cli(conn, commands, output_format='text')
-
-    n = len(config_commands)
-    cmd_results = results[1:1 + n]
-    diff_raw = results[1 + n] if len(results) > 1 + n else ''
-    finalize_raw = results[2 + n] if len(results) > 2 + n else ''
-
-    cmd_outputs: list[str] = []
-    for cmd, raw in zip(config_commands, cmd_results):
-        out_str = _cli_result_to_text(raw).strip() or '(ok)'
-        cmd_outputs.append(f'  {cmd}\n  → {out_str}')
-
-    return _cli_result_to_text(diff_raw), cmd_outputs, _cli_result_to_text(finalize_raw)
-
-
-async def _validate_internal(
-    conn: SrlConnection, config_commands: list[str]
-) -> tuple[str, list[str]]:
-    """Run commands in candidate, capture diff, discard. Returns (diff, cmd_outputs)."""
-    diff, cmd_outputs, _ = await _run_candidate_sequence(
-        conn, config_commands, finalize='discard now'
-    )
-    return diff, cmd_outputs
+    return '\n'.join(_cli_result_to_text(r) for r in results if _cli_result_to_text(r)).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -195,10 +178,12 @@ async def validate_config(device_name: str, config_commands: list[str]) -> str:
     """
     try:
         conn = get_connection(device_name)
-        diff, cmd_outputs = await _validate_internal(conn, config_commands)
+        output = await _run_candidate_sequence(
+            conn, config_commands, finalize='discard now'
+        )
         result = f'Validation preview for {device_name}\n'
-        result += 'Commands:\n' + '\n'.join(cmd_outputs) + '\n\n'
-        result += f'Diff (what would change):\n{diff or "(no changes detected)"}\n'
+        result += 'Commands:\n  ' + '\n  '.join(config_commands) + '\n\n'
+        result += f'Diff (what would change):\n{output or "(no changes detected)"}\n'
         result += 'Status: NOT applied — changes discarded safely.\n'
         logfire.info('Config validated', device=device_name, commands=config_commands)
         return result
@@ -225,12 +210,16 @@ async def apply_config(device_name: str, config_commands: list[str]) -> str:
     try:
         conn = get_connection(device_name)
 
-        diff, cmd_outputs, commit_str = await _run_candidate_sequence(
+        output = await _run_candidate_sequence(
             conn, config_commands, finalize='commit now'
         )
 
+        # On success the device emits 'All changes have been committed.' in the batch
+        # output blob. A real commit rejection is raised as SrlJsonRpcError by _call
+        # (caught below). If neither the success banner nor an exception appears, treat
+        # it as a failure rather than silently claiming success.
         success_marker = 'All changes have been committed.'
-        if success_marker not in commit_str:
+        if success_marker not in output:
             try:
                 await jrpc_cli(conn, ['discard now'], output_format='text')
             except SrlJsonRpcError:
@@ -240,14 +229,13 @@ async def apply_config(device_name: str, config_commands: list[str]) -> str:
                 device=device_name,
                 command='; '.join(config_commands),
                 error_type='commit_failed',
-                error_text=commit_str.strip(),
+                error_text=output.strip(),
             )
             logfire.error('Config commit failed', device=device_name)
             return (
                 f'COMMIT FAILED on {device_name}\n\n'
-                f'Commands:\n' + '\n'.join(cmd_outputs) + '\n\n'
-                f'Diff:\n{diff}\n\n'
-                f'Commit output:\n{commit_str}\n\n'
+                f'Commands:\n  ' + '\n  '.join(config_commands) + '\n\n'
+                f'Device output:\n{output}\n\n'
                 f'Changes discarded. Device is in a clean state.\n'
                 f'Review the error and correct the commands before retrying.'
             )
@@ -255,9 +243,8 @@ async def apply_config(device_name: str, config_commands: list[str]) -> str:
         logfire.info('Config applied', device=device_name, commands=config_commands)
         return (
             f'Configuration applied successfully to {device_name}\n\n'
-            f'Commands:\n' + '\n'.join(cmd_outputs) + '\n\n'
-            f'Changes applied (diff):\n{diff}\n\n'
-            f'Commit result:\n{commit_str}'
+            f'Commands:\n  ' + '\n  '.join(config_commands) + '\n\n'
+            f'Device output (diff + commit):\n{output}'
         )
     except Exception as exc:
         return f'Error configuring {device_name}: {exc}'
