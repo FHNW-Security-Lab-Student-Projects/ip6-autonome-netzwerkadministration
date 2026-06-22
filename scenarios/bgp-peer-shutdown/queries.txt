@@ -1,1 +1,0 @@
-Client1 cannot reach client3, but all interfaces appear to be up. Investigate the root cause.

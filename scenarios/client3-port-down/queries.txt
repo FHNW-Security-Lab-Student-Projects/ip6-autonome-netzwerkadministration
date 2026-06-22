@@ -1,3 +1,1 @@
-Client3 appears to be offline and unreachable from the rest of the network. Investigate.
-Check interface oper-state and the LLDP/topology view to locate the break.
-Summarise the single root cause: name the device, the interface, and what is wrong.
+Client3 appears to be offline and unreachable from the rest of the network. Investigate the root cause.

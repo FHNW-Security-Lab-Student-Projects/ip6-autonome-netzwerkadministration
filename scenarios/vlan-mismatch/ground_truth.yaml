@@ -1,6 +1,0 @@
-root_cause: >
-  On switch1, client1's access port (ethernet-1/1) was moved into the wrong broadcast
-  domain — VLAN20/mac-vrf vlan20 instead of VLAN10 — so client1 is now in client2's L2
-  segment and cannot reach its default gateway 192.168.1.1 (which lives on VLAN10).
-  client1's ARP for the gateway fails. A correct answer names switch1 e1-1 being in the
-  wrong VLAN/mac-vrf.

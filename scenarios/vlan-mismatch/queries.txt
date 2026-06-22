@@ -1,1 +1,0 @@
-client1 cannot reach anything beyond its own segment, but client2 (same switch) is fine. Investigate.

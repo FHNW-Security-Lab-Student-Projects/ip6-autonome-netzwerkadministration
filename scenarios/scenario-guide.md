@@ -2,7 +2,7 @@
 
 This explains every scenario in [scenarios/](.), the fault it injects, and **why it
 sits in its difficulty tier**. For the runner format and reset procedure see
-[README.md](README.md); for the lab itself see [../docs/target-topology.md](../docs/target-topology.md).
+[HOW-TO-RUN.md](HOW-TO-RUN.md); for the lab itself see [../docs/target-topology.md](../docs/target-topology.md).
 
 ## The baseline topology
 
@@ -24,14 +24,16 @@ the right device, layer, and config line.
 
 ## What makes a scenario easy vs. hard
 
-Three properties drive the difficulty rating, in order of impact:
+Difficulty is driven by **how far the agent has to travel from the obvious first check to
+reach the truth** — not by whether the fault happens to be logged. Three properties, in
+order of impact:
 
 | Property | Easy direction | Hard direction |
 |---|---|---|
-| **Syslog visibility** | Fault raises an error event the agent can find in Loki without probing | Silent — nothing logged; the agent must actively probe to see it |
-| **Honesty of the obvious signal** | The first thing you check *is* the fault | The obvious signal lies: link up but BGP down; BGP up but no routes; port up but wrong VLAN |
-| **Number of signals to correlate** | One device, one `show` command | Must compare two outputs (route tables, ACL counters) or vary an input (packet size) |
-| **Where the "correct" value lives** | In the config the agent reads, or obvious from current state | Only in the recorded **snapshot history** — the faulty runtime value looks valid in isolation (the *history-required* tier) |
+| **Honesty of the obvious signal** | The first thing you check *is* the fault | The obvious signal lies: link up but BGP down; BGP up but no routes; ping succeeds but the service is dead |
+| **How far the fault hides from the symptom** | On the exact device and layer the symptom points at | Displaced — a shared uplink, a lower layer, or another host — somewhere the agent has no reason to look until it rules everything else out |
+| **Number of signals to correlate** | One device, one `show` command | Must compare two outputs (two RIBs, ACL counter vs. traffic) or vary an input (packet size) |
+
 
 A secondary factor is **how many plausible wrong answers exist**. Easy faults have one
 obvious culprit. Hard faults look healthy at every layer the agent normally checks, so
@@ -44,9 +46,14 @@ giving-up answer counts as a MISS when scored against that root cause.
 
 ## Baseline scenario (no fault — sanity check)
 
-This verifies the agent doesn't *invent* problems in a healthy network. It has **no
-`setup.sh` / `teardown.sh`** — only `queries.txt` + `ground_truth.yaml` — so the runner
-just sends the queries against the unbroken topology.
+This verifies the agent doesn't *invent* problems in a healthy network. It has a `setup.sh`
+that **injects no fault and has no teardown** — it only clears `state_snapshots.json` so the
+run starts from a fresh snapshot history, exactly like the fault scenarios do (there is
+deliberately no before/after `--capture-once`: with no fault there is no good→bad diff to
+record). The runner otherwise just sends `queries.txt` against the unbroken topology.
+
+> Run it **without** `--no-fault` so the `setup.sh` actually executes — `--no-fault` skips
+> `setup.sh`/`teardown.sh`, which would leave a stale `state_snapshots.json` in place.
 
 ### `basic-client-communication`
 - **Fault:** none. The network is healthy; client1, client2 and client3 can all
@@ -58,7 +65,7 @@ just sends the queries against the unbroken topology.
 
 ## Easy tier
 
-> One device, one show command, **and it shows up in syslog.** The obvious signal is the truth.
+> One device, one show command, and the fault sits **right where the symptom points.** The obvious signal is the truth.
 
 ### `intf-down`
 - **Fault:** router1 `ethernet-1/2` (the link to router2) is admin-disabled.
@@ -73,18 +80,22 @@ just sends the queries against the unbroken topology.
   syslog, and LLDP/topology pinpoints the break.
 - **Distractors to reject:** the routers, BGP, client3's own config, router2's gateway.
 
+### `switch1-uplink-down`
+- **Fault:** switch1 `ethernet-1/3` (the trunk uplink to router1) is admin-disabled.
+- **Why easy:** oper-state down is visible in one `show` on switch1 and in syslog, and
+  LLDP/topology pinpoints the break. The distinctive tell is the symptom signature itself:
+  client1 **and** client2 both go offline while client3 stays up, so the shared uplink — the one
+  link both VLAN10 and VLAN20 traverse — is the obvious and correct suspect. The fault sits
+  exactly where the symptom points.
+- **Distractors to reject:** the routers, BGP, the individual client access ports (all up),
+  router1's gateways, and client3's side of the network (healthy).
+
 ---
 
 ## Medium tier
 
-> The obvious signal **lies** — you have to look one layer deeper. Some are in syslog, some aren't.
-
-### `bgp-peer-shutdown`
-- **Fault:** router1's eBGP neighbor `10.0.0.2` is admin-disabled. The interface and the
-  `10.0.0.0/30` link stay **up**.
-- **Why medium:** the interface check (the easy reflex) says "all up" — that's the lie. The
-  agent must check BGP *session state*, not link state. It is in syslog (session down), but
-  only if the agent looks past the healthy-looking interfaces.
+> The obvious signal **lies** — the fault is one step displaced from the obvious suspect, so
+> you have to look one layer deeper or one hop away.
 
 ### `missing-export-policy`
 - **Fault:** router1's eBGP `export-policy` is removed. Session is Established, but router1
@@ -93,20 +104,44 @@ just sends the queries against the unbroken topology.
   is an explicit MISS. The agent must inspect **RIB-in / RIB-out** (what's actually
   advertised/received), one layer below session state. Nothing is logged.
 
-### `vlan-mismatch`
-- **Fault:** on switch1, client1's access port is moved into VLAN20 (client2's segment)
-  instead of VLAN10. The port stays **up**.
-- **Why medium / silent:** the port is up and configured, so L1 checks pass — that's the lie.
-  The fault lives in L2 membership; the tell is that client1 can't ARP its gateway while
-  client2 (same switch) is fine. No syslog event.
+### `missing-vlan-on-trunk`
+- **Fault:** on switch1, the trunk uplink to router1 (`ethernet-1/3`) stops carrying VLAN10 —
+  the tagged `ethernet-1/3.10` sub-interface is removed from the trunk and from `mac-vrf vlan10`.
+  client1's access port stays correctly in VLAN10, so `mac-vrf vlan10` still exists but now has
+  **no uplink member** — an isolated L2 island. The port stays **up** (still carrying VLAN20).
+- **Why medium / silent:** the trunk port is up and client1's own access port is clean, so the
+  two obvious places to look both pass — that's the lie. The fault is on the shared uplink, one
+  hop removed from the obvious suspect. The tell is the same client1-fails / client2-works
+  asymmetry plus inspecting **which VLANs the trunk actually carries**. No syslog event. Sits at
+  the harder edge of medium: the fault is *not* on the port directly
+  associated with the failing client, so it distinguishes agents that check "is the access port
+  in the right VLAN?" from agents that check "does that VLAN's path to the router actually exist?"
+- **Distractors to reject:** client1's access port (correct), `mac-vrf vlan10` existence (present),
+  routing/BGP (healthy), client2's segment, and "the trunk port is up, looks fine".
+
+### `duplicate-ip-arp`
+- **Fault:** a real duplicate-IP event on VLAN30. client4 (normally `10.10.10.11`) also claims
+  `10.10.10.10` and announces it (gratuitous ARP) while client3's switch port is down, so router2
+  (client3's gateway, `ethernet-1/2.30` = 10.10.10.1) relearns `10.10.10.10` → **client4's real
+  MAC**. client3 is brought back but client4 **keeps** the duplicate address, so router2's neighbor
+  cache stays poisoned: frames to client3 go to client4's MAC.
+- **Why medium / the obvious signal lies:** a ping to `10.10.10.10` still **succeeds** (client4
+  answers), so the reachability reflex says "fine" — that's the lie. The tell is the mismatch:
+  pingable IP, but client3's real service (`http.server` on TCP 1111) is dead. The root cause is
+  **named in syslog** — SR Linux logs `AddNbr Duplicate add 10.10.10.10,<mac>` with both competing
+  MACs — so an agent that checks Loki is pointed straight at the duplicate. (Snapshot history still
+  corroborates it — `10.10.10.10` used to resolve to client3's MAC — but it is **not required**: the
+  syslog event reveals the fault, which is why this is medium, not history-required.)
+- **Distractors to reject:** routing/BGP (healthy), interface/port down (all up in the final state),
+  VLAN-membership or gateway-IP misconfig (clean), and "an ARP entry exists, looks fine".
 
 ---
 
 ## Hard tier
 
-> **Silent** (nothing in syslog), the config *looks* complete at every layer the agent
-> normally checks, and the symptom needs **active, multi-signal probing**. "No problem
-> found" is the trap.
+> The config *looks* complete at **every layer the agent normally checks**, and the fault hides
+> somewhere it has no reason to look — so the symptom needs **active, multi-signal probing**
+> (vary an input, or correlate two outputs). "No problem found" is the trap.
 
 ### `acl-silent-drop`
 - **Fault:** an ingress ACL on router2 (`block-icmp` on `ethernet-1/1.0`) silently drops
@@ -133,18 +168,24 @@ just sends the queries against the unbroken topology.
 
 ---
 
-## History-required tier — persistent fault, recorded baseline
+## History-required tier — *currently unfilled*
 
-> The hard tier above is solvable from current state + config + syslog (compare two RIBs,
-> read ACL counters, vary packet size). This one adds a different axis: **the fault is in
-> dynamic runtime state — an ARP binding — and the wrong value looks perfectly valid in
-> isolation.** The fault is fully PRESENT during the investigation
-> (connectivity stays broken; this is *not* a self-healed flap), but nothing in current state
-> or syslog says the value is wrong. The only record of the *correct* value is a healthy
-> baseline that `setup.sh` recorded into the snapshot history before injecting the fault.
-> This is the *only* tier that genuinely requires `state_snapshot_agent`.
+> This tier was meant for a fault in **dynamic runtime state** that is wrong *only* relative to a
+> recorded baseline — nothing in current state or syslog flags it, so it would be the one tier that
+> genuinely requires `state_snapshot_agent`.
+>
+> Its intended occupant, `duplicate-ip-arp`, turned out to be **syslog-visible on real SR Linux gear**
+> (`AddNbr Duplicate add 10.10.10.10,<mac>` names the conflicting IP and both MACs), so it was
+> reclassified to **medium** rather than filtered to fake silence — filtering a warning real gear emits
+> would measure an artificial puzzle, not real troubleshooting. The honest takeaway: duplicate-IP / ARP
+> conflicts surface in syslog and don't require history reasoning.
+>
+> An honest occupant would have to be **drift that never trips a log** — e.g. a working-but-suboptimal
+> route whose next-hop / AS-path changed from a recorded baseline — and would need validating against the
+> lab to confirm it actually stays silent (the same check that caught `duplicate-ip-arp`). **None is
+> defined yet.**
 
-### How the timing works (different from every other scenario)
+### Snapshot mechanism (still recorded by `duplicate-ip-arp`'s `setup.sh`)
 
 The snapshot agent's background refresh loop only runs *while the orchestrator is alive*, i.e.
 **after** `setup.sh`. So `setup.sh` records the healthy baseline itself, by calling the snapshot
@@ -162,25 +203,6 @@ still-broken live state every 2 min). The agent then has both the recorded healt
 the current broken value, and localizes the fault by diffing them: `snapshot_status` for the
 timestamps, then `state_before` / `state_diff`. `teardown.sh` removes the persistent fault.
 
-### `duplicate-ip-arp`
-- **Fault:** a **real duplicate-IP event** on VLAN30. client4 (normally `10.10.10.11`)
-  also claims `10.10.10.10` and announces it (gratuitous ARP) while client3's switch
-  port is down, so router2 (client3's gateway, `ethernet-1/2.30` = 10.10.10.1) relearns
-  `10.10.10.10` → **client4's real MAC**. client3 is brought back but client4 **keeps** the
-  duplicate address, so `10.10.10.10` stays live on both hosts and router2's neighbor cache
-  stays poisoned: frames to client3 go to client4's MAC. **Deceptive symptom:** because client4
-  is live and owns that MAC, a ping to `10.10.10.10` still **succeeds** (client4 replies), yet
-  client3's real service (`http.server` on TCP 1111) is **unreachable** — the reportable tell is
-  this mismatch (pingable IP, dead service), not a hard ping failure. **Persists** (a live,
-  non-expired dynamic neighbor; no static entry, so it is invisible in config).
-- **Why history-required:** the poisoned MAC is client4's genuine, live MAC on the same
-  segment, so a live `show arpnd arp-entries` shows a dynamic entry that seems fine; routing
-  and BGP are healthy. Nothing in current state or syslog says the MAC is wrong. The tell is
-  the `arp` snapshot history: `10.10.10.10` used to resolve to client3's real MAC and now
-  resolves to client4's.
-- **Distractors to reject:** routing/BGP (healthy), interface/port down (all up in the final
-  state), VLAN-membership or gateway-IP misconfig (clean), and "an ARP entry exists, looks fine".
-
 ---
 
 ## Quick reference
@@ -189,10 +211,10 @@ timestamps, then `state_before` / `state_diff`. `teardown.sh` removes the persis
 |---|---|---|---|---|---|
 | `intf-down` | easy | router1 e1-2 | L1 | ✅ | one `show interface` |
 | `client3-port-down` | easy | switch2 e1-2 | L1 | ✅ | one `show interface` / LLDP |
-| `bgp-peer-shutdown` | medium | router1 neighbor | L3 | ✅ | BGP session state (links lie) |
+| `switch1-uplink-down` | easy | switch1 e1-3 | L1 | ✅ | one `show interface` / LLDP (client1+client2 both down) |
 | `missing-export-policy` | medium | router1 export-policy | L3 | ❌ | RIB-out (session state lies) |
-| `vlan-mismatch` | medium | switch1 e1-1 | L2 | ❌ | VLAN membership + ARP |
+| `missing-vlan-on-trunk` | medium | switch1 e1-3 | L2 | ❌ | trunk VLAN membership (port up + clean access port both lie) |
+| `duplicate-ip-arp` | medium | router2 ARP | L2/L3 | ✅ | syslog `Duplicate add` event (ping succeeds but service dead) |
 | `acl-silent-drop` | hard | router2 ACL | data plane | ❌ | ACL drop counters |
 | `one-way-route-filter` | hard | router1 import-policy | L3 | ❌ | route-table asymmetry (2 RIBs) |
 | `mtu-blackhole` | hard | router1 e1-2 | data plane | ❌ | packet-size probing + MTU |
-| `duplicate-ip-arp` | hard (history) | router2 ARP | L2/L3 | ❌ | ARP **history** (MAC vs recorded baseline) |

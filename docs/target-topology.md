@@ -271,7 +271,7 @@ set / network-instance vlan30 interface ethernet-1/1.30
   `sr_cli "source /path/file.cfg"`. `sr_cli -c "cmd1" -c "cmd2"` does **not** run multiple
   commands (`-c` only means "commit at end").
 - This document describes the **healthy baseline only**. Faults are applied on top of it by
-  the scenarios in [../scenarios/](../scenarios/) (see [../scenarios/README.md](../scenarios/README.md)).
+  the scenarios in [../scenarios/](../scenarios/) (see [../scenarios/scenario-guide.md](../scenarios/scenario-guide.md)).
 - A full reset to this state is always available with
   `sudo containerlab redeploy --cleanup -t testlab.clab.yml` (re-applies the startup-configs).
 ```

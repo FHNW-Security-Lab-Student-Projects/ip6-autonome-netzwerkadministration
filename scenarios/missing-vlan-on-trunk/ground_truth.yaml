@@ -1,0 +1,8 @@
+root_cause: >
+  On switch1, the trunk uplink to router1 (ethernet-1/3) no longer carries VLAN10 — the
+  tagged ethernet-1/3.10 sub-interface was removed from the trunk and from mac-vrf vlan10.
+  client1's access port (ethernet-1/1) is still correctly in vlan10, but the vlan10
+  broadcast domain on switch1 now has no uplink member, so it is an isolated L2 island:
+  client1 cannot reach its default gateway 192.168.1.1 (which lives on router1 via the
+  trunk). client2 on VLAN20 is unaffected because the trunk still carries ethernet-1/3.20.
+  A correct answer names the missing VLAN10 tagged sub-interface on switch1's trunk e1-3.

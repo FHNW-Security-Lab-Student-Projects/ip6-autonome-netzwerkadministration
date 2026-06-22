@@ -2,7 +2,7 @@
 
 Quickstart for launching the multi-agent troubleshooter against one fault-injection
 scenario in this folder. For the catalog of scenarios and difficulty tiers see
-[README.md](README.md); for the full reference (flags, logging, evaluation) see
+[scenario-guide.md](scenario-guide.md); for the full reference (flags, logging, evaluation) see
 [../docs/running-experiments.md](../docs/running-experiments.md).
 
 ## TL;DR
@@ -29,7 +29,7 @@ When `--scenario <name>` matches a folder in `scenarios/`, the runner automatica
 
 ```bash
 # Pick a different model (any OpenRouter model ID)
-uv run python experiment_runner.py --model z-ai/glm-5 --scenario vlan-mismatch
+uv run python experiment_runner.py --model z-ai/glm-5 --scenario missing-vlan-on-trunk
 
 # Multi-turn: carry conversation history between the queries in queries.txt
 uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario mtu-blackhole --multi-turn

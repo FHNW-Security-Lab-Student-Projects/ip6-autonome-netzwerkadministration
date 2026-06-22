@@ -1,0 +1,1 @@
+client1 and client2 have both lost connectivity to the rest of the network, while client3 is unaffected. Investigate the root cause.

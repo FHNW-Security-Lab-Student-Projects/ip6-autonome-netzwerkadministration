@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EASY: router1 e1-2 (link to router2) admin-disabled
+# EASY: switch1 trunk uplink to router1 (e1-3) admin-disabled
 set -euo pipefail
 
 # Clear snapshot history so the evaluation starts from a fresh state.
@@ -11,15 +11,15 @@ CAPTURE=(uv run python "$HERE/../../state_snapshot_agent.py" --capture-once)
 # Capture the healthy baseline BEFORE applying the fault. The background snapshot loop only
 # starts with the agents (after the fault is in place), so this is the only way to give the
 # snapshot agent a clean good->bad diff.
-echo "[intf-down] capturing healthy baseline"
+echo "[switch1-uplink] capturing healthy baseline"
 "${CAPTURE[@]}"
-sudo docker exec -i clab-testlab-router1 sr_cli <<'SRL'
+sudo docker exec -i clab-testlab-switch1 sr_cli <<'SRL'
 enter candidate
-set / interface ethernet-1/2 admin-state disable
+set / interface ethernet-1/3 admin-state disable
 commit now
 SRL
 
 # Capture the faulted state so the good->bad change is in snapshot history immediately.
 sleep 3
-echo "[intf-down] capturing faulted state"
+echo "[switch1-uplink] capturing faulted state"
 "${CAPTURE[@]}"

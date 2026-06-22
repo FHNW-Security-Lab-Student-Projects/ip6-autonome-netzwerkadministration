@@ -224,8 +224,11 @@ scenarios/bgp-router1-router2-down/
 └── teardown.sh          # restores the baseline; runs after, best-effort
 ```
 
-`setup.sh` and `teardown.sh` are optional — omit them for baseline scenarios that
-probe the unbroken topology. `--no-fault` skips them even when present.
+`setup.sh` and `teardown.sh` are optional. A baseline scenario that probes the
+unbroken topology needs no `teardown.sh`, but it may still ship a `setup.sh` that injects
+no fault and only clears `state_snapshots.json` so the run starts from a fresh snapshot
+history (this is what `basic-client-communication` does). `--no-fault` skips both scripts
+even when present — so don't pass it when you want that snapshot-clearing setup to run.
 
 ### `ground_truth.yaml`
 
@@ -265,7 +268,7 @@ the reference printed alongside the answer.
 | `scenarios/basic-client-communication/` | none | Probes end-to-end reachability between client1, client2 and client3 in the healthy topology |
 
 This is the baseline (no-fault) scenario. The 10 fault scenarios live alongside it in
-[../scenarios/](../scenarios/) — see [../scenarios/README.md](../scenarios/README.md) and
+[../scenarios/](../scenarios/) — see
 [../scenarios/scenario-guide.md](../scenarios/scenario-guide.md). Author new fault scenarios
 by creating a folder with all four files above.
 

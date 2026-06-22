@@ -23,8 +23,10 @@ whether the agents found the real root cause.
         │                    → walks you through each answer; you press f/m/s
         │                    → appends your verdicts to evaluation_log.jsonl
         │
-  ④  Aggregate              uv run python analyze_experiments.py
-                             uv run python raw_experiments_html.py
+  ④  Aggregate              uv run python analyze_experiments.py        # tables / CSV
+                             uv run python raw_experiments_html.py       # HTML table
+                             uv run python visualize_experiments.py      # averaged charts
+                             uv run python visualize_raw_experiments.py  # per-session chart
 ```
 
 Steps ②–④ are fully decoupled. Running an experiment never evaluates it — the runner
@@ -72,7 +74,7 @@ A scenario is a folder under `scenarios/` holding everything needed to reproduce
 one experiment:
 
 ```
-scenarios/bgp-router1-router2-down/
+scenarios/intf-down/
 ├── queries.txt          # what to ask the agents (one query per line)
 ├── ground_truth.yaml    # the actual root cause (your evaluation reference)
 ├── setup.sh             # injects the fault   (optional)
@@ -85,7 +87,14 @@ One query per line; `#` lines are comments. For a multi-turn investigation, end
 with a query that asks for a final diagnosis — that last answer is what you evaluate.
 
 ```text
-# scenarios/bgp-router1-router2-down/queries.txt
+# scenarios/intf-down/queries.txt
+Client1 reports it can no longer reach client3. Investigate the root cause.
+```
+
+For a multi-turn investigation, list several queries and end with one that asks for
+the final diagnosis — that last answer is what you evaluate:
+
+```text
 Are client1 and client3 able to communicate? Investigate.
 Check the BGP session state between router1 and router2.
 Summarize the root cause of the problem you found.
@@ -100,7 +109,7 @@ re-deriving the right answer each time (see also the baseline examples in
 `scenarios/*/ground_truth.yaml`):
 
 ```yaml
-# scenario: bgp-router1-router2-down
+# scenario: intf-down
 root_cause: >
   Interface ethernet-1/2 (e1-2) on router1 is administratively disabled, which tore
   down the BGP session to router2 and removed the cross-router route advertisements —
@@ -141,7 +150,7 @@ SR Linux CLI. The scripts `docker exec` into the node and drive `sr_cli`:
 
 ```bash
 #!/usr/bin/env bash
-# scenarios/bgp-router1-router2-down/setup.sh
+# scenarios/intf-down/setup.sh
 set -euo pipefail
 sudo docker exec clab-testlab-router1 sr_cli -c "enter candidate" \
   -c "set / interface ethernet-1/2 admin-state disable" \
@@ -151,7 +160,7 @@ echo "fault injected: router1 ethernet-1/2 admin-disabled"
 
 ```bash
 #!/usr/bin/env bash
-# scenarios/bgp-router1-router2-down/teardown.sh
+# scenarios/intf-down/teardown.sh
 set -euo pipefail
 sudo docker exec clab-testlab-router1 sr_cli -c "enter candidate" \
   -c "set / interface ethernet-1/2 admin-state enable" \
@@ -160,7 +169,7 @@ echo "baseline restored: router1 ethernet-1/2 admin-enabled"
 ```
 
 ```bash
-chmod +x scenarios/bgp-router1-router2-down/*.sh
+chmod +x scenarios/intf-down/*.sh
 ```
 
 > **The `sr_cli` invocation above is illustrative — verify the exact syntax for
@@ -178,7 +187,7 @@ chmod +x scenarios/bgp-router1-router2-down/*.sh
 ```bash
 uv run python experiment_runner.py \
   --model anthropic/claude-sonnet-4.6 \
-  --scenario bgp-router1-router2-down \
+  --scenario intf-down \
   --multi-turn
 ```
 
@@ -199,12 +208,12 @@ What happens, in order:
 
 ```bash
 # Sanity run against the healthy topology (skip setup.sh / teardown.sh)
-uv run python experiment_runner.py -m z-ai/glm-5 -s bgp-router1-router2-down --no-fault
+uv run python experiment_runner.py -m z-ai/glm-5 -s intf-down --no-fault
 
 # Compare several models on the identical fault — run once per model, same scenario
-uv run python experiment_runner.py -m z-ai/glm-5                  -s bgp-router1-router2-down --multi-turn
-uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6 -s bgp-router1-router2-down --multi-turn
-uv run python experiment_runner.py -m google/gemini-2.0-flash-001 -s bgp-router1-router2-down --multi-turn
+uv run python experiment_runner.py -m z-ai/glm-5                  -s intf-down --multi-turn
+uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6 -s intf-down --multi-turn
+uv run python experiment_runner.py -m google/gemini-2.0-flash-001 -s intf-down --multi-turn
 ```
 
 All runs share the `scenario` label (and identical fault); only the `model` differs.
@@ -243,7 +252,7 @@ exploration).
 uv run python evaluate_experiments.py --redo
 
 # Narrow the scope
-uv run python evaluate_experiments.py --scenario bgp-router1-router2-down
+uv run python evaluate_experiments.py --scenario intf-down
 uv run python evaluate_experiments.py --model anthropic/claude-sonnet-4.6
 uv run python evaluate_experiments.py --since 2026-05-20
 ```
@@ -271,16 +280,29 @@ These never prompt and never call any model — they just render what's already 
 uv run python analyze_experiments.py
 
 # Filter to one scenario, export tables to CSV
-uv run python analyze_experiments.py --scenario bgp-router1-router2-down --csv report
+uv run python analyze_experiments.py --scenario intf-down --csv report
 
 # Sortable per-session HTML table, rows coloured green (found) / red (missed)
 uv run python raw_experiments_html.py --out figures/raw_experiments.html
+
+# Vector charts for the thesis (PDF by default) — averaged across runs
+uv run python visualize_experiments.py --out figures
+
+# Same data as one bar per session (no averaging), verdict-coloured labels
+uv run python visualize_raw_experiments.py --out figures
 ```
 
 `analyze_experiments.py` auto-joins `evaluation_log.jsonl`, so the summary shows
 `evaluated_turns` and `found_rate` (the fraction of evaluated runs where the agent
 found the issue). If you haven't evaluated yet, those columns are simply omitted and
 the header notes `Evaluated: 0/N`.
+
+All four consumers read the same `experiment_log.jsonl` + `evaluation_log.jsonl`:
+`analyze_experiments.py` prints/exports tables, `raw_experiments_html.py` renders a
+sortable HTML table, and the two `visualize_*.py` scripts emit PDF/PNG figures
+(`visualize_experiments.py` averages across runs; `visualize_raw_experiments.py` shows
+one bar per session). See [visualize-experiments.md](visualize-experiments.md) for the
+full chart reference.
 
 ---
 
@@ -290,21 +312,20 @@ the header notes `Evaluated: 0/N`.
 # 0. one-time
 cp .env.example .env                      # set OPENROUTER_API_KEY
 uv sync
-test -f failure_log.py || git checkout 914c108 -- failure_log.py
 sudo containerlab deploy -t testlab.clab.yml
 
 # 1. author the scenario folder (queries.txt + ground_truth.yaml + setup.sh + teardown.sh)
 #    — see Step ① above; test setup.sh / teardown.sh by hand first.
 
 # 2. run two models on the same fault
-uv run python experiment_runner.py -m z-ai/glm-5                  -s bgp-router1-router2-down --multi-turn
-uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6 -s bgp-router1-router2-down --multi-turn
+uv run python experiment_runner.py -m z-ai/glm-5                  -s intf-down --multi-turn
+uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6 -s intf-down --multi-turn
 
 # 3. evaluate by hand (press f / m / s for each answer)
 uv run python evaluate_experiments.py
 
 # 4. aggregate
-uv run python analyze_experiments.py --scenario bgp-router1-router2-down
+uv run python analyze_experiments.py --scenario intf-down
 ```
 
 ---
@@ -318,6 +339,8 @@ uv run python analyze_experiments.py --scenario bgp-router1-router2-down
 | `evaluation_log.jsonl` | `evaluate_experiments.py` | One manual verdict per session (`found_issue` + optional `note`), keyed by `session_id` |
 | `evaluation_review.md` / `.csv` | `evaluate_experiments.py --review` | Read-only join of answers + your verdicts |
 | `figures/raw_experiments.html` | `raw_experiments_html.py` | Sortable per-session table |
+| `figures/*.pdf` (averaged) | `visualize_experiments.py` | Vector charts averaged across runs (cost, duration, tokens, found-rate) |
+| `figures/raw_sessions_overview.pdf` | `visualize_raw_experiments.py` | One bar per session, verdict-coloured labels |
 
 ---
 
@@ -325,7 +348,6 @@ uv run python analyze_experiments.py --scenario bgp-router1-router2-down
 
 | Symptom | Cause / fix |
 |---|---|
-| `ModuleNotFoundError: failure_log` | Restore it: `git checkout 914c108 -- failure_log.py` |
 | Run aborts immediately with a `setup` error | `setup.sh` exited non-zero. Test it by hand; check the container name (`clab-testlab-router1`) and that the lab is deployed. |
 | `success=True` but answer is wrong | Expected — `success` only means "didn't crash." Correctness is your call in Step ③. |
 | `analyze_experiments.py` shows no correctness columns | No verdicts yet, or `evaluation_log.jsonl` is missing. Run Step ③ first. |
