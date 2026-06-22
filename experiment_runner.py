@@ -162,7 +162,12 @@ def _print_results(
         # Session totals. Native (from usage()) is the authoritative count and the
         # basis for cost — always valid. Normalized (Generation API) is the
         # cross-model-comparable count and can be INVALID if a generation was dropped.
-        status = 'OK' if session.success else f'ERROR: {session.error[:40]}'
+        if session.success:
+            status = 'OK'
+        elif session.error.startswith('DNF'):
+            status = session.error[:44]
+        else:
+            status = f'ERROR: {session.error[:40]}'
         cost_str = f'${session.total_cost_usd:.6f}' if session.total_cost_usd else '$ -.------'
         cost_label = f'{cost_str} (est)' if session.cost_estimated else cost_str
         print(f'  {"─" * (W - 2)}')
@@ -226,12 +231,21 @@ async def _run_turn(
     scenario: str,
     run_id: str,
     message_history: list,
+    max_seconds: int = 0,
 ) -> tuple[ExperimentSession, list[str], bool, str, str, list]:
     """Run one query. Returns (session, success, error, output, updated_history).
 
     Does NOT print anything — caller prints everything at the end.
     Does NOT call finish_session — caller batches cost fetching first.
     Gen_ids are stored inside each AgentRunRecord via record_agent_run().
+
+    When ``max_seconds`` > 0 the orchestrator run is capped by a wall-clock timeout.
+    On expiry the turn is recorded as DNF (did-not-finish): success=False with a
+    "DNF ..." error and empty output, but every sub-agent run that already
+    completed stays in the session — its tokens / tool calls / cost are preserved,
+    because sub-agents self-record via _active_session as they finish. Only the
+    orchestrator's own usage for the interrupted turn (recorded after the run
+    returns) and any one in-flight sub-agent are not counted.
     """
     session = begin_session(user_query=query, model=model_name, scenario=scenario, run_id=run_id)
     _active_session.set(session)
@@ -239,11 +253,21 @@ async def _run_turn(
     failures_before = _count_failure_log_lines()
     try:
         with capture_generation_ids() as gen_ids:
-            result = await orchestrator.run(query, model=model, message_history=message_history)
+            if max_seconds > 0:
+                async with asyncio.timeout(max_seconds):
+                    result = await orchestrator.run(query, model=model, message_history=message_history)
+            else:
+                result = await orchestrator.run(query, model=model, message_history=message_history)
         await record_agent_run(session, 'orchestrator', model_name, result, gen_ids)
         session.invalid_commands = _count_failure_log_lines() - failures_before
         session.output = result.output
         return session, True, '', result.output, result.all_messages()
+    except TimeoutError:
+        # Wall-clock cap hit. Keep the partial session — completed sub-agent runs
+        # are already recorded — and mark it DNF so evaluation scores it as
+        # did-not-finish while its token/cost stats still flow into the log.
+        session.invalid_commands = _count_failure_log_lines() - failures_before
+        return session, False, f'DNF (wall-clock timeout after {max_seconds}s)', '', message_history
     except APITimeoutError:
         session.invalid_commands = _count_failure_log_lines() - failures_before
         return session, False, 'Orchestrator timed out after 3 minutes', '', message_history
@@ -259,6 +283,7 @@ async def run(
     multi_turn: bool,
     scenario_dir: Path | None = None,
     apply_fault: bool = True,
+    max_seconds: int = 0,
 ) -> None:
     _active_model_name.set(model_name)
     model = _build_model(model_name)
@@ -291,6 +316,7 @@ async def run(
                 session, success, error, output, message_history = await _run_turn(
                     query, model_name, model, scenario, run_id,
                     message_history if multi_turn else [],
+                    max_seconds,
                 )
                 pending.append((session, success, error, output))
 
@@ -310,6 +336,7 @@ async def run(
                     session, success, error, output, message_history = await _run_turn(
                         query, model_name, model, scenario, run_id,
                         message_history if multi_turn else [],
+                        max_seconds,
                     )
                     pending.append((session, success, error, output))
     finally:
@@ -363,6 +390,15 @@ def main() -> None:
         help='Skip the scenario setup.sh / teardown.sh scripts. '
              'Use for sanity runs against the unbroken topology.',
     )
+    parser.add_argument(
+        '--max-seconds',
+        type=int,
+        default=int(os.getenv('EXPERIMENT_MAX_SECONDS', '0')),
+        metavar='N',
+        help='Wall-clock cap (seconds) per query for the orchestrator run. On expiry '
+             'the turn is recorded as DNF (success=False, error="DNF ..."); completed '
+             "sub-agents' token/cost stats are still logged. 0 = no cap (default).",
+    )
     args = parser.parse_args()
 
     scenario_dir = _resolve_scenario_dir(args.scenario)
@@ -387,6 +423,7 @@ def main() -> None:
         multi_turn=args.multi_turn,
         scenario_dir=scenario_dir,
         apply_fault=not args.no_fault,
+        max_seconds=args.max_seconds,
     ))
 
 

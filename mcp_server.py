@@ -8,7 +8,6 @@ import logfire
 from fastmcp import FastMCP  # , Context
 from failure_log import log_command_failure, log_transport_failure
 from response_limits import MAX_RESPONSE_CHARS, truncate
-from session_dedup import CallTracker
 from srl_jsonrpc import SrlJsonRpcError, SrlTransportError, get_connection, jrpc_cli, jrpc_get
 
 env_file = Path(__file__).parent / ".env"
@@ -243,9 +242,6 @@ async def get_config_path(device_name: str, path: str) -> str:
     return f"GET running {path}\nDevice: {device_name}\n\n{body}"
 
 
-_device_info_tracker = CallTracker()
-
-
 @mcp.tool()
 def get_device_info(device_name: str) -> str:
     """
@@ -262,19 +258,10 @@ def get_device_info(device_name: str) -> str:
         if device_name not in hosts:
             return f"Device '{device_name}' not found. Available devices: {', '.join(hosts.keys())}"
 
-        if _device_info_tracker.seen_before(device_name):
-            return (
-                f"(Info for {device_name!r} already returned this session — inventory is "
-                "static. Re-read the earlier response in context instead of fetching it again.)"
-            )
-
         device = hosts[device_name]
         return f"Device: {device_name}\nHostname: {device['hostname']}\nPlatform: {device['platform']}"
     except Exception as e:
         return f"Error getting device info: {str(e)}"
-
-
-_list_devices_tracker = CallTracker()
 
 
 @mcp.tool()
@@ -286,11 +273,6 @@ def list_all_devices() -> str:
         Complete list of devices with their platform and hostname information
     """
     try:
-        if _list_devices_tracker.seen_before():
-            return (
-                "(Device inventory already returned this session — it is static. "
-                "Re-read the earlier response in context instead of fetching it again.)"
-            )
         hosts, _ = load_inventory()
         inventory_lines = ["Network Device Inventory:\n"]
         for name, info in hosts.items():

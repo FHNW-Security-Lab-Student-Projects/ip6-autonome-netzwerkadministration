@@ -14,3 +14,6 @@ config_backups/
 # Containerlab runtime output (auto-generated on clab deploy)
 clab-testlab/
 *.clab.yml.annotations.json
+
+# Per-run logs from run_experiment_matrix.sh
+logs/

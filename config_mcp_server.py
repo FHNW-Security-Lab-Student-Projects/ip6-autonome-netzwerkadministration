@@ -29,7 +29,6 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 
 from failure_log import log_command_failure
-from session_dedup import CallTracker
 from srl_jsonrpc import SrlConnection, SrlJsonRpcError, get_connection, jrpc_cli
 
 env_file = Path(__file__).parent / '.env'
@@ -102,20 +101,10 @@ async def _run_candidate_sequence(
 # MCP tools
 # ---------------------------------------------------------------------------
 
-_list_devices_tracker = CallTracker()
-_device_info_tracker = CallTracker()
-_command_reference_tracker = CallTracker()
-
-
 @mcp.tool()
 def list_all_devices() -> str:
     """Return all network devices from inventory with hostname and platform."""
     try:
-        if _list_devices_tracker.seen_before():
-            return (
-                '(Device inventory already returned this session — it is static. '
-                'Re-read the earlier response in context instead of fetching it again.)'
-            )
         hosts, _ = _load_inventory()
         lines = ['Available devices:']
         for name, info in hosts.items():
@@ -136,11 +125,6 @@ def get_device_info(device_name: str) -> str:
         hosts, _ = _load_inventory()
         if device_name not in hosts:
             return f"Device '{device_name}' not found. Available: {list(hosts.keys())}"
-        if _device_info_tracker.seen_before(device_name):
-            return (
-                f'(Info for {device_name!r} already returned this session — inventory is '
-                'static. Re-read the earlier response in context instead of fetching it again.)'
-            )
         d = hosts[device_name]
         return f'Device: {device_name}\nHostname: {d["hostname"]}\nPlatform: {d["platform"]}'
     except Exception as exc:
@@ -153,11 +137,6 @@ def get_command_reference() -> str:
 
     Call this before constructing any configuration commands to verify correct syntax.
     """
-    if _command_reference_tracker.seen_before():
-        return (
-            '(Command reference already returned this session — contents are static. '
-            'Re-read the earlier response in context instead of fetching it again.)'
-        )
     return SR_LINUX_KNOWLEDGE_PATH.read_text()
 
 

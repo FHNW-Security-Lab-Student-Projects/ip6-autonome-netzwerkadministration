@@ -1,1 +1,1 @@
-client1 can reach 10.10.10.10 (client3) by ping, but client3's HTTP service on port 1111 (http://10.10.10.10:1111) is unreachable from client1, investigate the root cause. I checked the service on client3 and the service is up and running.
+client1 can reach 10.10.10.10 (client3) by ping, but client3's HTTP service on port 1111 (http://10.10.10.10:1111) is unreachable from client1, investigate the root cause. I checked the service on client3 and the service is up and running with no firewall in place.
