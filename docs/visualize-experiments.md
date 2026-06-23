@@ -4,12 +4,13 @@
 
 `visualize_experiments.py` reads the same `experiment_log.jsonl` as `analyze_experiments.py` and writes **vector PDF charts** intended for inclusion in a LaTeX document. It is a companion to the text/CSV report — same data, graphical view.
 
-Four groups of charts are produced:
+Five groups of charts are produced:
 
 - **Model comparison** — mean per metric (cost, duration, tokens, tool calls) with ±1 std error bars.
 - **Scenario performance** — same metrics grouped by scenario, with model as the hue.
 - **Correctness** — `found_rate` per scenario × model, sourced from your manual verdicts in `evaluation_log.jsonl` (the `found_issue` field). This is the **source of truth for what was successful**, not the `success` field — `success` only means a run didn't crash. Only evaluated runs count; the chart is skipped if you haven't evaluated anything yet.
-- **Distributions** — boxplots (with individual points overlaid) showing run-to-run variability per model.
+- **Distributions (per model)** — boxplots (with individual points overlaid) showing run-to-run variability per model.
+- **Distributions (per scenario)** — boxplots of cost, duration, and tokens grouped by scenario (model as the hue when more than one model is present), showing how each metric spreads within a troubleshooting scenario.
 
 ---
 
@@ -46,7 +47,7 @@ uv run python visualize_experiments.py --file path/to/other.jsonl
 
 ## Generated files
 
-Running with defaults produces up to eleven files in `figures/` (the correctness chart
+Running with defaults produces up to fourteen files in `figures/` (the correctness chart
 is omitted when there are no verdicts yet):
 
 | File                                       | Chart                                       |
@@ -62,6 +63,9 @@ is omitted when there are no verdicts yet):
 | `distribution_duration.pdf`                | Duration boxplot per model                  |
 | `distribution_tokens.pdf`                  | Input-tokens boxplot per model              |
 | `distribution_cost.pdf`                    | Cost boxplot per model                      |
+| `scenario_distribution_cost.pdf`           | Cost boxplot per scenario (× model)         |
+| `scenario_distribution_duration.pdf`       | Duration boxplot per scenario (× model)     |
+| `scenario_distribution_tokens.pdf`         | Input-tokens boxplot per scenario (× model) |
 
 All PDFs are **vector** — they scale to any column width without aliasing and stay sharp at any zoom level.
 

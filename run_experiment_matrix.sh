@@ -35,20 +35,19 @@ set -uo pipefail
 
 # OpenRouter model IDs — 2 per price tier (see docs/model-tier-definition.md).
 MODELS=(
-  "z-ai/glm-5.2"           # low
-  "z-ai/glm-5"
+  "deepseek/deepseek-v3.2"
 )
 
 # Scenario folder names under scenarios/.
 SCENARIOS=(
-   acl-silent-drop
+  # acl-silent-drop
   # client3-port-down
   # duplicate-ip-arp
    intf-down
   # missing-export-policy
   # missing-vlan-on-trunk
   # mtu-blackhole
-   one-way-route-filter
+  # one-way-route-filter
   # switch1-uplink-down
   # basic-client-communication
 )

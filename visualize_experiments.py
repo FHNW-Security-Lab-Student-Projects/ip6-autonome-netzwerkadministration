@@ -108,6 +108,30 @@ def plot_scenario_performance(df: pd.DataFrame, out_dir: Path, ext: str) -> list
     return written
 
 
+def plot_invalid_commands(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
+    """Bar chart of invalid-command counts per scenario, split by model.
+
+    Bars show the total number of invalid commands the agents issued (estimator=sum),
+    so the height is a literal count, not a per-run average. If the column is missing
+    or every run is zero, the chart is skipped rather than drawn empty.
+    """
+    if 'invalid_commands' not in df.columns:
+        print('  [skip] invalid-commands chart: column not present.')
+        return []
+    if df['invalid_commands'].fillna(0).sum() == 0:
+        print('  [skip] invalid-commands chart: no invalid commands recorded.')
+        return []
+
+    fig, ax = plt.subplots()
+    sns.barplot(data=df, x='scenario', y='invalid_commands', hue='model',
+                ax=ax, estimator='sum', errorbar=None)
+    ax.set_xlabel('Scenario')
+    ax.set_ylabel('Invalid commands (count)')
+    ax.legend(title='Model', fontsize=8)
+    _rotate_xticks(ax)
+    return [_save(fig, out_dir, 'invalid_commands', ext)]
+
+
 def plot_correctness(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
     """Bar chart of found_rate — the fraction of evaluated runs the agent got right.
 
@@ -153,6 +177,38 @@ def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
                       color='black', size=3, alpha=0.5)
         ax.set_xlabel('Model')
         ax.set_ylabel(ylabel)
+        _rotate_xticks(ax)
+        written.append(_save(fig, out_dir, name, ext))
+    return written
+
+
+def plot_scenario_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
+    """Boxplots of cost, duration, and tokens per scenario (model as hue).
+
+    Mirrors plot_distributions but pivots the x-axis to the scenario, so each box
+    shows the run-to-run spread of a metric within one troubleshooting scenario.
+    Individual runs are overlaid as points; with multiple models the boxes are split
+    by model so per-scenario model differences stay visible.
+    """
+    written: list[Path] = []
+    multi_model = df['model'].nunique() > 1
+    hue = 'model' if multi_model else None
+
+    metrics = [
+        ('total_cost_usd',                'Cost (USD)',               'scenario_distribution_cost'),
+        ('duration_s',                    'Duration (s)',             'scenario_distribution_duration'),
+        ('total_normalized_input_tokens', 'Input tokens (normalized)', 'scenario_distribution_tokens'),
+    ]
+    for column, ylabel, name in metrics:
+        fig, ax = plt.subplots()
+        sns.boxplot(data=df, x='scenario', y=column, hue=hue, ax=ax)
+        sns.stripplot(data=df, x='scenario', y=column, hue=hue,
+                      ax=ax, color='black', size=3, alpha=0.5,
+                      dodge=multi_model, legend=False)
+        ax.set_xlabel('Scenario')
+        ax.set_ylabel(ylabel)
+        if hue is not None:
+            ax.legend(title='Model', fontsize=8)
         _rotate_xticks(ax)
         written.append(_save(fig, out_dir, name, ext))
     return written
@@ -218,8 +274,10 @@ def main() -> None:
     written: list[Path] = []
     written += plot_model_comparison(df, out_dir, args.format)
     written += plot_scenario_performance(df, out_dir, args.format)
+    written += plot_invalid_commands(df, out_dir, args.format)
     written += plot_correctness(df, out_dir, args.format)
     written += plot_distributions(df, out_dir, args.format)
+    written += plot_scenario_distributions(df, out_dir, args.format)
 
     print(f'Wrote {len(written)} figure(s) to {out_dir}/')
     for p in written:
