@@ -75,6 +75,20 @@ def make_tracked_http_client() -> httpx.AsyncClient:
     )
 
 
+def _gen_id_sort_key(gen_id: str) -> tuple[int, object]:
+    """Sort key giving chronological order for OpenRouter generation IDs.
+
+    IDs look like ``gen-<unix_ms>-<rand>``; sort by the embedded timestamp when present.
+    Anything that doesn't parse falls back to lexicographic order and sorts after the
+    timestamped ones (the tuple's first element keeps the two groups from comparing
+    int against str).
+    """
+    parts = gen_id.split('-')
+    if len(parts) >= 2 and parts[1].isdigit():
+        return (0, int(parts[1]))
+    return (1, gen_id)
+
+
 @contextlib.contextmanager
 def capture_generation_ids() -> Generator[list[str], None, None]:
     """Sync context manager — collects OpenRouter generation IDs during an agent run.
@@ -142,6 +156,11 @@ class ExperimentSession:
     scenario: str           # optional label for structured experiments (e.g. "bgp-flap-01")
     agent_runs: list[AgentRunRecord] = field(default_factory=list)
     run_id: str = ''        # UUID shared by every session in one experiment_runner invocation
+    # First / last OpenRouter generation ID seen across the whole run (run_id). The same
+    # two values are written on every session sharing this run_id. Purely for manual
+    # lookup on OpenRouter afterwards — NOT used by any visualization or statistic.
+    first_generation_id: str = ''
+    last_generation_id: str = ''
     output: str = ''        # orchestrator's final natural-language answer
     # Filled by finalize_costs() / finish_session()
     duration_s: float = 0.0   # summed LLM generation_time across all runs (seconds)
@@ -290,13 +309,23 @@ async def finalize_costs(sessions: list[ExperimentSession], api_key: str) -> Non
     """
     import asyncio
 
-    # Collect every unique generation ID across all runs in all sessions.
-    all_ids = list({
-        gid
-        for session in sessions
-        for run in session.agent_runs
-        for gid in _run_gen_ids.get(id(run), [])
-    })
+    # Collect every unique generation ID across all runs in all sessions, in
+    # chronological order. The first/last are stamped onto every session (run-level
+    # metadata, for manual OpenRouter lookup); the set is also what we fetch below.
+    all_ids = sorted(
+        {
+            gid
+            for session in sessions
+            for run in session.agent_runs
+            for gid in _run_gen_ids.get(id(run), [])
+        },
+        key=_gen_id_sort_key,
+    )
+    first_id = all_ids[0] if all_ids else ''
+    last_id = all_ids[-1] if all_ids else ''
+    for session in sessions:
+        session.first_generation_id = first_id
+        session.last_generation_id = last_id
     if not all_ids:
         return
 

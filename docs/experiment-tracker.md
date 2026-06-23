@@ -207,6 +207,56 @@ LIMIT 50
 
 ---
 
+## Cross-referencing with OpenRouter generation IDs
+
+Every session record carries two run-level fields for manual lookup:
+
+| Field | Description |
+|---|---|
+| `first_generation_id` | First OpenRouter generation ID seen across the whole run (`run_id`), in chronological order |
+| `last_generation_id` | Last OpenRouter generation ID seen across the whole run |
+
+Both values are **identical on every session sharing the same `run_id`** (one
+`experiment_runner.py` invocation). They are written by `finalize_costs()` in
+`experiment_tracker.py` from the `x-generation-id` headers captured during the run.
+They are **purely for after-the-fact lookup — no visualization or statistic reads them.**
+
+### Mapping a generation ID to Logfire
+
+The OpenRouter generation ID is the **exact same value** that Pydantic AI's
+instrumentation records in Logfire under the span attribute
+**`gen_ai.response.id`** (e.g. `gen-1782147674-7d7pT7CMP74SO4RoHEWc`). It appears on
+both the inner `Chat Completion …` span and the `chat <model>` span. So you can look up
+a run directly by its logged generation ID — no need to rely on timestamps.
+
+**Find one generation and its trace:**
+
+```sql
+SELECT span_name, trace_id, start_timestamp
+FROM records
+WHERE attributes->>'gen_ai.response.id' = '<paste gen id>'
+```
+
+Grab the returned `trace_id` to pull the full agent run for that LLM round-trip.
+
+**Pull everything between a run's first and last generation** (uses the two logged
+fields as bounds — handy for inspecting a whole `run_id` window):
+
+```sql
+SELECT start_timestamp, span_name, attributes->>'gen_ai.response.id' AS gen_id
+FROM records
+WHERE start_timestamp BETWEEN
+    (SELECT start_timestamp FROM records WHERE attributes->>'gen_ai.response.id' = '<first_generation_id>')
+AND (SELECT start_timestamp FROM records WHERE attributes->>'gen_ai.response.id' = '<last_generation_id>')
+ORDER BY start_timestamp
+```
+
+> **Retention caveat:** `experiment_log.jsonl` keeps the IDs forever, but Logfire
+> retention is limited (≈14 days on the free tier). For older runs the IDs are still in
+> the log but may have aged out of Logfire.
+
+---
+
 ## Keeping Costs Accurate
 
 Cost estimates are computed from the `MODEL_PRICING` table in `experiment_tracker.py`. Prices change — update the table periodically from [openrouter.ai/models](https://openrouter.ai/models).

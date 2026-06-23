@@ -54,7 +54,7 @@ SCENARIOS=(
 )
 
 REPEATS=5                              # runs per (model, scenario) pair
-MAX_SECONDS=420                          # wall-clock cap per run; 0 = no cap. On expiry the run
+MAX_SECONDS=600                          # wall-clock cap per run; 0 = no cap. On expiry the run
                                        # is logged as DNF (completed sub-agent stats are kept)
 REDEPLOY_BETWEEN_RUNS=1                # 1 = redeploy lab before each run, 0 = don't
 SETTLE_SECONDS=45                      # wait for SR Linux nodes to boot after redeploy
