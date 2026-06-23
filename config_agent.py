@@ -40,6 +40,7 @@ llm = OpenRouterModel(
 config_mcp = MCPServerStdio(
     command='uv',
     args=['run', 'config_mcp_server.py'],
+    env=dict(os.environ),
     tool_prefix='config_',
     timeout=30,
 )

@@ -1,6 +1,10 @@
 {
     "image": "ghcr.io/srl-labs/containerlab/devcontainer-dind-slim:latest",
     "shutdownAction": "none",
+    "containerEnv": {
+        "UV_PROJECT_ENVIRONMENT": "/home/vscode/venv",
+        "UV_CACHE_DIR": "/home/vscode/.cache/uv"
+    },
     "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"$HOME/.cargo/bin:$PATH\" && uv python install 3.13 && uv sync",
     "customizations": {
         "vscode": {

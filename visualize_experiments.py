@@ -57,7 +57,7 @@ def plot_model_comparison(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Pat
 
     metrics = [
         ('total_cost_usd',    'Cost (USD)',  'model_comparison_cost'),
-        ('duration_s',        'Duration (s)', 'model_comparison_duration'),
+        ('duration_s',        'LLM inference time, summed (s)', 'model_comparison_duration'),
         ('total_tool_calls',  'Tool calls',  'model_comparison_tool_calls'),
     ]
     for column, ylabel, name in metrics:
@@ -93,7 +93,7 @@ def plot_model_comparison(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Pat
 def plot_scenario_performance(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
     written: list[Path] = []
     metrics = [
-        ('duration_s',       'Duration (s)', 'scenario_performance_duration'),
+        ('duration_s',       'LLM inference time, summed (s)', 'scenario_performance_duration'),
         ('total_cost_usd',   'Cost (USD)',   'scenario_performance_cost'),
         ('total_tool_calls', 'Tool calls',   'scenario_performance_tool_calls'),
     ]
@@ -166,7 +166,7 @@ def plot_correctness(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
 def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
     written: list[Path] = []
     metrics = [
-        ('duration_s',         'Duration (s)',  'distribution_duration'),
+        ('duration_s',         'LLM inference time, summed (s)',  'distribution_duration'),
         ('total_normalized_input_tokens', 'Input tokens (normalized)',  'distribution_tokens'),
         ('total_cost_usd',     'Cost (USD)',    'distribution_cost'),
     ]
@@ -196,7 +196,7 @@ def plot_scenario_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> li
 
     metrics = [
         ('total_cost_usd',                'Cost (USD)',               'scenario_distribution_cost'),
-        ('duration_s',                    'Duration (s)',             'scenario_distribution_duration'),
+        ('duration_s',                    'LLM inference time, summed (s)',             'scenario_distribution_duration'),
         ('total_normalized_input_tokens', 'Input tokens (normalized)', 'scenario_distribution_tokens'),
     ]
     for column, ylabel, name in metrics:

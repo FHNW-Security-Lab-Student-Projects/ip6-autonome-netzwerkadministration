@@ -90,7 +90,7 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
     # 1. Duration
     ax = axes[0]
     ax.barh(y, df['duration_s'], color=bar_colors)
-    ax.set_xlabel('Duration (s)')
+    ax.set_xlabel('LLM inference time, summed (s)')
     ax.invert_yaxis()
     ax.set_yticks(list(y))
     styles = [_verdict_style(row) for _, row in df.iterrows()]

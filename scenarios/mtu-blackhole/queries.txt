@@ -1,1 +1,1 @@
-Small pings between client1 and client3 succeed, but large transfers and big packets fail or hang. investigate the root cause.
+Small pings between client1 and client3 succeed, but large transfers and big packets fail or hang. investigate the root cause. (IMPORTANT: This is the only information you get, provide the Root cause don't ask for any instructions or more information).

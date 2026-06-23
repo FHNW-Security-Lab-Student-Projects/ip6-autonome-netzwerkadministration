@@ -1,1 +1,1 @@
-Could client1, client2 and client3 communicate with each other (they have not tried yet) ?
+Could client1, client2 and client3 communicate with each other (they have not tried yet) ? (IMPORTANT: This is the only information you get, provide the Root cause don't ask for any instructions or more information).

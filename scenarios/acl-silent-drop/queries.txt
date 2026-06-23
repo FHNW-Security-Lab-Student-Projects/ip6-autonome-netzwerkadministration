@@ -1,1 +1,1 @@
-Pings from client1 to client3 fail. Investigate root cause.
+Pings from client1 to client3 fail. Investigate root cause (IMPORTANT: This is the only information you get, provide the Root cause don't ask for any instructions or more information).

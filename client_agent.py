@@ -68,8 +68,10 @@ AVAILABLE_OPENROUTER_MODELS: dict[str, str] = {
     'GLM5': 'z-ai/glm-5',
     'Claude Sonnet 4.6': 'anthropic/claude-sonnet-4.6',
     'Claude Opus 4.7': 'anthropic/claude-opus-4.7',
-    'GLM5.1': 'z-ai/glm-5.1',
-    'qwen3.6-plus' : 'qwen/qwen3.6-plus',
+    'GLM5.2': 'z-ai/glm-5.2',
+    'qwen3.7-max' : 'qwen/qwen3.7-max',
+    'deepseek-v3.2' : 'deepseek/deepseek-v3.2',
+    'ministral-14b-2512' : 'mistralai/ministral-14b-2512',
 }
 
 # Pre-built Model objects for the web UI (imported by web_ui.py for to_web(models=...)).

@@ -1,0 +1,83 @@
+\documentclass[final]{fhnwreport}         %[mode] = draft or final
+\input{fhnwheader}                        %loads all packages, definitions and settings
+
+%%%%% Logo: Hochschule HTU oder HSI, Sprache DE oder EN:
+%\newcommand{\logofilename}{FHNW_HTU_DE}
+%\newcommand{\logofilename}{FHNW_HTU_EN}
+%\newcommand{\logofilename}{FHNW_HSI_DE}
+\newcommand{\logofilename}{FHNW_HSI_EN}
+%%%%%
+%%%%% Bibliographie entweder im IEEE- oder im APA-Stil:
+\usepackage[style=ieee,urldate=comp,backend=biber]{biblatex}
+%\usepackage[style=apa,urldate=comp,backend=biber]{biblatex}
+%%%%%
+\addbibresource{literature/references.bib}
+
+\title{IP6: Troubleshooting network problems with an AI driven multi-agent system}  %Project Title
+\author{P6 Project}    %Document Type => Technical Report, ...
+\date{Windisch, \today}               %Place and Date
+
+\begin{document}
+
+\pagenumbering{roman}
+
+%%---TITLEPAGE---------------------------------------------------------------------------
+\selectlanguage{english}                  %ngerman or english
+\maketitle
+
+\vfill
+
+\begin{tabular}{@{}p{5cm} l}
+Student          &    Dominik Krebs\\[2ex]
+Experts           &    Christopher Scherb / Luc Heitz\\[2ex]
+Project Number              &    IMVS12\\[4ex]
+\multicolumn{2}{@{}l}{University of Applied Sciences Northwestern Switzerland}
+\end{tabular}
+
+\clearpage
+
+%%---ABSTRACT----------------------------------------------------------------------------
+\selectlanguage{english}				%ngerman or english
+\thispagestyle{empty}
+\include{sections/abstract}
+
+%%---TABLE OF CONTENTS-------------------------------------------------------------------
+\selectlanguage{english}				%ngerman or english
+\tableofcontents
+\clearpage
+
+\listoffigures
+\listoftables
+\cleardoublepage
+
+%%---TEXT--------------------------------------------------------------------------------
+\pagenumbering{arabic}
+\include{sections/introduction}
+\include{sections/background}
+\include{sections/architecture}
+\include{sections/implementation}
+\include{sections/methodology}
+\include{sections/results}
+\include{sections/evaluation}
+\include{sections/conclusion}
+
+%%---AUXILIARY TOOLS---------------------------------------------------------------------
+\include{sections/auxiliary_tools}
+
+%%---BIBLIOGRAPHY------------------------------------------------------------------------
+{\sloppypar
+\printbibliography[heading=bibintoc, title=References]
+}
+
+%%---APPENDIX----------------------------------------------------------------------------
+\selectlanguage{english}				%ngerman or english
+\include{sections/authenticity}
+\selectlanguage{english}				%ngerman or english
+\include{sections/appendix}
+
+%%---NOTES for DEBUG---------------------------------------------------------------------
+%\newpage
+%\listoftodos[\section{Todo-Notes}]
+%\clearpage
+
+\end{document}

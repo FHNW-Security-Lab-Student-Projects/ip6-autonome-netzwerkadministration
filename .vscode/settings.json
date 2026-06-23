@@ -1,5 +1,26 @@
 {
+  "python.defaultInterpreterPath": "/home/vscode/venv/bin/python",
   "yaml.schemas": {
     "": ["scenarios/**/*.yaml"]
-  }
+  },
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk",
+      "command": "latexmk",
+      "args": [
+        "-pdf",
+        "-interaction=nonstopmode",
+        "-synctex=1",
+        "-outdir=%DIR%",
+        "%DOC%"
+      ]
+    }
+  ],
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "latexmk",
+      "tools": ["latexmk"]
+    }
+  ],
+  "latex-workshop.latex.autoBuild.run": "onSave"
 }

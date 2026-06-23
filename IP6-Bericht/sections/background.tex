@@ -1,0 +1,73 @@
+\section{Background}
+\label{sec:background}
+This section gives the necessary background information about the technologies used in this work to build an AI agent.
+
+\subsection{Agents and AI Agents}
+Before defining the term "AI Agent" we must understand what an agent is.
+From a very basic perspective, an agent is an entity which is able to produce some effect or make changes in its
+environment \parencite{CASTELFRANCHI1998157}. With the rise of generative AI a new term "AI Agent" has emerged.
+AI Agents can be defined as software entities which are designed to fulfill goal-oriented tasks \parencite{Sapkota_2026}.
+This means we are are to define our goal (what we want to do / achieve) in natural language and 
+
+\subsection{Large Language Models (LLMs)}
+Large Language Models (LLMs) are an evolution
+ in artificial intelligence, moving from
+ rule-based systems to general-purpose generative models. An LLM is essentially
+ a complex statistical system designed to predict the likelihood of
+ a sequence of words. By training on massive amounts of text, often
+ using lots of data from the public internet. These
+ models learn to generate coherent and contextually appropriate
+ continuations for a given input prompt \parencite{douglas2023largelanguagemodels}.
+
+\subsection{Function Calling}
+\label{sec:func-calling}
+LLMs have great generative capabilities but they lack the ability to perform any task beyond generating a response.
+This means LLMs are not able to retrieve any external information in real time. 
+This limitation means LLMs only have access to the static training data, this inherently results in reponses that are plausible but factually incorrect or outdated (often referred to
+as hallucination). \parencite{Qu_2025}. 
+To address this limitation a paradigm named "Function Calling" has been developed. 
+It solves these problems by giving LLMs the ability to interact with external systems by invoking predefined blocks of code (functions) \parencite{wang2026FunctionCalling}.
+
+\subsubsection{Function Calling process example using OpenAI API}
+The following Image illustrates the procedure of function calling using the OpenAI API.
+
+\begin{enumerate}
+    \setlength{\itemsep}{8pt}
+    \item The prompt message and all the tool definitions are sent to the model.
+    \item Based on the provided prompt and tools the model decides to call some function, providing the necessary arguments (in this example "paris").
+    \item The function chosen by the model is executed.
+    \item All prior messages together with the result (output) of the function execution are sent back to the model.
+    \item Based on all the messages the model gives back a final response \parencite{openai_function_calling}.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=0.9\linewidth]{graphics/function-calling-diagram-steps.png}
+\end{center}
+\caption{Function calling procedure
+\parencite{openai_function_calling}}
+\label{fig:function-calling-procedure}
+\end{figure}
+
+
+\newpage
+\subsection{Model Context Protocol (MCP)}
+\label{sec:mcp}
+The Model Context Protocol (MCP) is an open-source standard designed to facilitate the connection between AI
+ applications and external systems. MCP allows AI models (such as ChatGPT) to securely interact with different
+ data sources (like local files and databases) and tools (execute functions).
+
+As illustrated in Figure~\ref{fig:mcp_architecture-overview}, MCP functions similarly to a
+"USB-C port for AI applications," providing a standardized way to connect AI
+applications to external systems \parencite{mcp_intro}.
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=0.9\linewidth]{graphics/mcp-architecture-overview.png}
+\end{center}
+\caption{MCP architecture
+\parencite{mcp_intro}}
+\label{fig:mcp_architecture-overview}
+\end{figure}
+
+

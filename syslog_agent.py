@@ -37,6 +37,7 @@ llm = OpenRouterModel(
 mcp_server = MCPServerStdio(
     command='uv',
     args=['run', 'syslog_mcp_server.py'],
+    env=dict(os.environ),
     tool_prefix='syslog_',
     timeout=30,
 )

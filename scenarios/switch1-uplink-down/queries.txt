@@ -1,1 +1,1 @@
-client1 and client2 have both lost connectivity to the rest of the network, while client3 is unaffected. Investigate the root cause.
+client1 and client2 have both lost connectivity to the rest of the network, while client3 is unaffected. Investigate the root cause. (IMPORTANT: This is the only information you get, provide the Root cause don't ask for any instructions or more information).
