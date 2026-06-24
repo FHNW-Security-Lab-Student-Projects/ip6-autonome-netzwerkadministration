@@ -114,25 +114,54 @@ def _get_agent_model() -> OpenRouterModel | None:
     return _model_cache[name]
 
 
-INSTRUCTIONS = (
-    'You are an orchestrator agent that coordinates a set of specialised sub-agents to '
-    'fulfil user requests. Each tool\'s description explains what its sub-agent does and '
-    'when to use it; delegate each request to the appropriate one.\n\n'
-    'Special notes for: "call_config_agent": changes device configuration. ALWAYS run the two-step workflow: '
-    'first delegate "VALIDATE ONLY: <full request>" to get a diff preview, show it to the '
-    'user, and only after explicit approval delegate "APPLY (user approved): '
-    'device=<name> commands=<exact commands from the validation>". Never apply on '
-    'inferred intent.\n\n'
-    'CONCURRENCY: the read-only tools (call_network_agent, call_snapshot_agent, '
-    'call_topology_agent, call_syslog_agent) may be called in parallel when a request involves several '
-    'independent lookups — optional, use your judgment. The stateful tools '
-    '(call_config_agent, open_syslog_investigation, continue_syslog_investigation) must '
-    'always be called sequentially.\n\n'
-    'IMPORTANT: SELF-CONTAINED REQUESTS: a sub-agent has no access to the conversation history, so '
-    'the `request` argument must carry everything it needs — relevant context from the '
-    'user\'s messages (their goal, constraints, any details they mentioned) and any '
-    'relevant findings from sub-agents called earlier in this conversation.'
-)
+# Feature flags. Experiments (experiment_runner.py) run a reduced orchestrator without
+# the config agent or the syslog investigation tools; the REPL and web UI keep them on.
+# Set ENABLE_CONFIG_AGENT=0 / ENABLE_INVESTIGATIONS=0 to disable.
+ENABLE_CONFIG_AGENT = os.getenv('ENABLE_CONFIG_AGENT', '1') != '0'
+ENABLE_INVESTIGATIONS = os.getenv('ENABLE_INVESTIGATIONS', '1') != '0'
+
+
+def _build_instructions() -> str:
+    """Compose the orchestrator instructions, omitting guidance for disabled tools."""
+    intro = (
+        'You are an orchestrator agent that coordinates a set of specialised sub-agents to '
+        'fulfil user requests. Each tool\'s description explains what its sub-agent does and '
+        'when to use it; delegate each request to the appropriate one.\n\n'
+    )
+
+    config_note = (
+        'Special notes for: "call_config_agent": changes device configuration. ALWAYS run the two-step workflow: '
+        'first delegate "VALIDATE ONLY: <full request>" to get a diff preview, show it to the '
+        'user, and only after explicit approval delegate "APPLY (user approved): '
+        'device=<name> commands=<exact commands from the validation>". Never apply on '
+        'inferred intent.\n\n'
+    ) if ENABLE_CONFIG_AGENT else ''
+
+    # The stateful-tool list only mentions tools that are actually registered.
+    stateful_tools = ['call_config_agent'] if ENABLE_CONFIG_AGENT else []
+    if ENABLE_INVESTIGATIONS:
+        stateful_tools += ['open_syslog_investigation', 'continue_syslog_investigation']
+    stateful_note = (
+        f' The stateful tools ({", ".join(stateful_tools)}) must always be called sequentially.'
+        if stateful_tools else ''
+    )
+    concurrency = (
+        'CONCURRENCY: the read-only tools (call_network_agent, call_snapshot_agent, '
+        'call_topology_agent, call_syslog_agent) may be called in parallel when a request involves several '
+        'independent lookups — optional, use your judgment.' + stateful_note + '\n\n'
+    )
+
+    self_contained = (
+        'IMPORTANT: SELF-CONTAINED REQUESTS: a sub-agent has no access to the conversation history, so '
+        'the `request` argument must carry everything it needs — relevant context from the '
+        'user\'s messages (their goal, constraints, any details they mentioned) and any '
+        'relevant findings from sub-agents called earlier in this conversation.'
+    )
+
+    return intro + config_note + concurrency + self_contained
+
+
+INSTRUCTIONS = _build_instructions()
 
 orchestrator = Agent(llm, name='orchestrator', instructions=INSTRUCTIONS)
 
@@ -168,21 +197,18 @@ async def call_topology_agent() -> str:
     return response
 
 
-@orchestrator.tool_plain
 def list_syslog_investigations() -> str:
     """List all syslog investigations (ID, device, status, created, summary).
     ONLY call this when the user's message clearly indicates that he wants to show the investigations"""
     return list_investigations()
 
 
-@orchestrator.tool_plain
 def get_syslog_investigation(investigation_id: str) -> str:
     """Get full details of a specific syslog investigation by ID or unique prefix. ONLY call this when the user's message starts
     with the exact prefix "/investigate" — never based on inferred intent."""
     return get_investigation_detail(investigation_id)
 
 
-@orchestrator.tool_plain
 async def open_syslog_investigation(description: str, device: str = '') -> str:
     """Open a new user-reported investigation and start LLM-driven analysis in the background.
 
@@ -197,7 +223,6 @@ async def open_syslog_investigation(description: str, device: str = '') -> str:
     return await open_manual_investigation(description, device)
 
 
-@orchestrator.tool_plain
 async def continue_syslog_investigation(
     investigation_id: str,
     follow_up: str = '',
@@ -215,7 +240,13 @@ async def continue_syslog_investigation(
     return await continue_investigation(investigation_id, follow_up, synchronous=not background)
 
 
-@orchestrator.tool_plain
+if ENABLE_INVESTIGATIONS:
+    orchestrator.tool_plain(list_syslog_investigations)
+    orchestrator.tool_plain(get_syslog_investigation)
+    orchestrator.tool_plain(open_syslog_investigation)
+    orchestrator.tool_plain(continue_syslog_investigation)
+
+
 async def call_config_agent(request: str) -> str:
     """Delegate a configuration request to the Config Agent.
 
@@ -231,6 +262,10 @@ async def call_config_agent(request: str) -> str:
         return result.output
     except APITimeoutError:
         return 'The config agent timed out after 3 minutes.'
+
+
+if ENABLE_CONFIG_AGENT:
+    orchestrator.tool_plain(call_config_agent)
 
 
 @orchestrator.tool_plain
@@ -277,9 +312,17 @@ async def call_syslog_agent(request: str) -> str:
 
 @asynccontextmanager
 async def main_lifespan():
-    """Compose all sub-agent lifespans: MCP servers, topology refresh, Loki poller."""
-    async with network_lifespan(), syslog_lifespan(), topology_lifespan(), snapshot_lifespan(), config_lifespan():
-        yield
+    """Compose all sub-agent lifespans: MCP servers, topology refresh, Loki poller.
+
+    The config agent's lifespan is only entered when the config agent is enabled, so
+    experiments don't spin up the config MCP server.
+    """
+    async with network_lifespan(), syslog_lifespan(), topology_lifespan(), snapshot_lifespan():
+        if ENABLE_CONFIG_AGENT:
+            async with config_lifespan():
+                yield
+        else:
+            yield
 
 
 async def main():

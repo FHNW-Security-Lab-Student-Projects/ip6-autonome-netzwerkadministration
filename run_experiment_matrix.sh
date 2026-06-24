@@ -35,7 +35,7 @@ set -uo pipefail
 
 # OpenRouter model IDs — 2 per price tier (see docs/model-tier-definition.md).
 MODELS=(
-  "deepseek/deepseek-v3.2"
+  "z-ai/glm-5.2"
 )
 
 # Scenario folder names under scenarios/.
@@ -43,16 +43,16 @@ SCENARIOS=(
   # acl-silent-drop
   # client3-port-down
   # duplicate-ip-arp
-   intf-down
+  # intf-down
   # missing-export-policy
-  # missing-vlan-on-trunk
-  # mtu-blackhole
-  # one-way-route-filter
+   missing-vlan-on-trunk
+   mtu-blackhole
+   one-way-route-filter
   # switch1-uplink-down
   # basic-client-communication
 )
 
-REPEATS=5                              # runs per (model, scenario) pair
+REPEATS=3                              # runs per (model, scenario) pair
 MAX_SECONDS=600                          # wall-clock cap per run; 0 = no cap. On expiry the run
                                        # is logged as DNF (completed sub-agent stats are kept)
 REDEPLOY_BETWEEN_RUNS=1                # 1 = redeploy lab before each run, 0 = don't

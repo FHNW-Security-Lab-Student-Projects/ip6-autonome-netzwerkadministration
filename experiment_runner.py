@@ -52,6 +52,11 @@ load_dotenv(Path(__file__).parent / '.env')
 
 from failure_log import FAILURE_LOG_PATH, TRANSPORT_LOG_PATH
 
+# Experiments run a reduced orchestrator: no config agent, no syslog investigation tools.
+# These must be set before importing client_agent, which reads them at import time.
+os.environ.setdefault('ENABLE_CONFIG_AGENT', '0')
+os.environ.setdefault('ENABLE_INVESTIGATIONS', '0')
+
 from client_agent import (
     DEFAULT_AGENT_MODEL,
     OPENROUTER_API_KEY,
