@@ -31,6 +31,24 @@ Large Language Models (LLMs) are an evolution
  models learn to generate coherent and contextually appropriate
  continuations for a given input prompt \parencite{douglas2023largelanguagemodels}.
 
+
+\subsection{Tokens, Context Windows and Cost}
+\label{sec:tokens-context-cost}
+LLMs do not operate on text (words and characters) directly. Text has to first go through a \emph{tokenizer} that breaks it into pieces called \emph{tokens}
+which can be words, sub-words or even just single characters. The goal of a \emph{tokenizer} is to return an efficient set of tokens to represent a text dataset. \parencite{alammar2024hands}
+
+Each model can only process a limited number of tokens at once. This upper bound is referred to as the
+\emph{context window} and covers the prompt, any provided tools, the conversation history and the generated
+response. Beyond being a hard limit, longer contexts also degrade the quality of the model's output:
+\textcite{liu-etal-2024-lost} show that models use information most reliably when it appears at the beginning or the
+end of the context and perform noticeably worse when relevant information is located in the middle, a
+phenomenon known as "lost in the middle". The degradation is not only a question of \emph{where} relevant
+information sits, but also of \emph{how much} context surrounds it: \textcite{hong2025context} evaluate a
+range of state-of-the-art models on deliberately simple tasks and find that performance declines, as the input grows longer, even when the task itself does not become harder. These two properties, the finite context window and the
+degradation over long contexts, are a central motivation for distributing work across several specialised
+agents rather than handling everything in a single, ever-growing context (see \cref{sec:multi-agent}).
+
+
 \subsection{Function Calling}
 \label{sec:func-calling}
 LLMs have great generative capabilities but they lack the ability to perform any task beyond generating a response.
@@ -81,5 +99,23 @@ applications to external systems \parencite{mcp_intro}.
 \parencite{mcp_intro}}
 \label{fig:mcp_architecture-overview}
 \end{figure}
+
+
+\newpage
+\subsection{Multi-Agent (AI) Systems}
+\label{sec:multi-agent}
+A multi-agent (AI) systems (MAS) are systems composed of multiple interacting agents. 
+MAS (Multi-agent systems) are able to solve more difficult problems compared to individual agents (a monolithic system) \parencite{tran2025multiagentcollaborationmechanismssurvey} 
+
+With the rise of LLM-based agents (AI Agents) (see \cref{sec:LLMs}), this idea has been transferred to systems in which
+the individual agents are driven by LLMs. \textcite{tran2025multiagentcollaborationmechanismssurvey} work describes how
+multiple LLM agents collaborate through different coordination structures. This work uses a \emph{hierarchical} structure together with
+a \emph{role-based} collaboration strategy. A detailed view of the architecture in this work is described in \cref{sec:concepts}.
+
+Splitting a task across several specialised agents has practical benefits that follow directly from the
+limitations discussed in \cref{sec:tokens-context-cost}: each agent can be given a focused instruction set and
+a smaller selection of tools, which keeps its individual context small, reduces the risk of context-related
+quality degradation.
+
 
 
