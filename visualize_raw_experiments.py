@@ -26,10 +26,27 @@ from visualize_experiments import _save  # reuse same save helper
 # Colours for the per-session verdict shown on each y-axis label. Mirrors the
 # green/red/grey of raw_experiments_html.py — the manual verdict in
 # evaluation_log.jsonl is the source of truth for what succeeded, so it drives
-# the label colour; a crashed run with no verdict stays red, unevaluated is grey.
+# the label colour; a crashed run with no verdict stays red, unevaluated is grey,
+# and a DNF (hit the wall-clock time limit) gets its own amber category.
 VERDICT_FOUND = '#1a7f37'
 VERDICT_MISSED = 'crimson'
 VERDICT_UNEVAL = '#888888'
+VERDICT_DNF = '#d97706'
+
+
+def _failure_kind(row: pd.Series) -> str:
+    """Classify a failed run: 'dnf' (hit the time limit), 'crashed', or '' (ok).
+
+    A run is only a failure when success is False. We separate a DNF — where the
+    run was cut off at the wall-clock limit rather than erroring — by inspecting
+    the recorded error text, so a timed-out run isn't mislabelled as a crash.
+    """
+    if bool(row.get('success', True)):
+        return ''
+    err = str(row.get('error') or '').lower()
+    if 'dnf' in err or 'timeout' in err or 'time limit' in err:
+        return 'dnf'
+    return 'crashed'
 
 
 sns.set_theme(context='paper', style='whitegrid', palette='colorblind')
@@ -50,23 +67,25 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _verdict_style(row: pd.Series) -> tuple[str, str]:
-    """Return (label_suffix, colour) encoding the manual verdict + crash state.
+    """Return (label_suffix, colour) encoding the manual verdict + failure state.
 
     Verdict (from evaluation_log.jsonl) is the source of truth and wins when present:
-    ✓ found / ✗ missed. Otherwise the run is unevaluated. A crashed run is suffixed
-    with `*` and stays red even when unevaluated, since a crash is never a success.
+    ✓ found / ✗ missed. Otherwise the run is unevaluated. A failed run is flagged
+    with a marker — `*` for a crash, `†` for a DNF (hit the time limit) — and, when
+    unevaluated, takes its failure colour: red for a crash, amber for a DNF.
     """
     found = row.get('found_issue')
-    crashed = not bool(row.get('success', True))
-    star = ' *' if crashed else ''
+    kind = _failure_kind(row)
+    marker = {'crashed': ' *', 'dnf': ' $\\dagger$'}.get(kind, '')
     # mathtext symbols render via matplotlib's own fonts, so they don't depend on
     # the serif face having a ✓/✗ glyph (DejaVu Serif lacks them).
     if pd.notna(found):
         if bool(found):
-            return rf' $\checkmark${star}', VERDICT_FOUND
-        return rf' $\times${star}', VERDICT_MISSED
-    # Unevaluated: grey unless it crashed, in which case flag it red.
-    return star, (VERDICT_MISSED if crashed else VERDICT_UNEVAL)
+            return rf' $\checkmark${marker}', VERDICT_FOUND
+        return rf' $\times${marker}', VERDICT_MISSED
+    # Unevaluated: grey, unless the run failed — flag a crash red, a DNF amber.
+    fail_colour = {'crashed': VERDICT_MISSED, 'dnf': VERDICT_DNF}.get(kind)
+    return marker, (fail_colour or VERDICT_UNEVAL)
 
 
 def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
@@ -137,11 +156,13 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
         plt.Rectangle((0, 0), 1, 1, color=VERDICT_MISSED),
         plt.Rectangle((0, 0), 1, 1, color=VERDICT_UNEVAL),
         plt.Line2D([], [], linestyle='none', marker='*', color=VERDICT_MISSED),
+        plt.Line2D([], [], linestyle='none', marker=r'$\dagger$', color=VERDICT_DNF),
     ]
     fig.legend(
         handles=model_handles + token_handles + verdict_handles,
         labels=(models + ['input tokens', 'output tokens']
-                + ['label: found', 'label: missed', 'label: unevaluated', 'crashed (*)']),
+                + ['label: found', 'label: missed', 'label: unevaluated',
+                   'crashed (*)', r'DNF / time limit ($\dagger$)']),
         loc='lower center',
         ncol=min(6, len(models) + 2),
         bbox_to_anchor=(0.5, -0.10),

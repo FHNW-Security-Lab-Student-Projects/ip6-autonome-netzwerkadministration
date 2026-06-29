@@ -49,6 +49,24 @@ degradation over long contexts, are a central motivation for distributing work a
 agents rather than handling everything in a single, ever-growing context (see \cref{sec:multi-agent}).
 
 
+\subsection{Multi-Agent (AI) Systems}
+\label{sec:multi-agent}
+A multi-agent (AI) systems (MAS) are systems composed of multiple interacting agents. 
+MAS (Multi-agent systems) are able to solve more difficult problems compared to individual agents (a monolithic system) \parencite{tran2025multiagentcollaborationmechanismssurvey} 
+
+With the rise of LLM-based agents (AI Agents) (see \cref{sec:LLMs}), this idea has been transferred to systems in which
+the individual agents are driven by LLMs. \textcite{tran2025multiagentcollaborationmechanismssurvey} work describes how
+multiple LLM agents collaborate through different coordination structures. This work uses a \emph{hierarchical} structure together with
+a \emph{role-based} collaboration strategy. A detailed view of the architecture in this work is described in \cref{sec:concepts}.
+
+Splitting a task across several specialised agents has practical benefits that follow directly from the
+limitations discussed in \cref{sec:tokens-context-cost}: each agent can be given a focused instruction set and
+a smaller selection of tools, which keeps its individual context small, reduces the risk of context-related
+quality degradation.
+
+
+
+
 \subsection{Function Calling}
 \label{sec:func-calling}
 LLMs have great generative capabilities but they lack the ability to perform any task beyond generating a response.
@@ -101,21 +119,7 @@ applications to external systems \parencite{mcp_intro}.
 \end{figure}
 
 
-\newpage
-\subsection{Multi-Agent (AI) Systems}
-\label{sec:multi-agent}
-A multi-agent (AI) systems (MAS) are systems composed of multiple interacting agents. 
-MAS (Multi-agent systems) are able to solve more difficult problems compared to individual agents (a monolithic system) \parencite{tran2025multiagentcollaborationmechanismssurvey} 
 
-With the rise of LLM-based agents (AI Agents) (see \cref{sec:LLMs}), this idea has been transferred to systems in which
-the individual agents are driven by LLMs. \textcite{tran2025multiagentcollaborationmechanismssurvey} work describes how
-multiple LLM agents collaborate through different coordination structures. This work uses a \emph{hierarchical} structure together with
-a \emph{role-based} collaboration strategy. A detailed view of the architecture in this work is described in \cref{sec:concepts}.
-
-Splitting a task across several specialised agents has practical benefits that follow directly from the
-limitations discussed in \cref{sec:tokens-context-cost}: each agent can be given a focused instruction set and
-a smaller selection of tools, which keeps its individual context small, reduces the risk of context-related
-quality degradation.
 
 
 
