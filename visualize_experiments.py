@@ -42,10 +42,21 @@ def _save(fig: plt.Figure, out_dir: Path, name: str, ext: str) -> Path:
     return path
 
 
-def _rotate_xticks(ax: plt.Axes, degrees: int = 15) -> None:
+def _rotate_xticks(ax: plt.Axes, degrees: int = 45) -> None:
     for label in ax.get_xticklabels():
         label.set_rotation(degrees)
         label.set_horizontalalignment('right')
+
+
+def _cat_subplots(n_categories: int, height: float = 3.7):
+    """Create a figure whose width grows with the number of x-axis categories.
+
+    The default 6.0 in width crowds long categorical labels once there are more
+    than a handful of groups (e.g. 10 scenarios). Scale width with the category
+    count, but never go below the 6.0 in default so small charts stay compact.
+    """
+    width = max(6.0, 1.5 + 0.9 * n_categories)
+    return plt.subplots(figsize=(width, height))
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +72,7 @@ def plot_model_comparison(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Pat
         ('total_tool_calls',  'Tool calls',  'model_comparison_tool_calls'),
     ]
     for column, ylabel, name in metrics:
-        fig, ax = plt.subplots()
+        fig, ax = _cat_subplots(df['model'].nunique())
         sns.barplot(data=df, x='model', y=column, ax=ax, errorbar='sd')
         ax.set_xlabel('Model')
         ax.set_ylabel(ylabel)
@@ -79,7 +90,7 @@ def plot_model_comparison(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Pat
         'total_normalized_input_tokens':  'Input',
         'total_normalized_output_tokens': 'Output',
     })
-    fig, ax = plt.subplots()
+    fig, ax = _cat_subplots(df['model'].nunique())
     sns.barplot(data=tokens, x='model', y='tokens', hue='kind', ax=ax, errorbar='sd')
     ax.set_xlabel('Model')
     ax.set_ylabel('Tokens (normalized)')
@@ -98,7 +109,7 @@ def plot_scenario_performance(df: pd.DataFrame, out_dir: Path, ext: str) -> list
         ('total_tool_calls', 'Tool calls',   'scenario_performance_tool_calls'),
     ]
     for column, ylabel, name in metrics:
-        fig, ax = plt.subplots()
+        fig, ax = _cat_subplots(df['scenario'].nunique())
         sns.barplot(data=df, x='scenario', y=column, hue='model', ax=ax, errorbar='sd')
         ax.set_xlabel('Scenario')
         ax.set_ylabel(ylabel)
@@ -122,7 +133,7 @@ def plot_invalid_commands(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Pat
         print('  [skip] invalid-commands chart: no invalid commands recorded.')
         return []
 
-    fig, ax = plt.subplots()
+    fig, ax = _cat_subplots(df['scenario'].nunique())
     sns.barplot(data=df, x='scenario', y='invalid_commands', hue='model',
                 ax=ax, estimator='sum', errorbar=None)
     ax.set_xlabel('Scenario')
@@ -150,7 +161,7 @@ def plot_correctness(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
         return []
     evaluated['found'] = evaluated['found_issue'].astype(bool).astype(int)
 
-    fig, ax = plt.subplots()
+    fig, ax = _cat_subplots(evaluated['scenario'].nunique())
     # errorbar=None: the bar height is the mean of found (0/1) per group = the found
     # rate. With few runs per cell, a CI would be noise, so show the rate cleanly.
     sns.barplot(data=evaluated, x='scenario', y='found', hue='model',
@@ -171,7 +182,7 @@ def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
         ('total_cost_usd',     'Cost (USD)',    'distribution_cost'),
     ]
     for column, ylabel, name in metrics:
-        fig, ax = plt.subplots()
+        fig, ax = _cat_subplots(df['model'].nunique())
         sns.boxplot(data=df, x='model', y=column, ax=ax)
         sns.stripplot(data=df, x='model', y=column, ax=ax,
                       color='black', size=3, alpha=0.5)
@@ -200,7 +211,7 @@ def plot_scenario_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> li
         ('total_normalized_input_tokens', 'Input tokens (normalized)', 'scenario_distribution_tokens'),
     ]
     for column, ylabel, name in metrics:
-        fig, ax = plt.subplots()
+        fig, ax = _cat_subplots(df['scenario'].nunique())
         sns.boxplot(data=df, x='scenario', y=column, hue=hue, ax=ax)
         sns.stripplot(data=df, x='scenario', y=column, hue=hue,
                       ax=ax, color='black', size=3, alpha=0.5,

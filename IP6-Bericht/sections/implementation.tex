@@ -1,4 +1,11 @@
 \section{Implementation}
 \label{sec:implementation}
 
+\subsection{Agent Framework and Harness}
+\label{sec:impl-framework}
+The agent harness introduced conceptually in \cref{sec:agent-loop} is provided in this work by
+\emph{Pydantic AI}, a Python agent framework \parencite{pydantic_ai}. Pydantic AI implements the agent loop, drives the
+function-calling exchange with the model, manages the message history across iterations and exposes the tools of each
+agent. % TODO: model configuration, MCP server wiring, delegation as tool calls, message-history persistence for handover.
+
 % TODO: Concrete implementation of the multi-agent system.

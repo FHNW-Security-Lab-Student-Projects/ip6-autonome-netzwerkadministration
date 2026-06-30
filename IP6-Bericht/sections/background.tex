@@ -10,6 +10,7 @@ From a very basic perspective, an agent is an entity which is able to produce so
 environment \parencite{CASTELFRANCHI1998157}.
 
 \subsubsection{AI Agent}
+\label{sec:AI_Agent}
 With the rise of generative AI a new term "AI Agent" has emerged.
 AI Agents can be defined as software entities which are designed to fulfill goal-oriented tasks.
 Such agents can take in information from their environment, be it structured or unstructured inputs, draw conclusions from
@@ -97,6 +98,60 @@ The following Image illustrates the function calling principle using the OpenAI 
 \label{fig:function-calling-procedure}
 \end{figure}
 
+\newpage
+\subsection{Agent Loop and Agent Harness}
+\label{sec:agent-loop}
+
+\subsubsection{Agent Loop}
+Function calling (see \cref{sec:func-calling}) describes a \emph{single} exchange in which the model receives a function, requests a
+function execution and receives its result. On its own, this does not yet make a system agentic. The model still needs to be
+invoked repeatedly, decide when another tool call is necessary, and recognise when the task is complete. This
+repetition is captured by the term \emph{agent loop}, the core control cycle of an AI Agent. The model receives the current
+context, decides on an action (either calling a tool or producing a final answer), the chosen tool is executed, its
+result is appended to the context, and the cycle repeats until the model returns a final answer or a stop condition is
+reached \parencite{yao2023reactsynergizingreasoningacting,anthropic_effective_agents,strands_agent_loop}. These steps of reasoning and acting were introduced
+as the \emph{ReAct} pattern by \textcite{yao2023reactsynergizingreasoningacting}. The agent loop is therefore what elevates a sequence of isolated
+function calls into goal-oriented behaviour that adapts to what the model observes while running, as introduced in
+\cref{sec:AI_Agent}.
+
+\Cref{fig:agent-loop} shows this cycle: an initial input and context enter the loop, the model reasons and selects a
+tool, the tool is executed and its result is fed back for the next round of reasoning, and the loop repeats until the
+model produces a final response.
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=0.9\linewidth]{graphics/agent-loop-strandsagents.png}
+\end{center}
+\caption{The agent loop \parencite{strands_agent_loop}}
+\label{fig:agent-loop}
+\end{figure}
+\newpage
+
+\subsubsection{Agent Harness}
+An LLM by itself cannot run this loop (agent loop), it only predicts a single continuation for a given input
+(see \cref{sec:func-calling}). The loop, the dispatching of tool calls, the accumulation of the message history and the
+evaluation of stop conditions all have to be implemented by the surrounding software. This runtime software is
+commonly referred to as the \emph{agent harness}, the software infrastructure that wraps around an LLM and enables it to
+act on tasks rather than only respond to prompts, often summarised as \emph{Agent = Model + Harness}
+\parencite{databricks_ai_harness,langchain_agent_harness}. The harness is the engine that drives the agent loop (the core) and manages the
+things around it. It forwards the conversation and the available tool definitions to the model, executes the tool
+calls the model requests and maintains the message history across iterations. In practice a
+harness is most of the time provided by an \emph{agent framework} with APIs to modify and add additoanl functionalities. The concrete framework used in this work is described in
+\cref{sec:implementation}.
+
+\Cref{fig:agent-harness} illustrates this relationship: the model sits at the centre and only reasons and decides,
+while everything around it, the context injection, control, action (tool calls), observation and persistence, is
+provided by the surrounding harness.
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=0.9\linewidth]{graphics/langchain-anatomy-of-an-agent-harness.png}
+\end{center}
+\caption{Anatomy of an agent: the model surrounded by the harness
+\parencite{langchain_agent_harness}}
+\label{fig:agent-harness}
+\end{figure}
+
 
 \newpage
 \subsection{Model Context Protocol (MCP)}
@@ -105,7 +160,19 @@ The Model Context Protocol (MCP) is an open-source standard designed to facilita
  applications and external systems. MCP allows AI models (such as ChatGPT) to securely interact with different
  data sources (like local files and databases) and tools (execute functions).
 
-As illustrated in \cref{fig:mcp_architecture-overview}, MCP functions similarly to a
+The core problem MCP addresses is the fragmentation of AI integrations. Before MCP, every
+new data source required its own custom implementation, making truly connected systems
+difficult to scale \parencite{mcp_anthropic}. This is commonly framed as the $N \times M$
+integration problem \parencite{mcp_nxm}. Without a common standard, connecting $N$ AI
+applications to $M$ external systems (data sources and tools) requires a custom 
+integration for every AI-Application, external system pair, resulting in up to $N \times M$ separate
+integrations that must each be built and maintained individually. MCP replaces this with a
+single shared protocol. Every AI application implements the MCP client side once, and every
+external system is exposed through an MCP server once. This reduces the integration effort
+from a multiplicative $N \times M$ to an additive $N + M$. 
+\parencite{mcp_nxm}.
+
+As illustrated in \cref{fig:mcp_architecture-overview}, MCP therefore functions similarly to a
 "USB-C port for AI applications," providing a standardized way to connect AI
 applications to external systems \parencite{mcp_intro}.
 

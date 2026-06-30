@@ -1,180 +1,246 @@
-<mxfile host="Electron" agent="Claude">
-  <diagram id="agents" name="agent architecture">
-    <mxGraphModel dx="1712" dy="1008" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1020" math="0" shadow="1">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-        <mxCell id="title" parent="1" style="text;html=1;fontSize=22;fontStyle=1;align=left;verticalAlign=middle;fontColor=#1A1A2E;" value="Multi-agent troubleshooting system — agent topology" vertex="1">
-          <mxGeometry height="34" width="900" x="40" y="18" as="geometry" />
-        </mxCell>
-        <mxCell id="subtitle" parent="1" style="text;html=1;fontSize=12;align=left;verticalAlign=middle;fontColor=#555555;" value="All agents run via OpenRouter · sub-agents are stateless (self-contained requests)" vertex="1">
-          <mxGeometry height="22" width="1100" x="40" y="52" as="geometry" />
-        </mxCell>
-        <mxCell id="user_entry" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;Users&lt;/b&gt;&lt;br&gt;&lt;font&gt;Web UI&lt;/font&gt;" vertex="1">
-          <mxGeometry height="54" width="200" x="160" y="130" as="geometry" />
-        </mxCell>
-        <mxCell id="auto_entry" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;Auto-triage&lt;/b&gt;&lt;br&gt;&lt;font&gt;Loki syslog poller — background loop&lt;br&gt;opens investigations on important events&lt;/font&gt;" vertex="1">
-          <mxGeometry height="60" width="340" x="1120" y="124" as="geometry" />
-        </mxCell>
-        <mxCell id="orch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#10243e;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;orchestrator&lt;/b&gt;&lt;br&gt;&lt;font&gt;client_agent.py · user-facing&lt;br&gt;delegates to sub-agents&lt;br&gt;&lt;/font&gt;" vertex="1">
-          <mxGeometry height="84" width="280" x="120" y="250" as="geometry" />
-        </mxCell>
-        <mxCell id="inv_orch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#cdb4f0;strokeColor=#7d5fb2;fontColor=#2e1a4d;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;investigation_orchestrator&lt;/b&gt;&lt;br&gt;&lt;font&gt;autonomous · READ-ONLY roster&lt;br&gt;excludes config_agent (no writes)&lt;br&gt;owns direct query_loki access&lt;/font&gt;" vertex="1">
-          <mxGeometry height="84" width="340" x="1120" y="250" as="geometry" />
-        </mxCell>
-        <mxCell id="e_user_orch" edge="1" parent="1" source="user_entry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;strokeWidth=1.5;fontSize=13;" target="orch">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="e_auto_inv" edge="1" parent="1" source="auto_entry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;strokeWidth=1.5;fontSize=13;" target="inv_orch">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="config_agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#4d2600;shadow=1;verticalAlign=middle;" value="&lt;b&gt;config_agent&lt;/b&gt;&lt;br&gt;&lt;font&gt;WRITE · candidate + commit&lt;br&gt;validate / apply&lt;/font&gt;" vertex="1">
-          <mxGeometry height="74" width="200" x="60" y="430" as="geometry" />
-        </mxCell>
-        <mxCell id="network_agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1b3a1b;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;network_agent&lt;/b&gt;&lt;br&gt;&lt;font&gt;READ-ONLY · live state&lt;br&gt;show / get state&lt;/font&gt;" vertex="1">
-          <mxGeometry height="74" width="220" x="340" y="430" as="geometry" />
-        </mxCell>
-        <mxCell id="snapshot_agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1b3a1b;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;snapshot_agent&lt;/b&gt;&lt;br&gt;&lt;font&gt;READ-ONLY · history&lt;br&gt;state before / diff over time&lt;/font&gt;" vertex="1">
-          <mxGeometry height="74" width="220" x="640" y="430" as="geometry" />
-        </mxCell>
-        <mxCell id="topology_cache" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#b0e3e6;strokeColor=#20a0a0;fontColor=#0b3d3d;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;topology agent&lt;/b&gt;&lt;br&gt;&lt;font&gt;not an LLM agent&lt;br&gt;nodes · links · LLDP · clab drift&lt;br&gt;&lt;/font&gt;" vertex="1">
-          <mxGeometry height="74" width="220" x="940" y="430" as="geometry" />
-        </mxCell>
-        <mxCell id="query_loki" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#3b1f52;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;query_loki&lt;/b&gt;&lt;br&gt;&lt;font&gt;direct MCP tool&lt;br&gt;(no agent wrapper)&lt;/font&gt;" vertex="1">
-          <mxGeometry height="74" width="200" x="1280" y="430" as="geometry" />
-        </mxCell>
-        <mxCell id="d_o_cfg" edge="1" parent="1" source="orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;labelBackgroundColor=#ffffff;" target="config_agent" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="d_o_net" edge="1" parent="1" source="orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;labelBackgroundColor=#ffffff;" target="network_agent" value="">
-          <mxGeometry relative="1" x="0.0025" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points">
-              <mxPoint x="260" y="382" />
-              <mxPoint x="430" y="382" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="d_o_snap" edge="1" parent="1" source="orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;labelBackgroundColor=#ffffff;" target="snapshot_agent" value="">
-          <mxGeometry relative="1" x="0.0007" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points">
-              <mxPoint x="730" y="292" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="d_o_topo" edge="1" parent="1" source="orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;labelBackgroundColor=#ffffff;" target="topology_cache" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="d_i_net" edge="1" parent="1" source="inv_orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" target="network_agent">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="450" y="280" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="d_i_snap" edge="1" parent="1" source="inv_orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" target="snapshot_agent">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="750" y="310" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="d_i_topo" edge="1" parent="1" source="inv_orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" target="topology_cache">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1290" y="382" />
-              <mxPoint x="1070" y="382" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="d_i_loki" edge="1" parent="1" source="inv_orch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" target="query_loki">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="config_mcp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;" value="&lt;b&gt;config_mcp_server.py&lt;/b&gt;&lt;br&gt;&lt;font&gt;validate and apply config&lt;/font&gt;" vertex="1">
-          <mxGeometry height="60" width="200" x="60" y="600" as="geometry" />
-        </mxCell>
-        <mxCell id="network_mcp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;mcp_server.py&lt;/b&gt;&lt;br&gt;&lt;font&gt;read commands against devices&lt;/font&gt;" vertex="1">
-          <mxGeometry height="60" width="220" x="340" y="600" as="geometry" />
-        </mxCell>
-        <mxCell id="snapshot_loop" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;state snapshot loop&lt;/b&gt;&lt;br&gt;&lt;font&gt;in-process · captures every 2 min&lt;br&gt;ARP · interfaces · route tables&lt;/font&gt;" vertex="1">
-          <mxGeometry height="60" width="220" x="640" y="600" as="geometry" />
-        </mxCell>
-        <mxCell id="topology_mcp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;topology_mcp_server.py&lt;/b&gt;&lt;br&gt;&lt;font&gt;compare clab topology with LLDP live view&lt;/font&gt;" vertex="1">
-          <mxGeometry height="60" width="220" x="940" y="600" as="geometry" />
-        </mxCell>
-        <mxCell id="syslog_mcp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;syslog_mcp_server.py&lt;/b&gt;&lt;br&gt;&lt;font&gt;query_loki (LogQL)&lt;/font&gt;" vertex="1">
-          <mxGeometry height="60" width="200" x="1280" y="600" as="geometry" />
-        </mxCell>
-        <mxCell id="t_cfg" edge="1" parent="1" source="config_agent" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;labelBackgroundColor=#ffffff;" target="config_mcp" value="">
-          <mxGeometry relative="1" x="-0.0417" y="10" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="t_net" edge="1" parent="1" source="network_agent" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;labelBackgroundColor=#ffffff;" target="network_mcp" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="t_snap" edge="1" parent="1" source="snapshot_agent" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;labelBackgroundColor=#ffffff;" target="snapshot_loop" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="t_topo" edge="1" parent="1" source="topology_cache" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;labelBackgroundColor=#ffffff;" target="topology_mcp" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="t_loki" edge="1" parent="1" source="query_loki" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;labelBackgroundColor=#ffffff;" target="syslog_mcp" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="devices" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#5a1410;shadow=1;verticalAlign=middle;fontSize=12;" value="&lt;b&gt;Nokia SR Linux testlab&lt;/b&gt;&lt;br&gt;router1 · router2 · switch1 · switch2  (+ clients)&lt;br&gt;reached over JSON-RPC (only network devices not clients) (:80 / :443)" vertex="1">
-          <mxGeometry height="110" width="800" x="60" y="760" as="geometry" />
-        </mxCell>
-        <mxCell id="monitoring" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#3b1f52;shadow=1;verticalAlign=middle;fontSize=13;" value="&lt;b&gt;Monitoring stack&lt;/b&gt;&#xa;Alloy (syslog :1514) → Loki (172.20.20.101:3100)&#xa;Grafana dashboards" vertex="1">
-          <mxGeometry height="110" width="380" x="1120" y="760" as="geometry" />
-        </mxCell>
-        <mxCell id="b_cfg" edge="1" parent="1" source="config_mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#b85450;strokeWidth=1.5;fontSize=13;fontColor=#7a1f1c;labelBackgroundColor=#ffffff;" target="devices" value="">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="b_net" edge="1" parent="1" source="network_mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#b85450;strokeWidth=1.5;fontSize=13;fontColor=#7a1f1c;labelBackgroundColor=#ffffff;" target="devices" value="">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="b_snap" edge="1" parent="1" source="snapshot_loop" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#b85450;strokeWidth=1.5;fontSize=13;fontColor=#7a1f1c;labelBackgroundColor=#ffffff;" target="devices" value="">
-          <mxGeometry relative="1" x="0.0256" as="geometry">
-            <mxPoint as="offset" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="b_topo" edge="1" parent="1" source="topology_mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#b85450;strokeWidth=1.5;fontSize=13;fontColor=#7a1f1c;labelBackgroundColor=#ffffff;" target="devices" value="">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint as="offset" />
-            <Array as="points">
-              <mxPoint x="1050" y="680" />
-              <mxPoint x="460" y="680" />
-            </Array>
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="b_loki" edge="1" parent="1" source="syslog_mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#9673a6;strokeWidth=1.5;fontSize=13;fontColor=#4a2d6b;labelBackgroundColor=#ffffff;" target="monitoring" value="">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="b_syslog" edge="1" parent="1" source="devices" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#9673a6;strokeWidth=1.5;fontSize=13;fontColor=#4a2d6b;labelBackgroundColor=#ffffff;" target="monitoring" value="syslog →">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="b_poll" edge="1" parent="1" source="auto_entry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#9673a6;strokeWidth=1.5;fontSize=13;fontColor=#4a2d6b;labelBackgroundColor=#ffffff;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="monitoring" value="">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1540" y="160" />
-              <mxPoint x="1540" y="815" />
-            </Array>
-            <mxPoint x="1500" y="810" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="oH0S2n9oKLJIMfUliJMt-8" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;labelBackgroundColor=#ffffff;entryX=-0.003;entryY=0.113;entryDx=0;entryDy=0;entryPerimeter=0;" target="inv_orch" value="">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="400" y="260" as="sourcePoint" />
-            <mxPoint x="1050" y="398" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
+<mxfile host="65bd71144e">
+    <diagram id="agents" name="agent architecture">
+        <mxGraphModel dx="1400" dy="778" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1020" math="0" shadow="1">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Multi-agent troubleshooting system — agent topology" style="text;html=1;fontSize=22;fontStyle=1;align=left;verticalAlign=middle;fontColor=#1A1A2E;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="18" width="900" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" value="All agents run via OpenRouter · sub-agents are stateless (self-contained requests)" style="text;html=1;fontSize=12;align=left;verticalAlign=middle;fontColor=#555555;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="52" width="1100" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="user_entry" value="&lt;b&gt;Users&lt;/b&gt;&lt;br&gt;&lt;font&gt;Web UI&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="130" width="200" height="54" as="geometry"/>
+                </mxCell>
+                <mxCell id="auto_entry" value="&lt;b&gt;Auto-triage&lt;/b&gt;&lt;br&gt;&lt;font&gt;Loki syslog poller — background loop&lt;br&gt;opens investigations on important events&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="124" width="340" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="orch" value="&lt;b&gt;orchestrator&lt;/b&gt;&lt;br&gt;&lt;font&gt;client_agent.py · user-facing&lt;br&gt;delegates to sub-agents&lt;br&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#10243e;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="250" width="280" height="84" as="geometry"/>
+                </mxCell>
+                <mxCell id="inv_orch" value="&lt;b&gt;investigation_orchestrator&lt;/b&gt;&lt;br&gt;&lt;font&gt;Orchestrator dedicated for autonomous syslog event analysis (config_agent excluded)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#cdb4f0;strokeColor=#7d5fb2;fontColor=#2e1a4d;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="250" width="340" height="84" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_user_orch" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;strokeWidth=1.5;fontSize=13;" parent="1" source="user_entry" target="orch" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_auto_inv" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#999999;strokeWidth=1.5;fontSize=13;" parent="1" source="auto_entry" target="inv_orch" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="config_agent" value="&lt;b&gt;config_agent&lt;/b&gt;&lt;br&gt;validate &amp;amp; apply configuration" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#4d2600;shadow=1;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="430" width="200" height="74" as="geometry"/>
+                </mxCell>
+                <mxCell id="network_agent" value="&lt;b&gt;network_agent&lt;/b&gt;&lt;br&gt;retrieve live state from devices" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1b3a1b;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="430" width="220" height="74" as="geometry"/>
+                </mxCell>
+                <mxCell id="snapshot_agent" value="&lt;b&gt;snapshot_agent&lt;/b&gt;&lt;div&gt;History&lt;/div&gt;&lt;div&gt;&lt;font&gt;state which is not available in syslog or live device state&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1b3a1b;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="640" y="430" width="220" height="74" as="geometry"/>
+                </mxCell>
+                <mxCell id="topology_cache" value="&lt;b&gt;topology agent&lt;/b&gt;&lt;br&gt;&lt;font&gt;cached live state of network topology, retrieved via LLDP&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#b0e3e6;strokeColor=#20a0a0;fontColor=#0b3d3d;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="940" y="430" width="220" height="74" as="geometry"/>
+                </mxCell>
+                <mxCell id="syslog_agent" value="&lt;b&gt;syslog_agent&lt;/b&gt;&lt;br&gt;&lt;font&gt;syslog analysis&lt;br&gt;query + interpret Loki logs&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1b3a1b;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="430" width="200" height="74" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_o_cfg" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;" parent="1" source="orch" target="config_agent" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_o_net" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;" parent="1" source="orch" target="network_agent" edge="1">
+                    <mxGeometry x="0.0025" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="260" y="382"/>
+                            <mxPoint x="430" y="382"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_o_snap" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;" parent="1" source="orch" target="snapshot_agent" edge="1">
+                    <mxGeometry x="0.0007" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="730" y="292"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_o_topo" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;" parent="1" source="orch" target="topology_cache" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d_o_syslog" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;" parent="1" source="orch" target="syslog_agent" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="400" y="360"/>
+                            <mxPoint x="1380" y="360"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_i_net" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" parent="1" source="inv_orch" target="network_agent" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="450" y="280"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_i_snap" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" parent="1" source="inv_orch" target="snapshot_agent" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="750" y="310"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_i_topo" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" parent="1" source="inv_orch" target="topology_cache" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1290" y="382"/>
+                            <mxPoint x="1070" y="382"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="d_i_syslog" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#7d5fb2;strokeWidth=2;fontSize=13;" parent="1" source="inv_orch" target="syslog_agent" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="config_mcp" value="&lt;b&gt;config_mcp_server.py&lt;/b&gt;&lt;br&gt;&lt;font&gt;validate and apply configuration&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="600" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="network_mcp" value="&lt;b&gt;mcp_server.py&lt;/b&gt;&lt;br&gt;&lt;font&gt;read commands against devices&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="600" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="syslog_mcp" value="&lt;b&gt;syslog_mcp_server.py&lt;/b&gt;&lt;br&gt;&lt;font&gt;query_loki (LogQL)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#6b5800;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="600" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="t_cfg" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;" parent="1" source="config_agent" target="config_mcp" edge="1">
+                    <mxGeometry x="-0.0417" y="10" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="t_net" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;" parent="1" source="network_agent" target="network_mcp" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="t_loki" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#d6b656;strokeWidth=1.5;fontSize=13;fontColor=#6b5800;" parent="1" source="syslog_agent" target="syslog_mcp" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="devices" value="&lt;b&gt;Nokia SR Linux testlab&lt;/b&gt;&lt;br&gt;router1 · router2 · switch1 · switch2  (+ clients)&lt;br&gt;reached over JSON-RPC (only network devices not clients) (:80 / :443)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#5a1410;shadow=1;verticalAlign=middle;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="760" width="800" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="monitoring" value="&lt;b&gt;Monitoring stack&lt;/b&gt;&#xa;Alloy (syslog :1514) → Loki (172.20.20.101:3100)&#xa;Grafana dashboards" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#3b1f52;shadow=1;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="1120" y="760" width="380" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_cfg" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#b85450;strokeWidth=1.5;fontSize=13;fontColor=#7a1f1c;" parent="1" source="config_mcp" target="devices" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="b_net" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#b85450;strokeWidth=1.5;fontSize=13;fontColor=#7a1f1c;" parent="1" source="network_mcp" target="devices" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="b_snap" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#b85450;strokeWidth=1.5;fontSize=13;fontColor=#7a1f1c;" parent="1" source="snapshot_agent" target="devices" edge="1">
+                    <mxGeometry x="0.0256" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="750" y="680"/>
+                            <mxPoint x="460" y="680"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="b_topo" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#b85450;strokeWidth=1.5;fontSize=13;fontColor=#7a1f1c;" parent="1" source="topology_cache" target="devices" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                        <Array as="points">
+                            <mxPoint x="1050" y="700"/>
+                            <mxPoint x="460" y="700"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="b_loki" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#9673a6;strokeWidth=1.5;fontSize=13;fontColor=#4a2d6b;" parent="1" source="syslog_mcp" target="monitoring" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_syslog" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#9673a6;strokeWidth=1.5;fontSize=13;fontColor=#4a2d6b;" parent="1" source="devices" target="monitoring" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="b_poll" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;dashed=1;strokeColor=#9673a6;strokeWidth=1.5;fontSize=13;fontColor=#4a2d6b;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="auto_entry" target="monitoring" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1540" y="160"/>
+                            <mxPoint x="1540" y="815"/>
+                        </Array>
+                        <mxPoint x="1500" y="810" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="oH0S2n9oKLJIMfUliJMt-8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6c8ebf;strokeWidth=2;fontSize=13;fontColor=#10243e;entryX=-0.003;entryY=0.113;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" target="inv_orch" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="400" y="260" as="sourcePoint"/>
+                        <mxPoint x="1050" y="398" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="labels" value="edge labels" style="locked=0;" parent="0"/>
+                <mxCell id="lbl_user_orch" value="troubleshooting request" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#333333;" parent="labels" vertex="1">
+                    <mxGeometry x="185" y="200" width="150" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_auto_inv" value="opens investigation" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#333333;" parent="labels" vertex="1">
+                    <mxGeometry x="1225" y="200" width="130" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_o_cfg" value="delegate" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#10243e;" parent="labels" vertex="1">
+                    <mxGeometry x="125" y="384" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_o_net" value="delegate" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#10243e;" parent="labels" vertex="1">
+                    <mxGeometry x="310" y="372" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_o_snap" value="delegate" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#10243e;" parent="labels" vertex="1">
+                    <mxGeometry x="530" y="282" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_o_topo" value="read topology" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#10243e;" parent="labels" vertex="1">
+                    <mxGeometry x="780" y="252" width="100" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_o_syslog" value="delegate" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#10243e;" parent="labels" vertex="1">
+                    <mxGeometry x="855" y="350" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_i_net" value="delegate" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#2e1a4d;" parent="labels" vertex="1">
+                    <mxGeometry x="600" y="270" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_i_snap" value="delegate" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#2e1a4d;" parent="labels" vertex="1">
+                    <mxGeometry x="990" y="300" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_i_topo" value="read topology" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#2e1a4d;" parent="labels" vertex="1">
+                    <mxGeometry x="1130" y="372" width="100" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_i_syslog" value="delegate" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#2e1a4d;" parent="labels" vertex="1">
+                    <mxGeometry x="1300" y="372" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_t_cfg" value="MCP · stdio" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#6b5800;" parent="labels" vertex="1">
+                    <mxGeometry x="115" y="542" width="90" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_t_net" value="MCP · stdio" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#6b5800;" parent="labels" vertex="1">
+                    <mxGeometry x="405" y="542" width="90" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_t_loki" value="MCP · stdio" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#6b5800;" parent="labels" vertex="1">
+                    <mxGeometry x="1335" y="542" width="90" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_b_cfg" value="JSON-RPC · write/commit" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#7a1f1c;" parent="labels" vertex="1">
+                    <mxGeometry x="85" y="700" width="150" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_b_net" value="JSON-RPC · read" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#7a1f1c;" parent="labels" vertex="1">
+                    <mxGeometry x="390" y="700" width="120" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_b_snap" value="JSON-RPC poll · every 2 min" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#7a1f1c;" parent="labels" vertex="1">
+                    <mxGeometry x="515" y="670" width="180" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_b_topo" value="LLDP via JSON-RPC · every 60 s" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#7a1f1c;" parent="labels" vertex="1">
+                    <mxGeometry x="655" y="690" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_b_loki" value="LogQL query" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#4a2d6b;" parent="labels" vertex="1">
+                    <mxGeometry x="1300" y="700" width="90" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_b_syslog" value="syslog → Alloy" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#4a2d6b;" parent="labels" vertex="1">
+                    <mxGeometry x="935" y="805" width="110" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl_b_poll" value="poll Loki for events" style="text;html=1;align=center;verticalAlign=middle;fillColor=#ffffff;strokeColor=none;rounded=1;fontSize=12;fontColor=#4a2d6b;" parent="labels" vertex="1">
+                    <mxGeometry x="1480" y="430" width="120" height="20" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
 </mxfile>
