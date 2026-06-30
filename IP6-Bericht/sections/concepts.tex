@@ -44,13 +44,13 @@ degrades output quality through the "lost in the middle" effect. By contrast, ea
 only a focused instruction set and a small, domain-scoped selection of tools, which keeps its individual
 context small and reduces context-related quality degradation.
 
-Each agent in this architecture is an independent agent loop (see \cref{sec:agent-loop}): it runs its own
+Each agent in this architecture is an independent agent loop (see \cref{sec:agent-loop}), it runs its own
 loop over its own context and tool set, driven by the same underlying agent harness. Delegation is itself realised as a
 tool call, the orchestrator's loop invokes a sub-agent as a tool, the sub-agent runs its own loop to completion and
 returns its findings, which the orchestrator then incorporates into its own context.
 
 \Cref{fig:architecture-overview} shows the resulting architecture: the orchestrator at the top delegates
-domain-scoped sub-tasks to the specialised sub-agents, each of which is backed by its own tool layer.
+domain-scoped sub-tasks to the specialised sub-agents, each of which has its own tools.
 
 \begin{figure}[htbp]
 \begin{center}
@@ -95,7 +95,7 @@ This split up of expertise is a deliberate design choice that reinforces the arc
 \subsection{LLM-Tier Concept}
 \label{sec:model-tier-concept}
 LLMs can be compared to each other using a variaty of metrics. For this work we decided to use the \emph{price per million tokens} as a comparison metric (because cost is a primary reserach question of this work).
-Models are grouped into \emph{tiers} according to their \emph{price} (for example a low, a mid and a high tier). The system is
+Models are grouped into \emph{tiers} according to their \emph{price} (low, mid and high). The system is
 designed so that the model tier can be varied independently of the agent logic, which makes it possible to
 study how model choice affects the success rate and cost in terms of troubleshooting networking issues.
 The concrete models assigned to each tier are described in \cref{sec:methodology}.
@@ -121,9 +121,7 @@ The first question is whether the system can react to the network on its own. In
 to describe a symptom, the system observes the incoming syslog stream and, when a message matching a
 configured pattern arrives, automatically launches an investigation. The autonomous investigation
 orchestrator then runs the same delegation pattern as the user-facing orchestrator with the execption of not having access to the configuration agent.
-It may correlate topology, live device state, historical snapshots and further
-syslog data to localise the probable cause. It is also designed so 
-investigations cannot be opened recursively. The result is a self-contained initial report produced from a syslog event without any human
+It is also designed so investigations cannot be opened recursively. The result is a self-contained initial report produced from a syslog event without any human
 involvement.
 
 \paragraph{Handover without duplicating work.}

@@ -2,15 +2,14 @@
 \label{sec:methodology}
 This section describes how the system designed in \cref{sec:concepts} is evaluated experimentally.
 Where \cref{sec:evaluation-concept} defined \emph{what} a scenario and a difficulty level are, this
-section describes the concrete experimental environment, the scenario catalogue, the model--scenario
+section describes the concrete experimental environment, the scenario catalogue, the model scenario
 experiment matrix, the per-run procedure, the metrics that are recorded, and the manual scoring used to
 decide whether a fault was correctly diagnosed.
 
 \subsection{Experimental Environment}
 \label{sec:experiment-environment}
-All experiments are run against an emulated network rather than a simulator, so that the agents interact
-with real device behaviour. The lab is defined with \emph{containerlab} and consists of Nokia SR Linux
-nodes wired into a fixed baseline topology in which the test clients can reach each other
+All experiments are run against a virtual network using \emph{containerlab}, so that the agents interact
+with real device behaviour. The lab consists of Nokia SR Linux nodes with a predefined configuration and topology in which the test clients can reach each other
 (\cref{fig:testlab-topology}).
 
 \begin{figure}[htbp]
@@ -21,19 +20,11 @@ nodes wired into a fixed baseline topology in which the test clients can reach e
 \label{fig:testlab-topology}
 \end{figure}
 
-The path deliberately spans four layers: a symptom such as "client1 cannot reach client3" may originate
-at L1 (a downed port), L2 (a VLAN or ARP problem), L3 (routing or BGP), or in the data plane (an ACL or
-MTU problem). This layered baseline is what makes difficulty meaningful (see
-\cref{sec:scenarios-difficulty}), because the agent must localise a fault to the correct device, layer and
-configuration line. The agents reach the devices through the tool layer described in
-\cref{sec:tool-layer}; the concrete deployment and startup of the lab and agents is documented in
-\cref{sec:implementation}.
-
 \subsection{Fault Scenarios and Difficulty Levels}
 \label{sec:scenarios-difficulty}
-The system is evaluated against a catalogue of reproducible fault \emph{scenarios}. Each scenario is a
-self-contained folder that injects exactly one known fault into the baseline topology and records the
-ground-truth root cause used for scoring. A scenario consists of:
+The system is evaluated against a set of reproducible fault \emph{scenarios}. Each scenario consists
+of a folder that injects exactly one known fault into the healthy baseline configuration (topology).
+A scenario consists of:
 
 \begin{itemize}
     \item \texttt{setup.sh} --- injects the fault before the queries are sent,
