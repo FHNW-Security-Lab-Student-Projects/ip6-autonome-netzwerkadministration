@@ -9,11 +9,6 @@ The project evaluates **what kinds of network problems can be troubleshooted by 
 network** — measuring time saved, the difficulty levels that can be diagnosed, the
 success rate per difficulty level, and the potential cost savings.
 
-> **Architecture note:** all agents run **in-process** using Pydantic AI's
-> [agent delegation](https://ai.pydantic.dev/multi-agent-applications/) pattern. An
-> earlier A2A-protocol design has been removed — there are no separate server processes
-> or per-agent ports to start.
-
 ## Agents
 
 A single orchestrator (`client_agent.py`) routes each request to the right sub-agent:
