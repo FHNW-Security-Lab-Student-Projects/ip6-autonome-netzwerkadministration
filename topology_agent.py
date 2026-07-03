@@ -10,8 +10,8 @@ Architecture:
               └── JSON-RPC into each device in parallel (httpx.AsyncClient)
 
 At startup and every REFRESH_INTERVAL seconds, topology discovery runs in the
-background and the result is cached. Callers use get_topology() or
-get_topology_response() to read the cache — no device I/O on the hot path.
+background and the result is cached. Callers use get_topology_response() to
+read the cache — no device I/O on the hot path.
 
 Import and use via agent delegation:
     from topology_agent import get_topology_response, topology_lifespan
@@ -75,7 +75,6 @@ class TopologyResult(BaseModel):
     nodes: dict[str, TopologyNode]
     links: list[TopologyLink]
     client_links: list[TopologyLink]  # static from YAML, not discovered via LLDP
-    # mermaid: str
     summary: str
     diff: TopologyDiff
 
@@ -170,12 +169,6 @@ async def _query_srlinux(node_name: str) -> dict:
         neighbor_count=len(neighbors),
     )
     return {'node': node_name, 'neighbors': neighbors}
-
-
-# Add new vendor functions here, e.g.:
-#
-# async def _query_arista(node_name: str) -> dict:
-#     ...
 
 
 # ---------------------------------------------------------------------------
@@ -347,33 +340,7 @@ async def _discover_topology(clab_file: str = DEFAULT_CLAB_FILE) -> TopologyResu
                     port_b=nbr['neighbor_port'],
                 ))
 
-    # # 5. Build Mermaid diagram
-    # labeled: set[str] = set()
-    # mermaid_lines = ['graph TD']
-    #
-    # def _node_label(name: str) -> str:
-    #     n = nodes[name]
-    #     parts = [name]
-    #     if n.role:
-    #         parts.append(n.role)
-    #     if n.ip_address:
-    #         parts.append(n.ip_address)
-    #     label = '\\n'.join(parts)
-    #     return f'{name}["{label}"]'
-    #
-    # for link in links:
-    #     a = _node_label(link.node_a) if link.node_a not in labeled else link.node_a
-    #     b = _node_label(link.node_b) if link.node_b not in labeled else link.node_b
-    #     labeled.update({link.node_a, link.node_b})
-    #     mermaid_lines.append(f'  {a} --- {b}')
-    #
-    # for link in client_links:
-    #     a = _node_label(link.node_a) if link.node_a not in labeled else link.node_a
-    #     b = _node_label(link.node_b) if link.node_b not in labeled else link.node_b
-    #     labeled.update({link.node_a, link.node_b})
-    #     mermaid_lines.append(f'  {a} -.- {b}')
-
-    # 6. Build summary + drift
+    # 5. Build summary + drift
     unreachable = [
         r['node'] for r in lldp_results
         if not isinstance(r, Exception) and 'error' in r
@@ -393,7 +360,6 @@ async def _discover_topology(clab_file: str = DEFAULT_CLAB_FILE) -> TopologyResu
         nodes=nodes,
         links=links,
         client_links=client_links,
-        # mermaid='\n'.join(mermaid_lines),
         summary=summary,
         diff=diff,
     )
@@ -430,11 +396,6 @@ async def _refresh_loop(interval: int = REFRESH_INTERVAL) -> None:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
-
-def get_topology() -> TopologyResult | None:
-    """Return the cached TopologyResult, or None if the cache is still warming up."""
-    return _cache.result if _cache else None
-
 
 def get_topology_response() -> str | None:
     """Return a formatted topology response string, or None if cache is warming up."""
@@ -480,8 +441,6 @@ def _format_response(topology: TopologyResult, collected_at: datetime) -> str:
             client_node = client_nodes.get(client_name)
             ip_info = f' ({client_node.ip_address})' if client_node and client_node.ip_address else ''
             lines.append(f'- {link.node_a}:{link.port_a} ↔ {link.node_b}:{link.port_b}{ip_info}')
-
-    # lines.append(f'\n### Mermaid Diagram\n```mermaid\n{topology.mermaid}\n```')
 
     diff = topology.diff
     has_drift = diff.missing_links or diff.unexpected_links or diff.missing_nodes

@@ -5,7 +5,7 @@ import yaml
 from pathlib import Path
 from dotenv import load_dotenv
 import logfire
-from fastmcp import FastMCP  # , Context
+from fastmcp import FastMCP
 from failure_log import log_command_failure, log_transport_failure
 from response_limits import MAX_RESPONSE_CHARS, truncate
 from srl_jsonrpc import SrlJsonRpcError, SrlTransportError, get_connection, jrpc_cli, jrpc_get

@@ -16,7 +16,10 @@ import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
+import matplotlib.transforms as mtransforms
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 import pandas as pd
 import seaborn as sns
 
@@ -32,6 +35,29 @@ VERDICT_FOUND = '#1a7f37'
 VERDICT_MISSED = 'crimson'
 VERDICT_UNEVAL = '#888888'
 VERDICT_DNF = '#d97706'
+
+# Fixed-order categorical palette (CVD-validated: worst adjacent-pair ΔE 24.2).
+# Slots are assigned to models in sorted-name order so a model keeps its colour
+# across regenerations regardless of which sessions are in the log.
+CATEGORICAL_SLOTS = [
+    '#2a78d6',  # blue
+    '#1baf7a',  # aqua
+    '#eda100',  # yellow
+    '#008300',  # green
+    '#4a3aa7',  # violet
+    '#e34948',  # red
+    '#e87ba4',  # magenta
+    '#eb6834',  # orange
+]
+
+# Chart chrome: recessive greys so the bars are the loudest thing on the page.
+INK = '#0b0b0b'
+INK_SECONDARY = '#52514e'
+GRIDLINE = '#e1e0d9'
+BASELINE = '#c3c2b7'
+TOKEN_KEY = '#767470'  # legend key for the input/output token shades
+
+GROUP_GAP = 0.9  # empty rows of air between model groups (in row units)
 
 
 def _failure_kind(row: pd.Series) -> str:
@@ -59,10 +85,20 @@ plt.rcParams.update({
 
 
 def _prepare(df: pd.DataFrame) -> pd.DataFrame:
+    """Sort sessions into contiguous model groups (then scenario, then time).
+
+    The model name moves out of the row label and into a group header, so the
+    label only carries what varies inside a group: the session id, plus the
+    scenario when more than one is shown.
+    """
     out = df.copy()
     out['started_at'] = pd.to_datetime(out['started_at'], errors='coerce')
-    out = out.sort_values('started_at', kind='stable').reset_index(drop=True)
-    out['label'] = out['session_id'].astype(str).str[:8] + ' · ' + out['model']
+    out = out.sort_values(
+        ['model', 'scenario', 'started_at'], kind='stable',
+    ).reset_index(drop=True)
+    out['label'] = out['session_id'].astype(str).str[:8]
+    if out['scenario'].nunique() > 1:
+        out['label'] += ' · ' + out['scenario']
     return out
 
 
@@ -93,44 +129,60 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
 
     # Stable model→colour mapping so every panel uses the same colour per model.
     models = sorted(df['model'].dropna().unique())
-    palette = dict(zip(models, sns.color_palette('colorblind', n_colors=len(models))))
+    slots = list(CATEGORICAL_SLOTS)
+    if len(models) > len(slots):  # never expected; keep colours deterministic anyway
+        slots += sns.color_palette('husl', n_colors=len(models) - len(slots)).as_hex()
+    palette = dict(zip(models, slots))
     bar_colors = [palette[m] for m in df['model']]
 
-    n_rows = len(df)
-    fig_height = max(2.4, 0.32 * n_rows + 1.0)
-    fig, axes = plt.subplots(
-        1, 4,
-        figsize=(11.0, fig_height),
-        sharey=True,
-    )
+    # Vertical layout in row units: each model group gets a header slot, its
+    # session rows, then GROUP_GAP of air before the next group.
+    row_y: list[float] = []
+    groups: list[tuple[str, float, int]] = []  # (model, header_y, n_sessions)
+    y = 0.0
+    for m in models:
+        n = int((df['model'] == m).sum())
+        groups.append((m, y, n))
+        row_y.extend(y + 1 + i for i in range(n))
+        y += n + 1 + GROUP_GAP
+    df['y'] = row_y
+    y_span = y - GROUP_GAP  # drop the trailing gap
 
-    y = range(n_rows)
+    n_rows = len(df)
+    top_in, bottom_in = 0.35, 0.55  # bands reserved for suptitle / legend
+    fig_height = max(3.2, 0.235 * (y_span + 1.5) + top_in + bottom_in)
+    fig, axes = plt.subplots(1, 4, figsize=(11.0, fig_height), sharey=True)
+
+    styles = [_verdict_style(row) for _, row in df.iterrows()]
 
     # 1. Duration
     ax = axes[0]
-    ax.barh(y, df['duration_s'], color=bar_colors)
-    ax.set_xlabel('LLM inference time, summed (s)')
-    ax.invert_yaxis()
-    ax.set_yticks(list(y))
-    styles = [_verdict_style(row) for _, row in df.iterrows()]
+    ax.barh(df['y'], df['duration_s'], height=0.62, color=bar_colors)
+    ax.set_title('LLM inference time (s)')
+    ax.set_yticks(list(df['y']))
     labels = [f'{lab}{suffix}' for lab, (suffix, _) in zip(df['label'], styles)]
-    ax.set_yticklabels(labels)
+    ax.set_yticklabels(labels, fontsize=7.5)
     for tick, (_, colour) in zip(ax.get_yticklabels(), styles):
         tick.set_color(colour)
+    ax.tick_params(axis='y', length=0, pad=3)
 
     # 2. Cost
     ax = axes[1]
-    ax.barh(y, df['total_cost_usd'], color=bar_colors)
-    ax.set_xlabel('Cost (USD)')
+    ax.barh(df['y'], df['total_cost_usd'], height=0.62, color=bar_colors)
+    ax.set_title('Cost (USD)')
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f'${x:g}' if x else '0'))
 
     # 3. Tokens (stacked input + output). Native counts (from usage()) — always valid,
     # so every session has a bar; fillna(0) just guards the left= stack defensively.
+    # The white hairline edge keeps a surface gap between the two stacked segments.
     ax = axes[2]
     tok_in  = df['total_input_tokens'].fillna(0)
     tok_out = df['total_output_tokens'].fillna(0)
-    ax.barh(y, tok_in, color=bar_colors, label='input')
-    ax.barh(y, tok_out, left=tok_in, color=bar_colors, alpha=0.45, label='output')
-    ax.set_xlabel('Tokens (native, input + output)')
+    ax.barh(df['y'], tok_in, height=0.62, color=bar_colors,
+            edgecolor='white', linewidth=0.5)
+    ax.barh(df['y'], tok_out, left=tok_in, height=0.62, color=bar_colors,
+            alpha=0.45, edgecolor='white', linewidth=0.5)
+    ax.set_title('Tokens (native, input + output)')
     # Abbreviate large token counts (e.g. 100000 -> 100k) so adjacent x-tick
     # labels don't collide.
     ax.xaxis.set_major_formatter(
@@ -139,40 +191,71 @@ def plot_raw_sessions(df: pd.DataFrame, out_dir: Path, ext: str) -> Path:
 
     # 4. Tool calls
     ax = axes[3]
-    ax.barh(y, df['total_tool_calls'], color=bar_colors)
-    ax.set_xlabel('Tool calls')
+    ax.barh(df['y'], df['total_tool_calls'], height=0.62, color=bar_colors)
+    ax.set_title('Tool calls')
 
-    # Legend: bar colours = model, token shades, and the y-label verdict key
-    # (verdict is the source of truth for success; it colours the y-labels).
-    model_handles = [
-        plt.Rectangle((0, 0), 1, 1, color=palette[m]) for m in models
-    ]
-    token_handles = [
-        plt.Rectangle((0, 0), 1, 1, facecolor='gray', edgecolor='none'),
-        plt.Rectangle((0, 0), 1, 1, facecolor='gray', edgecolor='none', alpha=0.45),
-    ]
-    verdict_handles = [
-        plt.Rectangle((0, 0), 1, 1, color=VERDICT_FOUND),
-        plt.Rectangle((0, 0), 1, 1, color=VERDICT_MISSED),
-        plt.Rectangle((0, 0), 1, 1, color=VERDICT_UNEVAL),
-        plt.Line2D([], [], linestyle='none', marker='*', color=VERDICT_MISSED),
-        plt.Line2D([], [], linestyle='none', marker=r'$\dagger$', color=VERDICT_DNF),
-    ]
-    fig.legend(
-        handles=model_handles + token_handles + verdict_handles,
-        labels=(models + ['input tokens', 'output tokens']
-                + ['label: found', 'label: missed', 'label: unevaluated',
-                   'crashed (*)', r'DNF / time limit ($\dagger$)']),
-        loc='lower center',
-        ncol=min(6, len(models) + 2),
-        bbox_to_anchor=(0.5, -0.10),
-        frameon=False,
-        fontsize=8,
-    )
+    # Shared axis chrome: recessive solid hairline grid on x only, single
+    # baseline spine, y reversed so the first group reads from the top.
+    for ax in axes:
+        ax.set_ylim(y_span + 0.6, -0.8)
+        ax.set_xlim(left=0)
+        ax.set_axisbelow(True)
+        ax.yaxis.grid(False)
+        ax.xaxis.grid(True, color=GRIDLINE, linewidth=0.6)
+        for side in ('top', 'right', 'left'):
+            ax.spines[side].set_visible(False)
+        ax.spines['bottom'].set_color(BASELINE)
+        ax.spines['bottom'].set_linewidth(0.8)
+        ax.xaxis.set_major_locator(MaxNLocator(4, min_n_ticks=3))
+        ax.tick_params(axis='x', labelsize=7.5, colors=INK_SECONDARY,
+                       length=2.5, width=0.6)
+        if n_rows > 30:  # tall figure: repeat the x scale at the top
+            ax.tick_params(axis='x', top=True, labeltop=True)
+        ax.title.set_fontsize(8.5)
+        ax.title.set_color(INK)
+        ax.title.set_fontweight('bold')
 
-    fig.suptitle('Raw experiment sessions (one row per session)', y=1.0,
-                 fontsize=10)
-    fig.tight_layout(rect=(0, 0.14, 1, 0.98))
+    # Group headers (swatch + model name) in the empty header row of each group,
+    # plus a hairline separator above every group after the first so the panels
+    # without headers still show where a new model starts.
+    for gi, (m, hy, n) in enumerate(groups):
+        trans = mtransforms.blended_transform_factory(
+            axes[0].transAxes, axes[0].transData)
+        axes[0].scatter([0.008], [hy], transform=trans, marker='s', s=24,
+                        color=palette[m], clip_on=False, zorder=5)
+        axes[0].text(0.028, hy, f'{m.split("/", 1)[-1]}   (n={n})',
+                     transform=trans, va='center', ha='left', fontsize=8,
+                     fontweight='bold', color=INK, zorder=5)
+        if gi:
+            for ax in axes:
+                ax.axhline(hy - GROUP_GAP / 2, color=GRIDLINE, linewidth=0.7)
+
+    # Legend: token shades plus the y-label verdict key (the manual verdict in
+    # evaluation_log.jsonl is the source of truth for success; it colours the
+    # row labels). Model identity is carried by the group headers above.
+    handles = [
+        Patch(facecolor=TOKEN_KEY, edgecolor='none'),
+        Patch(facecolor=TOKEN_KEY, edgecolor='none', alpha=0.45),
+        Line2D([], [], linestyle='none', marker='s', markersize=6,
+               color=VERDICT_FOUND),
+        Line2D([], [], linestyle='none', marker='s', markersize=6,
+               color=VERDICT_MISSED),
+        Line2D([], [], linestyle='none', marker='s', markersize=6,
+               color=VERDICT_UNEVAL),
+        Line2D([], [], linestyle='none', marker=r'$*$', color=VERDICT_MISSED),
+        Line2D([], [], linestyle='none', marker=r'$\dagger$', color=VERDICT_DNF),
+    ]
+    labels = ['input tokens', 'output tokens',
+              r'label: found ($\checkmark$)', r'label: missed ($\times$)',
+              'label: unevaluated', 'crashed (*)',
+              r'DNF / time limit ($\dagger$)']
+    fig.legend(handles=handles, labels=labels, loc='lower center',
+               ncol=len(handles), bbox_to_anchor=(0.5, 0.04 / fig_height),
+               frameon=False, fontsize=7.5, handletextpad=0.5, columnspacing=1.2)
+
+    fig.suptitle('Raw experiment sessions — one row per session, grouped by model',
+                 y=1 - 0.06 / fig_height, fontsize=10.5, color=INK)
+    fig.tight_layout(rect=(0, bottom_in / fig_height, 1, 1 - top_in / fig_height))
 
     return _save(fig, out_dir, 'raw_sessions_overview', ext)
 

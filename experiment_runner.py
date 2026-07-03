@@ -67,7 +67,6 @@ from client_agent import (
     orchestrator,
 )
 from experiment_tracker import (
-    AgentRunRecord,
     ExperimentSession,
     begin_session,
     capture_generation_ids,
@@ -78,6 +77,8 @@ from experiment_tracker import (
 
 
 def _count_failure_log_lines() -> int:
+    """Line count of command_failures.jsonl. Sampled before/after each turn — the
+    delta is the number of invalid commands attributable to that turn."""
     try:
         return sum(1 for _ in FAILURE_LOG_PATH.open())
     except FileNotFoundError:

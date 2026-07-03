@@ -23,10 +23,10 @@ architecture, the agent roles and the evaluation concept described below serve t
 The \emph{second part} is an independent feasibility use case rather than a measured research question: the
 \emph{automatic syslog investigation}. The motivating question here is not \emph{how well} or \emph{at what
 cost}, but simply \emph{whether} it is possible to build a system that reacts autonomously to certain syslog
-messages and starts a self-contained initial investigation without any human trigger. How such a mechanism works in
-practice and how a human operator can take over and continue the troubleshooting without
+messages and starts a self-contained initial investigation without any human trigger. A related question is how such
+a mechanism works in practice and how a human operator can take over and continue the troubleshooting without
 repeating the work the autonomous investigation has already done. This use case reuses the same
-agents shown and described in \cref{fig:architecture-overview} building blocks but it uses a different entry point (\texttt{investigation\_orchestrator}). It is described on its own in
+agent building blocks shown in \cref{fig:architecture-overview} but uses a different entry point (\texttt{investigation\_orchestrator}). It is described on its own in
 \cref{sec:autonomous-syslog-usecase} and is not part of the quantitative evaluation.
 
 \subsection{Overall Architecture}
@@ -67,14 +67,14 @@ up the system:
 
 \begin{itemize}
     \item \textbf{Orchestrator (user-facing).} Coordinates an interactive troubleshooting session, splits
-          the user's goal and delegates sub-tasks to sub-agents and synthesises their findings into a final answer. Since the sub-agents are "stateless" the orchestrator
+          the user's goal into sub-tasks, delegates them to the sub-agents and synthesises their findings into a final answer. Since the sub-agents are "stateless" the orchestrator
           needs to supply all the required information to the sub-agents.
-    \item \textbf{Investigation orchestrator (autonomous).} Coordiantes the autonomous syslog event based investigations. 
+    \item \textbf{Investigation orchestrator (autonomous).} Coordinates the autonomous syslog event based investigations.
           It runs the same delegation pattern as the user-facing
           orchestrator without access to the config agent.
     \item \textbf{Network agent.} Retrieves live device state through read commands.
     \item \textbf{State-snapshot agent.} Provides historical device state. The state-snapshot agent focuses on information which can't be retrieved via syslog or
-          device life state but can be useful for troubleshooting (like past ARP entries or routing tables).
+          device live state but can be useful for troubleshooting (like past ARP entries or routing tables).
     \item \textbf{Topology agent.} Supplies the (cached) network topology so other agents can reason about how
           devices are connected. It compares the "should be" state of the topology with the actual "live" state of the network (via LLDP queries).
     \item \textbf{Syslog agent.} Queries and analyses syslog data for the entire network.
@@ -94,7 +94,7 @@ This split up of expertise is a deliberate design choice that reinforces the arc
 
 \subsection{LLM-Tier Concept}
 \label{sec:model-tier-concept}
-LLMs can be compared to each other using a variaty of metrics. For this work we decided to use the \emph{price per million tokens} as a comparison metric (because cost is a primary reserach question of this work).
+LLMs can be compared to each other using a variety of metrics. For this work we decided to use the \emph{price per million tokens} as a comparison metric (because cost is a primary research question of this work).
 Models are grouped into \emph{tiers} according to their \emph{price} (low, mid and high). The system is
 designed so that the model tier can be varied independently of the agent logic, which makes it possible to
 study how model choice affects the success rate and cost in terms of troubleshooting networking issues.
@@ -120,13 +120,13 @@ builds on the autonomous investigation orchestrator introduced in \cref{sec:agen
 The first question is whether the system can react to the network on its own. Instead of waiting for a human
 to describe a symptom, the system observes the incoming syslog stream and, when a message matching a
 configured pattern arrives, automatically launches an investigation. The autonomous investigation
-orchestrator then runs the same delegation pattern as the user-facing orchestrator with the execption of not having access to the configuration agent.
+orchestrator then runs the same delegation pattern as the user-facing orchestrator with the exception of not having access to the configuration agent.
 It is also designed so investigations cannot be opened recursively. The result is a self-contained initial report produced from a syslog event without any human
 involvement.
 
 \paragraph{Handover without duplicating work.}
 The second question concerns what happens \emph{after} an autonomous investigation has run. An autonomous
-report, may be incomplete or require a corrective configuration change that only a
+report may be incomplete or require a corrective configuration change that only a
 human may authorise. The operator must therefore be able to take over and continue troubleshooting from the
 point the autonomous investigation reached, without re-running the same operational commands or
 re-deriving findings that have already been established. The concept addresses this by treating the

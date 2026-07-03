@@ -5,5 +5,9 @@
       "WebSearch",
       "mcp__logfire__query_run"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "logfire"
+  ],
+  "enableAllProjectMcpServers": true
 }

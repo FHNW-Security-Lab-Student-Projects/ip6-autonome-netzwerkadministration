@@ -48,6 +48,17 @@ def _rotate_xticks(ax: plt.Axes, degrees: int = 45) -> None:
         label.set_horizontalalignment('right')
 
 
+def _model_legend_outside(ax: plt.Axes) -> None:
+    """Place the model legend to the right of the axes, outside the plot area.
+
+    Seaborn puts the legend inside the axes by default, where it covers bars once
+    there are more than a few models. savefig.bbox='tight' grows the canvas to
+    include the relocated legend, so nothing gets clipped.
+    """
+    ax.legend(title='Model', fontsize=8, loc='upper left',
+              bbox_to_anchor=(1.02, 1), borderaxespad=0)
+
+
 def _cat_subplots(n_categories: int, height: float = 3.7):
     """Create a figure whose width grows with the number of x-axis categories.
 
@@ -110,10 +121,14 @@ def plot_scenario_performance(df: pd.DataFrame, out_dir: Path, ext: str) -> list
     ]
     for column, ylabel, name in metrics:
         fig, ax = _cat_subplots(df['scenario'].nunique())
-        sns.barplot(data=df, x='scenario', y=column, hue='model', ax=ax, errorbar='sd')
+        # errorbar=('pi', 100): whiskers span the observed min-max of the runs in
+        # each group. With only 2-4 runs a symmetric SD interval extends below
+        # zero, implying negative cost / tool calls.
+        sns.barplot(data=df, x='scenario', y=column, hue='model', ax=ax,
+                    errorbar=('pi', 100))
         ax.set_xlabel('Scenario')
         ax.set_ylabel(ylabel)
-        ax.legend(title='Model', fontsize=8)
+        _model_legend_outside(ax)
         _rotate_xticks(ax)
         written.append(_save(fig, out_dir, name, ext))
     return written
@@ -138,7 +153,7 @@ def plot_invalid_commands(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Pat
                 ax=ax, estimator='sum', errorbar=None)
     ax.set_xlabel('Scenario')
     ax.set_ylabel('Invalid commands (count)')
-    ax.legend(title='Model', fontsize=8)
+    _model_legend_outside(ax)
     _rotate_xticks(ax)
     return [_save(fig, out_dir, 'invalid_commands', ext)]
 
@@ -169,9 +184,61 @@ def plot_correctness(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
     ax.set_xlabel('Scenario')
     ax.set_ylabel('Found rate')
     ax.set_ylim(0, 1)
-    ax.legend(title='Model', fontsize=8)
+    _model_legend_outside(ax)
     _rotate_xticks(ax)
     return [_save(fig, out_dir, 'correctness_found_rate', ext)]
+
+
+def plot_cost_vs_correctness(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
+    """Scatter of mean cost per run (log x) against found rate, one dot per model.
+
+    The price-to-performance view: models toward the top-left are cheap AND
+    correct, and the dashed step line traces the Pareto frontier (models where no
+    other model is both cheaper and more accurate). Cost is averaged over all runs
+    of a model, while the found rate only covers the manually evaluated runs (same
+    verdict source as plot_correctness), so the two denominators differ.
+    """
+    if 'found_issue' not in df.columns:
+        print('  [skip] cost-vs-correctness chart: no evaluation_log.jsonl joined.')
+        return []
+    evaluated = df[df['found_issue'].notna()].copy()
+    if evaluated.empty:
+        print('  [skip] cost-vs-correctness chart: no verdicts yet — run evaluate_experiments.py.')
+        return []
+    evaluated['found'] = evaluated['found_issue'].astype(bool).astype(int)
+
+    models = list(df['model'].unique())
+    colors = dict(zip(models, sns.color_palette(n_colors=len(models))))
+    stats = pd.DataFrame({
+        'cost':       df.groupby('model')['total_cost_usd'].mean(),
+        'found_rate': evaluated.groupby('model')['found'].mean(),
+    }).dropna()
+
+    fig, ax = plt.subplots()
+
+    # Pareto frontier: walk the models cheapest-first and keep those that raise
+    # the best found rate seen so far; steps-post joins them into the boundary.
+    best = -1.0
+    frontier = []
+    for _, row in stats.sort_values('cost').iterrows():
+        if row['found_rate'] > best:
+            best = row['found_rate']
+            frontier.append(row)
+    frontier = pd.DataFrame(frontier)
+    ax.plot(frontier['cost'], frontier['found_rate'], drawstyle='steps-post',
+            linestyle='--', linewidth=1, color='0.6', zorder=1)
+
+    for model, row in stats.iterrows():
+        ax.scatter(row['cost'], row['found_rate'], s=45,
+                   color=colors[model], zorder=2)
+        ax.annotate(model.split('/', 1)[-1], (row['cost'], row['found_rate']),
+                    xytext=(6, 4), textcoords='offset points', fontsize=8)
+
+    ax.set_xscale('log')
+    ax.set_xlabel('Mean cost per run (USD, log scale)')
+    ax.set_ylabel('Found rate')
+    ax.set_ylim(0, 1.05)
+    return [_save(fig, out_dir, 'cost_vs_correctness', ext)]
 
 
 def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
@@ -183,7 +250,9 @@ def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
     ]
     for column, ylabel, name in metrics:
         fig, ax = _cat_subplots(df['model'].nunique())
-        sns.boxplot(data=df, x='model', y=column, ax=ax)
+        # showfliers=False: outlier runs are already drawn by the stripplot below;
+        # the boxplot's own flier circles would render the same runs twice.
+        sns.boxplot(data=df, x='model', y=column, ax=ax, showfliers=False)
         sns.stripplot(data=df, x='model', y=column, ax=ax,
                       color='black', size=3, alpha=0.5)
         ax.set_xlabel('Model')
@@ -194,33 +263,50 @@ def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
 
 
 def plot_scenario_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
-    """Boxplots of cost, duration, and tokens per scenario (model as hue).
+    """Per-model panels of run-to-run spread per scenario (one dot = one run).
 
-    Mirrors plot_distributions but pivots the x-axis to the scenario, so each box
-    shows the run-to-run spread of a metric within one troubleshooting scenario.
-    Individual runs are overlaid as points; with multiple models the boxes are split
-    by model so per-scenario model differences stay visible.
+    Replaces the earlier single-axes grouped boxplots: 10 scenarios x 6 models
+    packed 60 boxes into one plot, and with only 2-4 runs per group the quartile
+    boxes suggested distributions that aren't there. Each model now gets its own
+    panel with the raw runs as dots and a tick at the per-scenario median.
+    Panels share one scenario order (by median over all models, largest on top)
+    and one x-scale, so positions stay comparable across models.
     """
     written: list[Path] = []
-    multi_model = df['model'].nunique() > 1
-    hue = 'model' if multi_model else None
+    models = list(df['model'].unique())
+    # Same palette order seaborn uses for hue='model' in the other charts, so
+    # each model keeps its established color here.
+    colors = dict(zip(models, sns.color_palette(n_colors=len(models))))
+    n_cols = min(3, len(models))
+    n_rows = -(-len(models) // n_cols)
 
     metrics = [
         ('total_cost_usd',                'Cost (USD)',               'scenario_distribution_cost'),
         ('duration_s',                    'LLM inference time, summed (s)',             'scenario_distribution_duration'),
         ('total_normalized_input_tokens', 'Input tokens (normalized)', 'scenario_distribution_tokens'),
     ]
-    for column, ylabel, name in metrics:
-        fig, ax = _cat_subplots(df['scenario'].nunique())
-        sns.boxplot(data=df, x='scenario', y=column, hue=hue, ax=ax)
-        sns.stripplot(data=df, x='scenario', y=column, hue=hue,
-                      ax=ax, color='black', size=3, alpha=0.5,
-                      dodge=multi_model, legend=False)
-        ax.set_xlabel('Scenario')
-        ax.set_ylabel(ylabel)
-        if hue is not None:
-            ax.legend(title='Model', fontsize=8)
-        _rotate_xticks(ax)
+    for column, xlabel, name in metrics:
+        data = df[df[column].notna()]
+        order = (data.groupby('scenario')[column].median()
+                 .sort_values(ascending=False).index.tolist())
+        fig, axes = plt.subplots(
+            n_rows, n_cols, sharex=True, sharey=True, squeeze=False,
+            figsize=(3.4 * n_cols, 0.3 * len(order) * n_rows + 1.4),
+            layout='constrained',
+        )
+        for ax, model in zip(axes.flat, models):
+            sub = data[data['model'] == model]
+            sns.stripplot(data=sub, y='scenario', x=column, order=order,
+                          ax=ax, color=colors[model], size=4, alpha=0.75)
+            medians = sub.groupby('scenario')[column].median().reindex(order)
+            ax.plot(medians.to_numpy(), range(len(order)), linestyle='',
+                    marker='|', color='0.2', markersize=9, markeredgewidth=1.3)
+            ax.set_title(model, fontsize=9)
+            ax.set_xlabel('')
+            ax.set_ylabel('')
+        for ax in axes.flat[len(models):]:
+            ax.set_visible(False)
+        fig.supxlabel(xlabel, fontsize=10)
         written.append(_save(fig, out_dir, name, ext))
     return written
 
@@ -287,6 +373,7 @@ def main() -> None:
     written += plot_scenario_performance(df, out_dir, args.format)
     written += plot_invalid_commands(df, out_dir, args.format)
     written += plot_correctness(df, out_dir, args.format)
+    written += plot_cost_vs_correctness(df, out_dir, args.format)
     written += plot_distributions(df, out_dir, args.format)
     written += plot_scenario_distributions(df, out_dir, args.format)
 

@@ -78,6 +78,9 @@ class InvestigationRecord(BaseModel):
 
 
 def _persist_investigations() -> None:
+    """Write all in-memory investigations (incl. serialized Pydantic AI message
+    history) to investigations.json. Called after every state change so the
+    standalone status UI (investigation_status.py) always reads current data."""
     records = {
         iid: InvestigationRecord(
             investigation_id=inv.investigation_id,
@@ -124,6 +127,8 @@ _DYNAMIC_RE = re.compile(
 
 
 def _normalize(msg: str) -> str:
+    """Mask the volatile parts of a log line (IPs, IDs, numbers, timestamps) so
+    recurrences of the same underlying event dedupe to the same investigation key."""
     return _DYNAMIC_RE.sub('*', msg).strip()
 
 
@@ -155,6 +160,8 @@ def _load_investigations() -> None:
             logfire.warning('Skipping corrupt investigation record', investigation_id=iid, error=str(exc))
 
 
+# Load persisted investigations at import time so lookups work immediately —
+# the Loki poller and agent API only start later, inside syslog_lifespan().
 _load_investigations()
 
 # ---------------------------------------------------------------------------
@@ -347,6 +354,9 @@ async def _api_resolve_investigation(request: Request) -> JSONResponse:
     return JSONResponse({'ok': True})
 
 
+# Minimal in-process HTTP API consumed by investigation_status.py: the standalone
+# status UI proxies its "mark resolved" button here, since only this process holds
+# the live Investigation objects (and their running bg_tasks).
 _agent_api = Starlette(routes=[
     Route('/investigations/{investigation_id}/resolve', _api_resolve_investigation, methods=['POST']),
 ])

@@ -4,12 +4,12 @@ Read-only syslog analysis agent for Nokia SR Linux devices. Queries syslog from
 Loki via MCP tools (query_loki) provided by syslog_mcp_server.py, and produces a
 concise analysis of what the logs show.
 
-Import and use via agent delegation:
-    from syslog_agent import syslog_agent, syslog_agent_lifespan
+Import and use via agent delegation (the MCP subprocess lifecycle is managed by
+syslog_investigations.syslog_lifespan, which enters the agent's context):
+    from syslog_agent import syslog_agent
 """
 
 import os
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -72,13 +72,3 @@ WORKFLOW:
   (notable events, severities, timing, affected device/interface) — not a raw dump
   of every line. Quote the few most relevant lines as evidence.""",
 )
-
-
-@asynccontextmanager
-async def syslog_agent_lifespan():
-    """Start the MCP server subprocess for the syslog agent."""
-    print('Starting syslog analysis agent MCP server...')
-    async with syslog_agent:
-        print('Syslog analysis agent MCP server running.')
-        yield
-    print('Syslog analysis agent MCP server stopped.')

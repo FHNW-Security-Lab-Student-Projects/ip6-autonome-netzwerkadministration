@@ -13,7 +13,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai.mcp import MCPServerStdio
@@ -21,18 +20,6 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from agent_history import compact_tool_history
 from model_config import agent_model_settings
-
-
-# Structured output disabled — tool_choice='required' is not supported by all OpenRouter providers.
-# Using plain str output instead so tool_choice='auto' is used, which has broader model support.
-# class NetworkAgentResult(BaseModel):
-#     answer: str | None = None
-#     needs_clarification: bool = False
-#     clarifying_questions: list[str] = []
-class NetworkAgentResult(BaseModel):
-    answer: str | None = None
-    needs_clarification: bool = False
-    clarifying_questions: list[str] = []
 
 load_dotenv(Path(__file__).parent / '.env')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
@@ -69,8 +56,9 @@ network_agent = Agent(
     # Stub older oversized tool returns once the run nears the model's context
     # window so they aren't re-sent verbatim every loop (see agent_history.py).
     capabilities=[ProcessHistory(processor=compact_tool_history)],
+    # Plain string output: a structured output type would force tool_choice='required',
+    # which not all OpenRouter providers support.
     output_type=str,
-    # output_type=NetworkAgentResult,  # disabled: tool_choice='required' not supported by all OpenRouter providers
     instructions=f"""You are a read-only network monitoring assistant for Nokia SR Linux devices.
 
 TOOL SELECTION (two routes to device data — pick deliberately; see each tool's

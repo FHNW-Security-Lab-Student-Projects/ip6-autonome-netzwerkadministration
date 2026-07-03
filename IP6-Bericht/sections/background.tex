@@ -12,12 +12,12 @@ environment \parencite{CASTELFRANCHI1998157}.
 \subsubsection{AI Agent}
 \label{sec:AI_Agent}
 With the rise of generative AI a new term "AI Agent" has emerged.
-AI Agents can be defined as software entities which are designed to fulfill goal-oriented tasks.
-Such agents can take in information from their environment, be it structured or unstructured inputs, draw conclusions from
-the context and initiate actions toward achieving specific objectives. Rather than executing a
+An AI Agent is a piece of software that works towards a goal it has been given.
+It takes in information from its environment (structured or not), reasons about what it sees and then
+acts to get closer to that goal. Rather than executing a
 predetermined and deterministic sequence of steps like a traditional agent, an AI Agent can respond to what it observes while running,
-adjusting its behaviour and the results it produces as the situation changes. The primary decision-making engine for these
-AI Agents are LLMs (see \cref{sec:LLMs}) \parencite{Sapkota_2026}.
+adjusting its behaviour and the results it produces as the situation changes. At its core, the decisions of such an
+agent are made by an LLM (see \cref{sec:LLMs}) \parencite{Sapkota_2026}.
 
 
 
@@ -28,7 +28,7 @@ Large Language Models (LLMs) are an evolution
  rule-based systems to general-purpose generative models. An LLM is essentially
  a complex statistical system designed to predict the likelihood of
  a sequence of words. By training on massive amounts of text, often
- using lots of data from the public internet. These
+ using lots of data from the public internet, these
  models learn to generate coherent and contextually appropriate
  continuations for a given input prompt \parencite{douglas2023largelanguagemodels}.
 
@@ -36,7 +36,7 @@ Large Language Models (LLMs) are an evolution
 \subsection{Tokens, Context Windows and Cost}
 \label{sec:tokens-context-cost}
 LLMs do not operate on text (words and characters) directly. Text has to first go through a \emph{tokenizer} that breaks it into pieces called \emph{tokens}
-which can be words, sub-words or even just single characters. The goal of a \emph{tokenizer} is to return an efficient set of tokens to represent a text dataset. \parencite{alammar2024hands}
+which can be words, sub-words or even just single characters. The goal of a \emph{tokenizer} is to return an efficient set of tokens to represent a text dataset \parencite{alammar2024hands}.
 
 Each model can only process a limited number of tokens at once. This upper bound is referred to as the
 \emph{context window} and covers the prompt, any provided tools, the conversation history and the generated
@@ -45,24 +45,24 @@ response. Beyond being a hard limit, longer contexts also degrade the quality of
 end of the context and perform noticeably worse when relevant information is located in the middle, a
 phenomenon known as "lost in the middle". The degradation is not only a question of \emph{where} relevant
 information sits, but also of \emph{how much} context surrounds it: \textcite{hong2025context} evaluate a
-range of state-of-the-art models on deliberately simple tasks and find that performance declines, as the input grows longer, even when the task itself does not become harder. These two properties, the finite context window and the
+range of state-of-the-art models on deliberately simple tasks and find that performance declines as the input grows longer, even when the task itself does not become harder. These two properties, the finite context window and the
 degradation over long contexts, are a central motivation for distributing work across several specialised
 agents rather than handling everything in a single, ever-growing context (see \cref{sec:multi-agent}).
 
 
 \subsection{Multi-Agent (AI) Systems}
 \label{sec:multi-agent}
-A multi-agent (AI) systems (MAS) are systems composed of multiple interacting agents. 
-MAS (Multi-agent systems) are able to solve more difficult problems compared to individual agents (a monolithic system) \parencite{tran2025multiagentcollaborationmechanismssurvey} 
+A multi-agent (AI) system (MAS) is a system composed of multiple interacting agents.
+MAS (multi-agent systems) are able to solve more difficult problems compared to individual agents (a monolithic system) \parencite{tran2025multiagentcollaborationmechanismssurvey}.
 
 With the rise of LLM-based agents (AI Agents) (see \cref{sec:LLMs}), this idea has been transferred to systems in which
-the individual agents are driven by LLMs. \textcite{tran2025multiagentcollaborationmechanismssurvey} work describes how
+the individual agents are driven by LLMs. The survey by \textcite{tran2025multiagentcollaborationmechanismssurvey} describes how
 multiple LLM agents collaborate through different coordination structures. This work uses a \emph{hierarchical} structure together with
 a \emph{role-based} collaboration strategy. A detailed view of the architecture in this work is described in \cref{sec:concepts}.
 
 Splitting a task across several specialised agents has practical benefits that follow directly from the
 limitations discussed in \cref{sec:tokens-context-cost}: each agent can be given a focused instruction set and
-a smaller selection of tools, which keeps its individual context small, reduces the risk of context-related
+a smaller selection of tools, which keeps its individual context small and reduces the risk of context-related
 quality degradation.
 
 
@@ -71,14 +71,14 @@ quality degradation.
 \subsection{Function Calling}
 \label{sec:func-calling}
 LLMs have great generative capabilities but they lack the ability to perform any task beyond generating a response.
-This means LLMs are not able to retrieve any external information in real time. 
-This limitation means LLMs only have access to the static training data, this inherently results in reponses that are plausible but factually incorrect or outdated (often referred to
-as hallucination). \parencite{Qu_2025}. 
+This means LLMs are not able to retrieve any external information in real time.
+Everything the model knows comes from its static training data, so an answer can sound convincing
+while actually being wrong or simply out of date, a behaviour commonly called hallucination \parencite{Qu_2025}.
 To address this limitation a paradigm named "Function Calling" has been developed. 
 It solves these problems by giving LLMs the ability to interact with external systems by invoking predefined blocks of code (functions) \parencite{wang2026FunctionCalling}.
 
 \subsubsection{Function Calling process example using OpenAI API}
-The following Image illustrates the function calling principle using the OpenAI function calling API as an example. The function calling API is an optional part of the new \emph{Responses API} or the older \emph{Chat Completions API} \parencite{openai_responses_create}.
+The following image illustrates the function calling principle using the OpenAI function calling API as an example. The function calling API is an optional part of the new \emph{Responses API} or the older \emph{Chat Completions API} \parencite{openai_responses_create,openai_function_calling}.
 
 \begin{enumerate}
     \setlength{\itemsep}{8pt}
@@ -128,15 +128,15 @@ model produces a final response.
 \newpage
 
 \subsubsection{Agent Harness}
-An LLM by itself cannot run this loop (agent loop), it only predicts a single continuation for a given input
+An LLM by itself cannot run this loop (the agent loop), as it only predicts a single continuation for a given input
 (see \cref{sec:func-calling}). The loop, the dispatching of tool calls, the accumulation of the message history and the
 evaluation of stop conditions all have to be implemented by the surrounding software. This runtime software is
-commonly referred to as the \emph{agent harness}, the software infrastructure that wraps around an LLM and enables it to
-act on tasks rather than only respond to prompts, often summarised as \emph{Agent = Model + Harness}
+commonly referred to as the \emph{agent harness}: everything that is built around the model so that it can actually
+work on a task instead of just answering a single prompt, often summarised as \emph{Agent = Model + Harness}
 \parencite{databricks_ai_harness,langchain_agent_harness}. The harness is the engine that drives the agent loop (the core) and manages the
 things around it. It forwards the conversation and the available tool definitions to the model, executes the tool
 calls the model requests and maintains the message history across iterations. In practice a
-harness is most of the time provided by an \emph{agent framework} with APIs to modify and add additoanl functionalities. The concrete framework used in this work is described in
+harness is most of the time provided by an \emph{agent framework} with APIs to modify and add additional functionality. The concrete framework used in this work is described in
 \cref{sec:implementation}.
 
 \Cref{fig:agent-harness} illustrates this relationship: the model sits at the centre and only reasons and decides,
@@ -157,20 +157,19 @@ provided by the surrounding harness.
 \subsection{Model Context Protocol (MCP)}
 \label{sec:mcp}
 The Model Context Protocol (MCP) is an open-source standard designed to facilitate the connection between AI
- applications and external systems. MCP allows AI models (such as ChatGPT) to securely interact with different
+ applications and external systems. MCP allows AI applications (such as ChatGPT) to securely interact with different
  data sources (like local files and databases) and tools (execute functions).
 
-The core problem MCP addresses is the fragmentation of AI integrations. Before MCP, every
-new data source required its own custom implementation, making truly connected systems
-difficult to scale \parencite{mcp_anthropic}. This is commonly framed as the $N \times M$
+The core problem MCP addresses is the fragmentation of AI integrations. Before MCP, hooking an AI
+application up to a new data source meant writing yet another one-off integration, an approach that
+quickly stops scaling as the number of connected systems grows \parencite{mcp_anthropic}. This is commonly framed as the $N \times M$
 integration problem \parencite{mcp_nxm}. Without a common standard, connecting $N$ AI
 applications to $M$ external systems (data sources and tools) requires a custom 
 integration for every AI-Application, external system pair, resulting in up to $N \times M$ separate
 integrations that must each be built and maintained individually. MCP replaces this with a
 single shared protocol. Every AI application implements the MCP client side once, and every
 external system is exposed through an MCP server once. This reduces the integration effort
-from a multiplicative $N \times M$ to an additive $N + M$. 
-\parencite{mcp_nxm}.
+from a multiplicative $N \times M$ to an additive $N + M$ \parencite{mcp_nxm}.
 
 As illustrated in \cref{fig:mcp_architecture-overview}, MCP therefore functions similarly to a
 "USB-C port for AI applications," providing a standardized way to connect AI

@@ -22,13 +22,14 @@ with real device behaviour. The lab consists of Nokia SR Linux nodes with a pred
 
 \subsection{Fault Scenarios and Difficulty Levels}
 \label{sec:scenarios-difficulty}
-The system is evaluated against a set of reproducible fault \emph{scenarios}. Each scenario consists
-of a folder that injects exactly one known fault into the healthy baseline configuration (topology).
+The system is evaluated against a set of reproducible fault \emph{scenarios}. Each scenario is
+a folder that injects exactly one known fault into the healthy baseline configuration (topology).
 A scenario consists of:
 
 \begin{itemize}
     \item \texttt{setup.sh} --- injects the fault before the queries are sent,
-    \item \texttt{teardown.sh} --- restores the baseline afterwards (always, even on crash or interrupt),
+    \item \texttt{teardown.sh} --- restores the baseline afterwards (always, even on crash or interrupt);
+          the fault-free baseline scenario needs none,
     \item \texttt{queries.txt} --- the deliberately open-ended troubleshooting prompt(s) given to the
           orchestrator (for example "investigate the root cause"), giving no hint about where to look,
     \item \texttt{ground\_truth.yaml} --- a single \texttt{root\_cause} description of the true fault, used
@@ -119,9 +120,15 @@ For every run the following measurements are recorded, mapping directly onto the
 questions:
 
 \begin{itemize}
-    \item \textbf{Wall-clock duration} per run --- the basis for the time-saving question.
-    \item \textbf{Token usage} (prompt and completion) and \textbf{cost}, the latter fetched from
-          OpenRouter per generation --- the basis for the cost question.
+    \item \textbf{Inference duration} per run --- the summed model generation time across all agent
+          runs, as reported by OpenRouter per generation --- the basis for the time-saving question.
+          Wall-clock time is deliberately not used, since it would be distorted by the tooling around
+          the run (lab redeployment, cost polling).
+    \item \textbf{Token usage} (prompt and completion) and \textbf{cost}, the latter computed from the
+          token counts and the model's advertised price per token --- the basis for the cost question.
+          This keeps the cost figure independent of which provider served a request and of any
+          prompt-cache discounts, at the price of being a list-price estimate rather than the billed
+          amount.
     \item \textbf{Completion status} (completed vs.\ DNF) and \textbf{invalid command count}, recorded
           when an agent issues a malformed device command, as an indicator of robustness.
     \item \textbf{Correctness verdict} per run, assigned manually (\cref{sec:evaluation-procedure}) --- the

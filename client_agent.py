@@ -16,9 +16,7 @@ from model_config import agent_model_settings
 from config_agent import config_agent, config_lifespan
 from experiment_tracker import (
     ExperimentSession,
-    begin_session,
     capture_generation_ids,
-    finish_session,
     make_tracked_http_client,
     record_agent_run,
 )
@@ -84,8 +82,9 @@ UI_EXTRA_MODELS: dict[str, OpenRouterModel] = {
 # name selected in the UI (e.g. 'google/gemini-2.0-flash-001'), or None for the default.
 _active_model_name: ContextVar[str | None] = ContextVar('_active_model_name', default=None)
 
-# ContextVar holding the active experiment session for the current request/REPL turn.
-# Set by web_ui.py middleware (per HTTP request) or by main() (per REPL turn).
+# ContextVar holding the active experiment session, set by experiment_runner.py per
+# turn. Stays None outside experiments (web UI / REPL), which disables the per-run
+# metric recording in the tool wrappers below.
 _active_session: ContextVar[ExperimentSession | None] = ContextVar('_active_session', default=None)
 
 DEFAULT_AGENT_MODEL = 'z-ai/glm-5'
@@ -326,6 +325,7 @@ async def main_lifespan():
 
 
 async def main():
+    """Terminal REPL: chat with the orchestrator, keeping history across turns."""
     logging.basicConfig(level=logging.INFO)
 
     async with main_lifespan():

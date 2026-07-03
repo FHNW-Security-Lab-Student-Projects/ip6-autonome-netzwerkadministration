@@ -71,6 +71,8 @@ async def query_loki(
         text_filter: Optional substring — only return lines containing this string.
         limit: Maximum number of log lines to return (default 100, max 500).
     """
+    # Build the LogQL stream selector: 'all' matches every device via the shared
+    # job label, otherwise filter on the per-device host label.
     severity_regex = '|'.join(s.strip() for s in severities.split(',') if s.strip())
     if device == 'all':
         stream = f'{{job="network-syslog", severity=~"{severity_regex}"}}'

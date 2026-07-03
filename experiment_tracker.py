@@ -307,8 +307,6 @@ async def finalize_costs(sessions: list[ExperimentSession], api_key: str) -> Non
     as native_tokens × the model's advertised per-token rate (model_config.pricing_for).
     See the module docstring for why.
     """
-    import asyncio
-
     # Collect every unique generation ID across all runs in all sessions, in
     # chronological order. The first/last are stamped onto every session (run-level
     # metadata, for manual OpenRouter lookup); the set is also what we fetch below.

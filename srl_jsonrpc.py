@@ -4,11 +4,10 @@ Single source of truth for talking to SR Linux devices. Replaces the old
 SSH/Netmiko transport. Connection details (hostname, credentials, port,
 scheme) are read from inventory/hosts.yaml + inventory/defaults.yaml.
 
-All four JSON-RPC methods are exposed:
-  - jrpc_get      : YANG path reads (state or config)
-  - jrpc_set      : structured config updates (atomic commit)
-  - jrpc_validate : dry-run structured config updates
-  - jrpc_cli      : escape hatch for arbitrary CLI commands
+Exposed JSON-RPC methods:
+  - jrpc_get : YANG path reads (state or config)
+  - jrpc_cli : escape hatch for arbitrary CLI commands (also used for config,
+               via candidate-mode CLI batches — see config_mcp_server.py)
 
 Endpoint: <scheme>://<host>:<port>/jsonrpc
 Auth:     HTTP basic (admin / NokiaSrl1! in this lab)
@@ -218,35 +217,6 @@ async def jrpc_get(
     }
     result = await _call(conn, 'get', params)
     return result if isinstance(result, list) else [result]
-
-
-async def jrpc_set(
-    conn: SrlConnection,
-    updates: list[dict],
-    datastore: str = 'candidate',
-) -> Any:
-    """Run a `set` request. updates = [{action,path,value?}, ...].
-
-    Common actions: 'update', 'replace', 'delete'.
-    """
-    params = {
-        'commands': updates,
-        'datastore': datastore,
-    }
-    return await _call(conn, 'set', params)
-
-
-async def jrpc_validate(
-    conn: SrlConnection,
-    updates: list[dict],
-    datastore: str = 'candidate',
-) -> Any:
-    """Run a `validate` request (dry-run set). Same shape as jrpc_set."""
-    params = {
-        'commands': updates,
-        'datastore': datastore,
-    }
-    return await _call(conn, 'validate', params)
 
 
 async def jrpc_cli(
