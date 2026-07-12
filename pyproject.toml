@@ -14,3 +14,8 @@ dependencies = [
     "matplotlib>=3.9",
     "seaborn>=0.13",
 ]
+
+[dependency-groups]
+dev = [
+    "pyarrow>=24.0.0",
+]

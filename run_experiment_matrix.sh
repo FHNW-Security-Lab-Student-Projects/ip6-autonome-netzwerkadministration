@@ -34,29 +34,37 @@ set -uo pipefail
 # ============================ CONFIG (edit me) ============================
 
 # OpenRouter model IDs — 2 per price tier (see docs/model-tier-definition.md).
-# TEMP: single re-run of the failed deepseek run (removed from experiment_log.jsonl
-# on 2026-07-02; died with "Exceeded maximum output retries (1)").
+# TEMP: re-run of the 2 failed qwen/qwen3.7-max runs (removed from
+# experiment_log.jsonl on 2026-07-06; one died with a JSON parse error, the
+# other with an upstream 429 rate limit before the first LLM request).
 # Restore the full matrix below once this run is done.
 
  MODELS=(
-   "anthropic/claude-opus-4.8"     "openai/gpt-5.5"                 # high
-   "z-ai/glm-5.2"                  "qwen/qwen3.7-max"               # mid
-   "deepseek/deepseek-v3.2"        "mistralai/ministral-14b-2512"   # low
+   "qwen/qwen3.7-max"
  )
+# MODELS=(
+#   "anthropic/claude-opus-4.8"     "openai/gpt-5.5"                 # high
+#   "z-ai/glm-5.2"                  "qwen/qwen3.7-max"               # mid
+#   "deepseek/deepseek-v3.2"        "mistralai/ministral-14b-2512"   # low
+# )
 
 # Scenario folder names under scenarios/.
  SCENARIOS=(
-    acl-silent-drop
-    client3-port-down
     duplicate-ip-arp
-    intf-down
-    missing-export-policy
-    missing-vlan-on-trunk
-    mtu-blackhole
     one-way-route-filter
-    switch1-uplink-down
-    basic-client-communication
  )
+# SCENARIOS=(
+#    acl-silent-drop
+#    client3-port-down
+#    duplicate-ip-arp
+#    intf-down
+#    missing-export-policy
+#    missing-vlan-on-trunk
+#    mtu-blackhole
+#    one-way-route-filter
+#    switch1-uplink-down
+#    basic-client-communication
+# )
 
 REPEATS=1                              # runs per (model, scenario) pair
 MAX_SECONDS=600                          # wall-clock cap per run; 0 = no cap. On expiry the run

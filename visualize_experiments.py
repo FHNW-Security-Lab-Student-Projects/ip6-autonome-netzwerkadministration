@@ -15,10 +15,14 @@ import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 import pandas as pd
 import seaborn as sns
 
-from analyze_experiments import DEFAULT_EVAL_LOG, DEFAULT_LOG, join_verdicts, load, load_verdicts
+from analyze_experiments import (
+    DEFAULT_EVAL_LOG, DEFAULT_LOG, DEFAULT_WALL_CLOCK_LOG,
+    join_verdicts, join_wall_clock, load, load_verdicts, load_wall_clock,
+)
 
 
 sns.set_theme(context='paper', style='whitegrid', palette='colorblind')
@@ -59,6 +63,18 @@ def _model_legend_outside(ax: plt.Axes) -> None:
               bbox_to_anchor=(1.02, 1), borderaxespad=0)
 
 
+def _has_data(df: pd.DataFrame, column: str, name: str) -> bool:
+    """True if the column exists and has at least one value; prints a skip note otherwise.
+
+    Lets optional metrics (wall_clock_s comes from a separate join) drop out of the
+    metric loops cleanly instead of producing empty charts.
+    """
+    if column in df.columns and df[column].notna().any():
+        return True
+    print(f'  [skip] {name}: no {column} data (run recover_wall_clock.py).')
+    return False
+
+
 def _cat_subplots(n_categories: int, height: float = 3.7):
     """Create a figure whose width grows with the number of x-axis categories.
 
@@ -80,15 +96,37 @@ def plot_model_comparison(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Pat
     metrics = [
         ('total_cost_usd',    'Cost (USD)',  'model_comparison_cost'),
         ('duration_s',        'LLM inference time, summed (s)', 'model_comparison_duration'),
+        ('wall_clock_s',      'Wall-clock time (s)', 'model_comparison_wall_clock'),
         ('total_tool_calls',  'Tool calls',  'model_comparison_tool_calls'),
     ]
     for column, ylabel, name in metrics:
+        if not _has_data(df, column, name):
+            continue
         fig, ax = _cat_subplots(df['model'].nunique())
         sns.barplot(data=df, x='model', y=column, ax=ax, errorbar='sd')
         ax.set_xlabel('Model')
         ax.set_ylabel(ylabel)
         _rotate_xticks(ax)
         written.append(_save(fig, out_dir, name, ext))
+
+    # Both time metrics side by side. Summed inference time can EXCEED wall clock
+    # because agents fire LLM requests in parallel — the gap between the two bars
+    # shows each model's orchestration concurrency, which neither chart shows alone.
+    if _has_data(df, 'wall_clock_s', 'model_comparison_time_metrics'):
+        times = df[['model', 'duration_s', 'wall_clock_s']].melt(
+            id_vars='model', var_name='kind', value_name='seconds',
+        )
+        times['kind'] = times['kind'].map({
+            'duration_s':   'LLM inference, summed',
+            'wall_clock_s': 'Wall clock',
+        })
+        fig, ax = _cat_subplots(df['model'].nunique())
+        sns.barplot(data=times, x='model', y='seconds', hue='kind', ax=ax, errorbar='sd')
+        ax.set_xlabel('Model')
+        ax.set_ylabel('Time (s)')
+        ax.legend(title='')
+        _rotate_xticks(ax)
+        written.append(_save(fig, out_dir, 'model_comparison_time_metrics', ext))
 
     # Normalized tokens (from the Generation API) — comparable across models that
     # tokenize differently, unlike native counts. The trade-off: normalized counts go
@@ -116,10 +154,13 @@ def plot_scenario_performance(df: pd.DataFrame, out_dir: Path, ext: str) -> list
     written: list[Path] = []
     metrics = [
         ('duration_s',       'LLM inference time, summed (s)', 'scenario_performance_duration'),
+        ('wall_clock_s',     'Wall-clock time (s)', 'scenario_performance_wall_clock'),
         ('total_cost_usd',   'Cost (USD)',   'scenario_performance_cost'),
         ('total_tool_calls', 'Tool calls',   'scenario_performance_tool_calls'),
     ]
     for column, ylabel, name in metrics:
+        if not _has_data(df, column, name):
+            continue
         fig, ax = _cat_subplots(df['scenario'].nunique())
         # errorbar=('pi', 100): whiskers span the observed min-max of the runs in
         # each group. With only 2-4 runs a symmetric SD interval extends below
@@ -241,14 +282,66 @@ def plot_cost_vs_correctness(df: pd.DataFrame, out_dir: Path, ext: str) -> list[
     return [_save(fig, out_dir, 'cost_vs_correctness', ext)]
 
 
+def plot_time_to_diagnosis(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
+    """Wall-clock time to a CORRECT diagnosis per model — the time-savings metric.
+
+    Includes only runs that finished within the matrix cap AND whose output was
+    judged correct (found_issue). DNF runs are excluded rather than entered at
+    their 600 s cap value: they are right-censored — the run was cut off, so it
+    has a failure, not a troubleshooting time. (A few DNF runs carry
+    found_issue=True because the partial output already named the root cause;
+    they still never delivered a diagnosis, so they are excluded too.)
+
+    The per-model n differs, so each group is annotated with correct/evaluated
+    counts. Read this chart together with the found-rate chart: a model can look
+    fast here simply because only its easy runs succeed.
+    """
+    if 'found_issue' not in df.columns or df['found_issue'].notna().sum() == 0:
+        print('  [skip] time-to-diagnosis chart: no verdicts yet — run evaluate_experiments.py.')
+        return []
+    if not _has_data(df, 'wall_clock_s', 'time_to_diagnosis'):
+        return []
+
+    evaluated = df[df['found_issue'].notna()]
+    finished = evaluated[~evaluated['error'].fillna('').str.startswith('DNF')]
+    correct = finished[finished['found_issue'].astype(bool) & finished['wall_clock_s'].notna()]
+    if correct.empty:
+        print('  [skip] time-to-diagnosis chart: no correctly diagnosed completed runs.')
+        return []
+
+    # Keep the global model order (and palette) even though some models may
+    # contribute few points; models with zero correct runs drop out.
+    order = [m for m in df['model'].unique() if (correct['model'] == m).any()]
+    fig, ax = _cat_subplots(len(order))
+    sns.boxplot(data=correct, x='model', y='wall_clock_s', order=order,
+                ax=ax, showfliers=False)
+    sns.stripplot(data=correct, x='model', y='wall_clock_s', order=order,
+                  ax=ax, color='black', size=3, alpha=0.5)
+
+    n_correct = correct.groupby('model').size()
+    n_evaluated = evaluated.groupby('model').size()
+    trans = transforms.blended_transform_factory(ax.transData, ax.transAxes)
+    for i, model in enumerate(order):
+        ax.text(i, 0.98, f'n={n_correct[model]}/{n_evaluated[model]}',
+                transform=trans, ha='center', va='top', fontsize=7, color='0.3')
+
+    ax.set_xlabel('Model')
+    ax.set_ylabel('Wall-clock time to correct diagnosis (s)')
+    _rotate_xticks(ax)
+    return [_save(fig, out_dir, 'time_to_diagnosis', ext)]
+
+
 def plot_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
     written: list[Path] = []
     metrics = [
         ('duration_s',         'LLM inference time, summed (s)',  'distribution_duration'),
+        ('wall_clock_s',       'Wall-clock time (s)',  'distribution_wall_clock'),
         ('total_normalized_input_tokens', 'Input tokens (normalized)',  'distribution_tokens'),
         ('total_cost_usd',     'Cost (USD)',    'distribution_cost'),
     ]
     for column, ylabel, name in metrics:
+        if not _has_data(df, column, name):
+            continue
         fig, ax = _cat_subplots(df['model'].nunique())
         # showfliers=False: outlier runs are already drawn by the stripplot below;
         # the boxplot's own flier circles would render the same runs twice.
@@ -283,9 +376,12 @@ def plot_scenario_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> li
     metrics = [
         ('total_cost_usd',                'Cost (USD)',               'scenario_distribution_cost'),
         ('duration_s',                    'LLM inference time, summed (s)',             'scenario_distribution_duration'),
+        ('wall_clock_s',                  'Wall-clock time (s)',      'scenario_distribution_wall_clock'),
         ('total_normalized_input_tokens', 'Input tokens (normalized)', 'scenario_distribution_tokens'),
     ]
     for column, xlabel, name in metrics:
+        if not _has_data(df, column, name):
+            continue
         data = df[df[column].notna()]
         order = (data.groupby('scenario')[column].median()
                  .sort_values(ascending=False).index.tolist())
@@ -309,6 +405,61 @@ def plot_scenario_distributions(df: pd.DataFrame, out_dir: Path, ext: str) -> li
         fig.supxlabel(xlabel, fontsize=10)
         written.append(_save(fig, out_dir, name, ext))
     return written
+
+
+def plot_scenario_time_to_diagnosis(df: pd.DataFrame, out_dir: Path, ext: str) -> list[Path]:
+    """Per-model panels of wall-clock time to a CORRECT diagnosis per scenario.
+
+    Same layout as plot_scenario_distributions, but restricted to runs that
+    finished within the matrix cap and were judged correct (see
+    plot_time_to_diagnosis for the censoring rationale). With at most 5 runs
+    per cell the dot count doubles as the per-cell n: a scenario row with no
+    dots means the model never produced a correct diagnosis there — that
+    absence is the difficulty-ceiling evidence, so empty rows are kept visible
+    rather than dropped.
+    """
+    if 'found_issue' not in df.columns or df['found_issue'].notna().sum() == 0:
+        print('  [skip] scenario time-to-diagnosis chart: no verdicts yet.')
+        return []
+    if not _has_data(df, 'wall_clock_s', 'scenario_time_to_diagnosis'):
+        return []
+
+    evaluated = df[df['found_issue'].notna()]
+    finished = evaluated[~evaluated['error'].fillna('').str.startswith('DNF')]
+    correct = finished[finished['found_issue'].astype(bool) & finished['wall_clock_s'].notna()]
+    if correct.empty:
+        print('  [skip] scenario time-to-diagnosis chart: no correctly diagnosed completed runs.')
+        return []
+
+    models = list(df['model'].unique())
+    colors = dict(zip(models, sns.color_palette(n_colors=len(models))))
+    n_cols = min(3, len(models))
+    n_rows = -(-len(models) // n_cols)
+
+    # One scenario order for all panels; include every scenario so a model's
+    # empty rows stay visible.
+    order = (correct.groupby('scenario')['wall_clock_s'].median()
+             .reindex(df['scenario'].unique()).sort_values(ascending=False, na_position='last')
+             .index.tolist())
+    fig, axes = plt.subplots(
+        n_rows, n_cols, sharex=True, sharey=True, squeeze=False,
+        figsize=(3.4 * n_cols, 0.3 * len(order) * n_rows + 1.4),
+        layout='constrained',
+    )
+    for ax, model in zip(axes.flat, models):
+        sub = correct[correct['model'] == model]
+        sns.stripplot(data=sub, y='scenario', x='wall_clock_s', order=order,
+                      ax=ax, color=colors[model], size=4, alpha=0.75)
+        medians = sub.groupby('scenario')['wall_clock_s'].median().reindex(order)
+        ax.plot(medians.to_numpy(), range(len(order)), linestyle='',
+                marker='|', color='0.2', markersize=9, markeredgewidth=1.3)
+        ax.set_title(model, fontsize=9)
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+    for ax in axes.flat[len(models):]:
+        ax.set_visible(False)
+    fig.supxlabel('Wall-clock time to correct diagnosis (s)', fontsize=10)
+    return [_save(fig, out_dir, 'scenario_time_to_diagnosis', ext)]
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +502,14 @@ def main() -> None:
              f'(default: {DEFAULT_EVAL_LOG.name}). Missing file is fine — the '
              f'correctness chart is simply skipped.',
     )
+    parser.add_argument(
+        '--wall-clock-file', '-w',
+        default=str(DEFAULT_WALL_CLOCK_LOG),
+        metavar='PATH',
+        help=f'Path to wall_clock_durations.jsonl from recover_wall_clock.py '
+             f'(default: {DEFAULT_WALL_CLOCK_LOG.name}). Missing file is fine — '
+             f'wall-clock charts are simply skipped.',
+    )
     args = parser.parse_args()
 
     path = Path(args.file)
@@ -364,6 +523,7 @@ def main() -> None:
 
     verdicts = load_verdicts(Path(args.eval_file))
     df = join_verdicts(df, verdicts)
+    df = join_wall_clock(df, load_wall_clock(Path(args.wall_clock_file)))
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -374,8 +534,10 @@ def main() -> None:
     written += plot_invalid_commands(df, out_dir, args.format)
     written += plot_correctness(df, out_dir, args.format)
     written += plot_cost_vs_correctness(df, out_dir, args.format)
+    written += plot_time_to_diagnosis(df, out_dir, args.format)
     written += plot_distributions(df, out_dir, args.format)
     written += plot_scenario_distributions(df, out_dir, args.format)
+    written += plot_scenario_time_to_diagnosis(df, out_dir, args.format)
 
     print(f'Wrote {len(written)} figure(s) to {out_dir}/')
     for p in written:

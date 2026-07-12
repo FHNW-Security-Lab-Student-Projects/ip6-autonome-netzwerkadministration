@@ -20,6 +20,7 @@ import pandas as pd
 
 DEFAULT_LOG = Path(__file__).parent / 'experiment_log.jsonl'
 DEFAULT_EVAL_LOG = Path(__file__).parent / 'evaluation_log.jsonl'
+DEFAULT_WALL_CLOCK_LOG = Path(__file__).parent / 'wall_clock_durations.jsonl'
 
 WIDTH = 80
 
@@ -90,6 +91,37 @@ def join_verdicts(df: pd.DataFrame, verdicts: pd.DataFrame) -> pd.DataFrame:
     return df.merge(verdicts[['session_id', 'found_issue']], on='session_id', how='left')
 
 
+def load_wall_clock(path: Path) -> pd.DataFrame:
+    """Load wall_clock_durations.jsonl (from recover_wall_clock.py) keyed by session_id.
+
+    duration_s in the experiment log is summed LLM generation_time (inference only);
+    wall_clock_s is the real start-to-finish time of the session recovered from
+    Logfire traces. Both metrics coexist: inference time compares model speed,
+    wall clock answers the time-savings question. Returns an empty frame if the
+    file doesn't exist — wall-clock columns then just stay empty.
+    """
+    if not path.exists():
+        return pd.DataFrame(columns=['session_id', 'wall_clock_s'])
+    records = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                records.append(json.loads(line))
+    if not records:
+        return pd.DataFrame(columns=['session_id', 'wall_clock_s'])
+    return pd.DataFrame(records)
+
+
+def join_wall_clock(df: pd.DataFrame, wall: pd.DataFrame) -> pd.DataFrame:
+    """Left-join wall_clock_s onto session df. Sessions without a trace get NaN."""
+    if wall.empty or 'wall_clock_s' not in wall.columns:
+        df = df.copy()
+        df['wall_clock_s'] = pd.NA
+        return df
+    return df.merge(wall[['session_id', 'wall_clock_s']], on='session_id', how='left')
+
+
 # ---------------------------------------------------------------------------
 # Aggregations
 # ---------------------------------------------------------------------------
@@ -110,6 +142,17 @@ def scenario_summary(df: pd.DataFrame) -> pd.DataFrame:
         )
     )
 
+    # avg_wall_clock_s appears only when wall_clock_durations.jsonl is joined in.
+    # Runs killed at the matrix runner's 600 s cap are right-censored, so averages
+    # that include them understate the true time.
+    if 'wall_clock_s' in df.columns and df['wall_clock_s'].notna().any():
+        wall_summary = (
+            df[df['wall_clock_s'].notna()]
+            .groupby(['scenario', 'model'], sort=True)
+            .agg(avg_wall_clock_s=('wall_clock_s', 'mean'))
+        )
+        summary = summary.join(wall_summary, how='left')
+
     # found_rate is computed only when verdicts are joined in. You evaluate only the
     # last (concluding) turn of each run, so the rate is over EVALUATED turns, not
     # all turns — evaluated_turns shows coverage.
@@ -126,10 +169,27 @@ def scenario_summary(df: pd.DataFrame) -> pd.DataFrame:
             summary = summary.join(verdict_summary, how='left')
             summary['evaluated_turns'] = summary['evaluated_turns'].fillna(0).astype(int)
 
+    # median_ttd_s: median wall-clock time to a CORRECT diagnosis, over runs that
+    # finished within the matrix cap. DNF runs are excluded (right-censored at
+    # 600 s — a run that never delivered a diagnosis has no time-to-diagnosis),
+    # as are correct-but-DNF partial outputs. NaN = no correct completed run.
+    if ('wall_clock_s' in df.columns and 'found_issue' in df.columns
+            and df['wall_clock_s'].notna().any()):
+        finished = df[df['wall_clock_s'].notna() & df['found_issue'].notna()
+                      & ~df['error'].fillna('').str.startswith('DNF')]
+        correct = finished[finished['found_issue'].astype(bool)]
+        if not correct.empty:
+            ttd_summary = (
+                correct.groupby(['scenario', 'model'], sort=True)
+                .agg(median_ttd_s=('wall_clock_s', 'median'))
+            )
+            summary = summary.join(ttd_summary, how='left')
+
     return summary.round({
-        'avg_duration_s': 1, 'avg_input_tokens': 0, 'avg_output_tokens': 0,
-        'avg_tool_calls': 1, 'avg_llm_requests': 1, 'avg_invalid_commands': 1,
-        'total_cost_usd': 6, 'success_rate': 2, 'found_rate': 2,
+        'avg_duration_s': 1, 'avg_wall_clock_s': 1, 'median_ttd_s': 1,
+        'avg_input_tokens': 0, 'avg_output_tokens': 0, 'avg_tool_calls': 1,
+        'avg_llm_requests': 1, 'avg_invalid_commands': 1, 'total_cost_usd': 6,
+        'success_rate': 2, 'found_rate': 2,
     })
 
 
@@ -281,6 +341,14 @@ def main() -> None:
              f'(default: {DEFAULT_EVAL_LOG.name}). Missing file is fine — '
              f'correctness columns are simply omitted.',
     )
+    parser.add_argument(
+        '--wall-clock-file', '-w',
+        default=str(DEFAULT_WALL_CLOCK_LOG),
+        metavar='PATH',
+        help=f'Path to wall_clock_durations.jsonl from recover_wall_clock.py '
+             f'(default: {DEFAULT_WALL_CLOCK_LOG.name}). Missing file is fine — '
+             f'wall-clock columns are simply omitted.',
+    )
     args = parser.parse_args()
 
     path = Path(args.file)
@@ -294,6 +362,7 @@ def main() -> None:
 
     verdicts = load_verdicts(Path(args.eval_file))
     df = join_verdicts(df, verdicts)
+    df = join_wall_clock(df, load_wall_clock(Path(args.wall_clock_file)))
 
     print_report(df)
 
