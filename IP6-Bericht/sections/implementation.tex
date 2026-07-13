@@ -1,140 +1,119 @@
 \section{Implementation}
 \label{sec:implementation}
-This section describes how the design of \cref{sec:concepts} is realised in code. It concentrates on the
-decisions that shaped the implementation rather than on the code itself; the full source is available in the
+The implementation of the design in \cref{sec:concepts} is described in this chapter. The full source is available in the
 project repository\footnote{\url{https://github.com/FHNW-Security-Lab-Student-Projects/ip6-autonome-netzwerkadministration}}.
 
 \subsection{Agent Framework and Harness}
 \label{sec:impl-framework}
 The agent harness introduced conceptually in \cref{sec:agent-loop} is provided in this work by
 \emph{Pydantic AI}, a Python agent framework \parencite{pydantic_ai}. Pydantic AI implements the agent loop,
-drives the function-calling exchange with the model, manages the message history across iterations and
+does the function-calling exchange with the model, manages the message history across iterations and
 exposes the tools of each agent.
 
-Every agent of \cref{sec:agent-roles} is one Pydantic AI agent, defined by four things: a name, an
-instruction text (its system prompt), a model and a set of tools. The entire multi-agent system runs in a
-single Python process. Agents are plain objects that call each other directly, there is no network protocol
-or separate service per agent. This keeps the system simple to start, debug and reason about, an earlier
-design based on an inter-agent network protocol was dropped for exactly this reason.
+Every agent of \cref{sec:agent-roles} is one Pydantic AI agent, defined by four things, a name, an
+instruction text (its system prompt), a model and tools. The entire multi-agent system runs in a
+single Python process. Agents are plain objects that call each other directly. There is no network protocol
+or separate service per agent. At the start of the project, the plan was to use the A2A
+protocol\footnote{Agent2Agent (A2A), an open protocol for communication between AI agents,
+\url{https://a2a-protocol.org/}.} for communication between the agents. This would have allowed the agents
+to run in separate processes or even on different machines. A2A was dropped because it introduced additional
+complexity without adding anything that contributed to the project's goals. 
 
 \subsection{Model Access}
 \label{sec:impl-models}
 All models are accessed through \emph{OpenRouter}, a gateway that exposes models from different vendors
-behind one API \parencite{openrouter}. Switching the model an agent uses therefore only means changing a
-model identifier, no vendor-specific code is involved. This is what makes the experiment matrix of
-\cref{sec:experiment-matrix} practical: the same system can be swept across six models from three price
-tiers without touching the agent logic.
+behind one API \parencite{openrouter}. Switching the model an agent uses only means changing a
+model identifier (some text). This is what makes the experiment matrix of
+\cref{sec:experiment-matrix} practical, the model can be changed without touching the agent logic.
 
-The selected model is a runtime parameter. The orchestrator passes the active model down into every
-sub-agent run, so a whole troubleshooting session runs on one model, which is required to attribute an
-outcome to a single tier (\cref{sec:model-tier-concept}).
-
-Two settings are applied centrally to every agent. First, the reasoning effort is fixed to the same level
-for all models, so that model-versus-model comparisons are not distorted by each provider picking its own
+Two settings are applied to every agent. First, the reasoning effort is fixed to the same level
+for all models, so that model versus model comparisons are not influenced by each provider picking its own
 default reasoning depth. Second, usage accounting is enabled on every request, so each model response
-carries its native token counts. These counts are the basis for the cost and token metrics of
+carries its usage information. This usage information is the basis for the cost and token metrics of
 \cref{sec:metrics}.
 
 \subsection{Delegation as Tool Calls}
 \label{sec:impl-delegation}
 Delegation between the orchestrator and its sub-agents (\cref{sec:architecture}) is realised as ordinary
-function calling: each sub-agent is registered on the orchestrator as a tool. The tool description tells
+function calling, each sub-agent is registered on the orchestrator as a tool. The tool description tells
 the orchestrator's model what the sub-agent can do and when to use it. When the model calls the tool, the
 wrapper runs the sub-agent's own agent loop to completion and returns its final answer as the tool result.
 
-Sub-agents are stateless: they never see the orchestrator's conversation and keep no memory between calls.
+Sub-agents are stateless, they never see the orchestrator's conversation and keep no conversation history between calls.
 The orchestrator's instructions therefore require every delegated request to be self-contained, carrying
-the user's goal, the relevant details and any findings from earlier sub-agent calls. Read-only sub-agents
-may be called in parallel when a request involves independent lookups.
+the user's goal, the relevant details and any important information from earlier sub-agent calls. Read-only sub-agents
+can be called in parallel when a request involves independent lookups (the decision is up the LLM).
 
-One agent role is deliberately not backed by an LLM. The topology agent is implemented as a background task
-that queries the LLDP neighbours of every device once a minute, compares them against the intended topology
-definition of the lab and caches the result. The orchestrator's topology tool simply returns this cache.
-Since topology retrieval is deterministic, a model in this path would add cost and latency without adding
-any capability.
+One agent is not based on an LLM making decisions. The topology agent is implemented as a background task
+that queries the LLDP neighbours of every device once a minute. Then it compares the "live" state against the "should be" topology
+definition of the lab and caches the result. The orchestrator's topology tool simply returns this cache (so the repsonse is faster).
+Since topology retrieval is deterministic and follows a strict order of events, an LLM would just add cost without adding anything beneficial to the agent.
 
 \subsection{Tool Servers and Device Access}
 \label{sec:impl-tools}
-Following the design of \cref{sec:tool-layer}, each tool-using agent is served by its own MCP server
+Following the design of \cref{sec:tool-layer}, each agent using tools via MCP, is served by its own MCP server
 (\cref{sec:mcp}), implemented with \emph{FastMCP} \parencite{fastmcp} and started as a subprocess of the
-main process. Tool names are prefixed per domain, so tools of different agents cannot be confused.
+main process.
 
 All interaction with the lab devices goes through the JSON-RPC interface of Nokia SR Linux
-\parencite{srlinux_jsonrpc}, wrapped in a single shared client module. The tools offer two routes to device
-data: executing formatted \texttt{show} commands, and reading a specific YANG path directly from the state
-or running-configuration datastore. The agent instructions explain when each route is appropriate. To keep
-the models from inventing plausible-looking but invalid commands, a reference of valid SR Linux read
-commands is embedded in the network agent's system prompt. When a device still rejects a command, the
-failure is detected in the tool output and recorded, this is the source of the invalid-command count of
+\parencite{srlinux_jsonrpc}. The tools offer two routes to device
+data. The first is executing formatted \texttt{show} commands and the second is reading a specific YANG path directly from the state
+or running-configuration datastore. As an attempt to keep
+the models from using invalid commands, a reference of valid SR Linux read
+commands is added in the network agent's system prompt. When a device still rejects a command, the
+failure is detected in the tool output and recorded. This is the source of the invalid-command count of
 \cref{sec:metrics}.
 
 For syslog, all devices log to a central \emph{Loki} instance \parencite{grafana_loki}, which the syslog
-agent queries through its MCP tool. A practical problem here is time: an LLM has no reliable clock and its
-prompt may be minutes old by the time a tool runs. The tools therefore accept time expressions such as
+agent queries through its MCP tool. A practical challange here is time, an LLM has no reliable clock and its
+prompt may be minutes old by the time a tool runs. The tools accept time values such as
 \enquote{now}, a relative offset (\enquote{15m ago}) or an absolute timestamp, and resolve them against the
-real clock at call time. The model only ever states its intent and never computes timestamps itself.
+real clock at tool runtime (so the time of the device where the tool code runs is used), so the model never has to compute a timestamp itself.
 
 \subsection{Context Management}
 \label{sec:impl-context}
-Device output is the dominant source of token growth: every iteration of an agent loop re-sends the full
-message history, so large tool returns are paid for again on every subsequent step. Observed runs of the
-network agent reached several hundred thousand input tokens for a single query before countermeasures were
-in place. Two measures address this, both following from \cref{sec:tokens-context-cost}.
+Device command output is the biggest factor in terms of context growth in this project. Every iteration of an agent loop the full
+message history is sent again, so large tool returns are paid for again on every subsequent step (without prompt caching). 
+Two actions were taken to address this, both following from \cref{sec:tokens-context-cost}.
 
-The first works at the source. Tool responses are serialised compactly and cut off at a fixed size; a
-truncated response ends with a note telling the model to re-query a narrower path instead. The instructions
-additionally steer the model towards narrow queries (a single leaf across all interfaces rather than the
-whole interface tree).
+The first works at the source. Tool responses are cut off at a fixed size. A
+truncated response ends with a note telling the model to try to fetch some information using a more narrow scoped query. (For example to query interfaces directly rather than doing summary queries).
 
-The second works on the history. Before each model request, a processor estimates the current prompt size,
-anchored on the token count the provider reported for the previous request. Only when the estimate
-approaches the model's context window (whose size is looked up per model, since the swept models differ
-considerably) does it act: the oldest oversized tool returns are replaced by a one-line stub stating which
-tool was called and that it can be re-invoked if the output is needed again. The most recent returns and
-all error messages are always kept verbatim, errors carry the correction the model needs to avoid repeating
-a bad call. This keeps long runs inside the context window, reduces cost and counters the
+The second works on the history. Before sending a request to the model, a processor estimates the current prompt size
+based on the token count the provider reported for the previous request. Only when the estimate
+approaches the model's context window (whose size is looked up per model, since the models differ) does it perform the operations. The oldest oversized tool returns are each replaced by a sentence stating
+which tool was called and that it can be re-invoked if the output is needed again. The most recent returns
+and all error messages are always kept as they are, since errors carry the correction the model needs to avoid
+repeating a bad call. This keeps long runs inside the context window and counters the
 \enquote{lost in the middle} degradation without hiding any information the model cannot get back.
 
-\subsection{Guarding Configuration Changes}
-\label{sec:impl-config}
-The configuration agent is the only write path into the network, and its use is guarded by a two-step
-workflow encoded in the orchestrator's instructions. A change request is first delegated as
-validation-only: the agent loads the commands into the device's candidate configuration and returns the
-resulting diff without committing. The orchestrator shows this diff to the user, and only after explicit
-approval does it send the apply request, which must carry the exact commands from the validation step. A
-request without a clear prefix is treated as validation, so the default is always the safe path. The
-autonomous investigation orchestrator has no access to the configuration agent at all
-(\cref{sec:agent-roles}).
 
 \subsection{Autonomous Investigations and Handover}
 \label{sec:impl-investigations}
 The syslog use case of \cref{sec:autonomous-syslog-usecase} is driven by a background task that polls Loki
-every 30 seconds for messages of severity error and above. A matching event opens an investigation, keyed
-by device and message so that a repeating log line does not spawn duplicates, and starts a triage run of
-the investigation orchestrator in the background. Because this orchestrator lacks the tools to open or
-continue investigations, an investigation can never trigger further investigations recursively.
+every 30 seconds and starts whenever logs matching the specified severity arrive. A matching event opens an investigation, keyed
+by device and a normalized message so that a repeating log lines don't open multiple investigations for the same type of log message.
+The investigation is then run as a background task via the investigation orchestrator agent ("investigation\_orchestrator" in \Cref{fig:architecture-overview}). Because this orchestrator lacks the tools to open or
+continue investigations (only the user-facing orchestrator agent has them), an investigation can never trigger further investigations recursively.
 
-Each investigation is persisted to disk as a record containing an identifier, the affected device, the
-triggering log line and its timestamp, the current status, a summary, and, crucially, the complete
-serialised message history of the agent run. This history is what realises the handover described in
-\cref{sec:autonomous-syslog-usecase}: the user-facing orchestrator has tools to list, inspect and continue
-investigations, and continuing a case loads the stored history and resumes the investigation orchestrator
-on top of it. The model therefore still holds all earlier findings and tool results and continues from
-where the autonomous run stopped, instead of re-running the same commands.
+Each investigation is persisted to disk as a record containing an the complete
+serialized message history of the agent run. This history is what realises the handover described in
+\cref{sec:autonomous-syslog-usecase}, the user-facing orchestrator has tools to list, inspect and continue
+investigations and continuing a case loads the stored history and feeds it to the investigation orchestrator.
+The model therefore still holds all earlier findings and tool results and continues from
+where the autonomous run stopped, instead of re-running the same commands. The user is also able to ask questions about previous investigation steps.
 
 \subsection{Interfaces and Instrumentation}
 \label{sec:impl-interfaces}
-The system has three entry points: a terminal chat for development, a web chat interface with a model
+The system has two entry points, a web chat interface with a model
 selector (built on the framework's bundled web UI), and a status page showing all open investigations. In
 the interactive interfaces the orchestrator keeps its message history across turns, so a troubleshooting
 session is one continuous conversation.
 
 All agent runs, tool calls and device requests are traced with \emph{Logfire} \parencite{logfire}. The
-traces show, per run, which sub-agents were called with which requests and what each tool returned, which
-was the main debugging instrument during development and was also used to verify the recorded token and
-cost figures.
+traces show, per run, which sub-agents were called with which requests and what each tool returned. This
+was the main debugging instrument during development.
 
 The experiments of \cref{sec:methodology} reuse the interactive system unchanged, except that the
 configuration agent and the investigation tools are disabled through feature flags, so the measured system
-is exactly the read-only troubleshooting core. The delegation wrappers record the usage of every sub-agent
-run into the experiment log, from which the metrics of \cref{sec:metrics} are derived.
+is exactly the read-only troubleshooting core.
