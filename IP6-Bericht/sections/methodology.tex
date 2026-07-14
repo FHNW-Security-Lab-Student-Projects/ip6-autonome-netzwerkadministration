@@ -1,16 +1,14 @@
 \section{Methodology}
 \label{sec:methodology}
-This section describes how the system designed in \cref{sec:concepts} is evaluated experimentally.
-Where \cref{sec:evaluation-concept} defined \emph{what} a scenario and a difficulty level are, this
-section describes the concrete experimental environment, the scenario catalogue, the model scenario
-experiment matrix, the per-run procedure, the metrics that are recorded, and the manual scoring used to
-decide whether a fault was correctly diagnosed.
+The system designed in \cref{sec:concepts} is evaluated experimentally.
+Where \cref{sec:evaluation-concept} defined what a scenario and a difficulty level are, the
+following describes how the experiments are run.
 
 \subsection{Experimental Environment}
 \label{sec:experiment-environment}
 All experiments are run against a virtual network using \emph{containerlab}, so that the agents interact
 with real device behaviour. The lab consists of Nokia SR Linux nodes with a predefined configuration and topology in which the test clients can reach each other
-(\cref{fig:testlab-topology}).
+(\cref{fig:testlab-topology}). This means the base is a fully functional network.
 
 \begin{figure}[htbp]
 \begin{center}
@@ -22,26 +20,25 @@ with real device behaviour. The lab consists of Nokia SR Linux nodes with a pred
 
 \subsection{Fault Scenarios and Difficulty Levels}
 \label{sec:scenarios-difficulty}
-The system is evaluated against a set of reproducible fault \emph{scenarios}. Each scenario is
+The system is evaluated against a set of fault scenarios. Each scenario is
 a folder that injects exactly one known fault into the healthy baseline configuration (topology).
 A scenario consists of:
 
 \begin{itemize}
-    \item \texttt{setup.sh} --- injects the fault before the queries are sent,
-    \item \texttt{teardown.sh} --- restores the baseline afterwards (always, even on crash or interrupt);
-          the fault-free baseline scenario needs none,
-    \item \texttt{queries.txt} --- the deliberately open-ended troubleshooting prompt(s) given to the
-          orchestrator (for example "investigate the root cause"), giving no hint about where to look,
-    \item \texttt{ground\_truth.yaml} --- a single \texttt{root\_cause} description of the true fault, used
+    \item \texttt{setup.sh}: Injects the fault before the queries are sent.
+    \item \texttt{teardown.sh}: Restores the baseline after experiment is done.
+    \item \texttt{queries.txt}: The open-ended troubleshooting prompt given to the
+          orchestrator (for example "investigate the root cause"), giving no hint about where to look.
+    \item \texttt{ground\_truth.yaml}: A description of the true fault (root cause), used
           as the reference during manual evaluation (\cref{sec:evaluation-procedure}).
 \end{itemize}
 
 \subsubsection{Difficulty Criteria}
 \label{sec:difficulty-criteria}
-Difficulty is not defined by whether the fault happens to be logged, but by \emph{how far the agent must
-travel from the obvious first check to reach the truth}. Three properties drive it: whether the obvious
-signal is honest or misleading (for example a link that is up while BGP is down), how far the fault hides
-from the symptom (on the indicated device, or displaced to a shared uplink or another host), and how many
+Difficulty is defined by how an agent needs to do from the obvious first check to reach the
+root cause. A fault being visible in syslog does not by itself make a fault easy. Three properties affect it, first whether the obvious
+signal tells the truth or is misleading (for example a link that is up while BGP is down). The second aspect is how far the fault hides
+from the symptom (for example the fault not being close to where the ), and how many
 signals must be correlated (a single \texttt{show} command versus comparing two route tables or varying a
 packet size). A secondary factor is how many plausible wrong answers exist, since a "no problem found"
 conclusion must count as a miss when the network is in fact broken.
@@ -49,7 +46,7 @@ conclusion must count as a miss when the network is in fact broken.
 \subsubsection{Scenario Catalogue}
 \label{sec:scenario-catalogue}
 \Cref{tab:scenarios} lists the scenarios grouped by difficulty tier. A baseline scenario with no fault is
-included to verify that the system does not \emph{invent} problems in a healthy network.
+included to verify that the system does not invent problems in a healthy network.
 
 \begin{table}[htbp]
 \centering
@@ -60,8 +57,8 @@ included to verify that the system does not \emph{invent} problems in a healthy 
 \midrule
 \texttt{basic-client-communication} & baseline & --- & confirm full reachability, invent no fault \\
 \texttt{intf-down}            & easy   & yes & one \texttt{show interface} \\
-\texttt{client3-port-down}    & easy   & yes & one \texttt{show interface} / LLDP \\
-\texttt{switch1-uplink-down}  & easy   & yes & one \texttt{show interface} / LLDP \\
+\texttt{client3-port-down}    & easy   & yes & one \texttt{show interface} \\
+\texttt{switch1-uplink-down}  & easy   & yes & one \texttt{show interface} \\
 \texttt{missing-export-policy}& medium & no  & RIB-out (session state lies) \\
 \texttt{missing-vlan-on-trunk}& medium & no  & trunk VLAN membership \\
 \texttt{duplicate-ip-arp}     & medium & yes & syslog \texttt{Duplicate add} event \\
@@ -74,13 +71,86 @@ included to verify that the system does not \emph{invent} problems in a healthy 
 \label{tab:scenarios}
 \end{table}
 
-% TODO: optionally expand each scenario into a short paragraph (fault injected + why that tier),
-% drawing on scenarios/scenario-guide.md, if more detail is wanted than the summary table.
+\subsubsection{Scenario Descriptions}
+\label{sec:scenario-descriptions}
+The following paragraphs describe each scenario in \cref{tab:scenarios}: the fault that
+\texttt{setup.sh} injects and why the scenario sits in its tier according to the criteria of
+\cref{sec:difficulty-criteria}.
+
+\paragraph{Baseline}
+\texttt{basic-client-communication} injects no fault, the network is healthy and all three
+clients can reach each other. The scenario verifies that the system confirms full reachability
+and does not invent a fault with is not there. This is a check against hallucinated
+faults.
+
+\paragraph{Easy tier}
+In the easy scenarios the fault sits exactly where the symptom points and the obvious signal is
+the truth. A single \texttt{show} command on the right device reveals it, and the event is logged.
+
+\begin{description}
+    \item[\texttt{intf-down}] The interface connecting router1 to router2 is
+          administratively disabled. The operational state goes down and the event appears in
+          syslog, so one interface check on router1 reveals the fault. 
+    \item[\texttt{client3-port-down}] The access port on switch2 towards
+          client3 is administratively disabled.
+          The down state is visible in a single interface check and in syslog. 
+    \item[\texttt{switch1-uplink-down}] The trunk uplink from switch1 to router1
+          is administratively disabled. The operational state goes down and the event appears in
+          syslog, so one interface check on switch1 or router1 reveals the fault.
+\end{description}
+
+\paragraph{Medium tier}
+In the medium scenarios the obvious signal is misleading, the fault is one step from the
+obvious signal, so the agent has to look one layer deeper.
+
+\begin{description}
+    \item[\texttt{missing-export-policy}] The eBGP export policy on router1 is removed.
+          The BGP session remains established, but router1 no longer advertises
+          its LAN prefixes, so router2 has no return route. The session state (BGP session) gives a false picture,
+          checking it and stopping results in a miss. There is no syslog entry generated. The agent must inspect
+          what is actually advertised and received (RIB-out/RIB-in), one layer below session state.
+    \item[\texttt{missing-vlan-on-trunk}] The trunk uplink from switch1 towards
+          router1 stops carrying the VLAN of client1, leaving that VLAN isolated from the network. The two obvious checks both pass, since the trunk port stays up (it still
+          carries the other VLAN) and client1's access port is correctly configured.
+          There is nothing logged to syslog.
+    \item[\texttt{duplicate-ip-arp}] A second host claims client3's IP address while
+          client3's switch port is briefly down, so the gateway (router2) relearns
+          the address onto the wrong MAC and its ARP cache stays poisoned after
+          client3 returns. A ping to the address still succeeds, because the second host
+          answers, so a plain reachability check reports the network as fine. The giveaway is the
+          mismatch between a pingable IP and a dead service on client3. The scenario is
+          medium rather than hard because SR Linux names the conflict in syslog (a duplicate-address
+          event listing both competing MACs).
+\end{description}
+
+\paragraph{Hard tier}
+In the hard scenarios the configuration looks complete at every layer the agent normally checks
+and nothing is logged. The fault hides where the agent has no reason to look until everything
+else is ruled out. The main risk in this tier is that the agent concludes the network is
+healthy.
+
+\begin{description}
+    \item[\texttt{acl-silent-drop}] An ingress ACL on router2 silently drops ICMP traffic
+          from client1's subnet. Routing and BGP are fully healthy. The drop
+          happens in the data plane, the agent has to think and check counters or inspect for a specific configuration.
+          There is no syslog entry which get's triggered when an ACL entry is hit.
+    \item[\texttt{one-way-route-filter}] A BGP import policy on router1 rejects
+          client3's prefix. The session is Established and router2 still
+          learns client1's prefix, so every single-device check passes. The fault shows up only as an
+          asymmetry between two route tables: the agent must compare router1's RIB
+          against router2's and notice one prefix missing on one side.
+    \item[\texttt{mtu-blackhole}] The IP MTU of router1's inter-router interface is
+          lowered to 1280 bytes, creating a path-MTU blackhole. Small packets pass while large
+          packets with the do-not-fragment flag are silently dropped. A normal ping
+          succeeds, so the agent can wrongly conclude the network is fine. Finding the
+          fault requires varying an input (trying with increasing packet sizes) and then
+          inspecting the interface MTU. 
+\end{description}
 
 \subsection{Experiment Matrix}
 \label{sec:experiment-matrix}
 To study the effect of model capability and cost (the model-tier concept of
-\cref{sec:model-tier-concept}), every scenario is run against several models drawn from the three price
+\cref{sec:model-tier-concept}), every scenario is run against different models taken from the three price
 tiers, with two models per tier:
 
 \begin{itemize}
@@ -89,30 +159,43 @@ tiers, with two models per tier:
     \item \textbf{Low:} \texttt{deepseek/deepseek-v3.2}, \texttt{mistralai/ministral-14b-2512}
 \end{itemize}
 
-The full matrix is therefore the cross product of all scenarios and all models, with each combination
-repeated $R$ times to account for the non-deterministic nature of the models. The same model is used
-across all agents within a run, so that an outcome can be attributed to a single tier. The matrix is
-executed in batch; a wall-clock cap per run bounds cost and time, and a run that exceeds the cap is
+The full matrix is the cross product of all scenarios and all models, with each combination
+repeated $R$ times because of the non-deterministic nature of the models. The same model is used
+across all agents. A wall-clock cap per run limits cost and time. A run that exceeds the cap is
 recorded as \emph{did-not-finish} (DNF) while keeping the statistics of any sub-agents that already
 completed.
 
 \subsection{Experiment Execution}
 \label{sec:experiment-execution}
-Each run in the matrix follows the same lifecycle to guarantee a clean, comparable starting point:
+The system under test is restricted to the read-only troubleshooting core of
+\cref{sec:architecture}. The user-facing orchestrator and its sub-agents. The configuration
+agent and the syslog-triggered autonomous investigation (\cref{sec:autonomous-syslog-usecase}) are
+disabled for all runs (\cref{sec:impl-interfaces}), since the experiments measure
+the system's ability to find a fault, applying a fix or detecting the fault unprompted are
+separate capabilities outside the scope of this evaluation.
+
+Each run follows the same procedure to guarantee a clean, comparable starting point.
 
 \begin{enumerate}
-    \item The lab is redeployed to a clean baseline and given time to settle.
-    \item \texttt{setup.sh} injects the scenario's fault; if it fails, the run aborts before any query.
+    \item The lab is redeployed to a clean baseline and given time to settle (for example for BGP to come up).
+    \item \texttt{setup.sh} injects the scenario's fault. 
     \item The orchestrator and all sub-agent tool servers are started, and the scenario's query is sent
-          through the full agent pipeline of \cref{sec:architecture}.
+          through the agent pipeline of \cref{sec:architecture} (restricted as described above).
     \item Each turn of the run is appended to a structured log, together with a shared run identifier.
-    \item \texttt{teardown.sh} restores the baseline in a \texttt{finally} block, so the next run is not
-          contaminated even if a query crashed or the sweep was interrupted.
+    \item \texttt{teardown.sh} restores the baseline in a finally block, so the next run is not
+          contaminated. Additionally the containerlab is re-deployed between every run.
 \end{enumerate}
 
-Running an experiment never evaluates it: the runner only records the agents' answers and measurements, and
-correctness is scored separately afterwards (\cref{sec:evaluation-procedure}). This decoupling makes runs
-reproducible and allows re-scoring or re-aggregating without re-running the (costly) experiments.
+One property of this setup matters for interpreting the results. Every run is \emph{describe once, then run}. The
+orchestrator receives a single symptom description (very broad) and is explicitly instructed not to ask for
+further information. From there the system (multi-agent network) has to work autonomously to a final answer. This
+restriction exists because the matrix runs automated. There is no human who could reply.
+Real operation would be interactive, a network operator could answer clarifying questions, add
+observations, or direct the agents to check something specific. The experiments
+measure the system in its most restricted mode of use.
+
+Correctness for the experiments is scored separately (based on the final result of the orchestrator agent)
+afterwards by a human (\cref{sec:evaluation-procedure}).
 
 \subsection{Recorded Metrics}
 \label{sec:metrics}
@@ -120,39 +203,37 @@ For every run the following measurements are recorded, mapping directly onto the
 questions:
 
 \begin{itemize}
-    \item \textbf{Inference duration} per run --- the summed model generation time across all agent
-          runs, as reported by OpenRouter per generation --- the basis for the time-saving question.
-          Wall-clock time is deliberately not used, since it would be distorted by the tooling around
-          the run (lab redeployment, cost polling).
-    \item \textbf{Token usage} (prompt and completion) and \textbf{cost}, the latter computed from the
-          token counts and the model's advertised price per token --- the basis for the cost question.
-          This keeps the cost figure independent of which provider served a request and of any
-          prompt-cache discounts, at the price of being a list-price estimate rather than the billed
-          amount.
+    \item \textbf{Duration} per run, in two forms. The \emph{wall-clock duration} of the agent
+          session is the time from submitting the query to the final answer, taken from the session's
+          tracing spans so that the tooling around the run (lab redeployment, cost polling) is
+          not counted. It is the basis for the time-saving question. The \emph{inference
+          duration}, the summed model generation time across all agent runs as reported by
+          OpenRouter per generation, compares model speed but is not a troubleshooting time,
+          agents running in parallel can make it exceed the wall clock.
+    \item \textbf{Token usage} (prompt and completion) and \textbf{cost}, which is computed from the
+          token counts and the model's advertised price per million tokens on OpenRouter. These are the basis for the cost question.
+          Prompt caching is deliberately left out of this calculation. Not every provider applies
+          server-side caching by default and where it exists it is often best-effort, so whether a
+          run benefits would depend on which provider happened to serve it rather than on the model
+          being tested. Pricing every token at the full list rate keeps the comparison fair across
+          models, at the price of being a list-price estimate rather than the billed amount.
+          In practice, real costs would tend to be lower where caching applies.
     \item \textbf{Completion status} (completed vs.\ DNF) and \textbf{invalid command count}, recorded
           when an agent issues a malformed device command, as an indicator of robustness.
-    \item \textbf{Correctness verdict} per run, assigned manually (\cref{sec:evaluation-procedure}) --- the
+    \item \textbf{Correctness verdict} per run, assigned manually (\cref{sec:evaluation-procedure}), the
           basis for the success-rate question.
 \end{itemize}
 
 \subsection{Evaluation Procedure}
 \label{sec:evaluation-procedure}
-Correctness is scored \emph{manually}; there is no LLM judge. Only the \textbf{final answer of each run} is
-evaluated (in a multi-turn investigation the earlier turns are treated as exploration). For each run the
-agent's final answer is read next to the scenario's \texttt{root\_cause} reference and assigned a binary
-verdict --- the agent either correctly identified the root cause (\emph{found}) or it did not, blamed the
-wrong cause, or invented a fault (\emph{missed}). For the baseline scenario, correctly reporting the network
+Correctness is scored manually. There is no LLM judge. Only the \textbf{final answer of each run} is
+evaluated. For each run the
+agent's final answer is compared to the scenario's root cause and decide if was \emph{found} or \emph{missed}. For the baseline scenario, correctly reporting the network
 as healthy counts as \emph{found}.
 
-To keep the judgement consistent, the criterion for a "find" is fixed in advance (the answer must name the
-correct device and fault, not merely a vague "routing problem"), and an optional free-text note records
-borderline calls. Each verdict is stored keyed by the run's session identifier, so it can be joined back
-onto the recorded measurements.
+The decision as to whether the root cause was correctly found is up to the human (author of this work) looking at the final answer of the agent (orchestrator).  
 
 \subsection{Aggregation}
 \label{sec:aggregation}
-Finally, the recorded measurements and the manual verdicts are joined and aggregated per
-(scenario, model) and per difficulty tier. The key derived quantity is the \emph{found rate} --- the
-fraction of evaluated runs in which the agent identified the root cause --- reported alongside the average
-cost, token usage and duration. These aggregates, presented in \cref{sec:results}, are what answer the four
-research questions across difficulty levels and model tiers.
+The results of the evaluation is presented in \cref{sec:results} to, answer the 
+research questions across different models.
