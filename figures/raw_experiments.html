@@ -29,10 +29,10 @@
 <body>
 <h1>Raw experiment sessions</h1>
 <div class="meta">
-  <div><b>Generated:</b> 2026-06-01 08:49 UTC</div>
-  <div><b>Sessions:</b> 2</div>
-  <div><b>Models:</b> qwen/qwen3.6-plus, z-ai/glm-5</div>
-  <div><b>Scenarios:</b> client1-client3-communication</div>
+  <div><b>Generated:</b> 2026-07-06 11:56 UTC</div>
+  <div><b>Sessions:</b> 300</div>
+  <div><b>Models:</b> anthropic/claude-opus-4.8, deepseek/deepseek-v3.2, mistralai/ministral-14b-2512, openai/gpt-5.5, qwen/qwen3.7-max, z-ai/glm-5.2</div>
+  <div><b>Scenarios:</b> acl-silent-drop, basic-client-communication, client3-port-down, duplicate-ip-arp, intf-down, missing-export-policy, missing-vlan-on-trunk, mtu-blackhole, one-way-route-filter, switch1-uplink-down</div>
 </div>
 <table class="dataframe display compact" id="sessions">
   <thead>
@@ -46,6 +46,8 @@
       <th>duration_s</th>
       <th>total_input_tokens</th>
       <th>total_output_tokens</th>
+      <th>total_normalized_input_tokens</th>
+      <th>total_normalized_output_tokens</th>
       <th>total_cost_usd</th>
       <th>total_tool_calls</th>
       <th>total_llm_requests</th>
@@ -55,35 +57,5403 @@
   </thead>
   <tbody>
     <tr class="verdict-found">
-      <td>4d31ee22</td>
-      <td>2026-06-01 08:07</td>
-      <td>z-ai/glm-5</td>
-      <td>client1-client3-communication</td>
-      <td>can client1 and client3 communicate with each other currentl</td>
+      <td>f3ad41df</td>
+      <td>2026-06-29 07:34</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
       <td>found</td>
-      <td>143.9</td>
-      <td>348054</td>
-      <td>4519</td>
-      <td>$0.1230</td>
-      <td>33</td>
+      <td>83.5</td>
+      <td>57,427</td>
+      <td>5,220</td>
+      <td>31,370</td>
+      <td>2,665</td>
+      <td>$0.4176</td>
+      <td>12</td>
+      <td>9</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>f073f729</td>
+      <td>2026-06-29 07:37</td>
+      <td>openai/gpt-5.5</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>448.1</td>
+      <td>708,242</td>
+      <td>28,889</td>
+      <td>577,069</td>
+      <td>15,410</td>
+      <td>$4.4079</td>
+      <td>159</td>
+      <td>48</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>dda02bfd</td>
+      <td>2026-06-29 07:46</td>
+      <td>z-ai/glm-5.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>529.8</td>
+      <td>128,144</td>
+      <td>11,003</td>
+      <td>110,887</td>
+      <td>9,244</td>
+      <td>$0.1547</td>
+      <td>62</td>
+      <td>13</td>
+      <td>3</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>c614c53b</td>
+      <td>2026-06-29 07:58</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>516.5</td>
+      <td>331,710</td>
+      <td>26,356</td>
+      <td>231,947</td>
+      <td>19,561</td>
+      <td>$0.5135</td>
+      <td>112</td>
+      <td>23</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>98828e3f</td>
+      <td>2026-06-29 08:04</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>940.5</td>
+      <td>1,554,426</td>
+      <td>34,349</td>
+      <td>1,076,358</td>
+      <td>27,487</td>
+      <td>$0.3674</td>
+      <td>120</td>
+      <td>126</td>
+      <td>26</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>9638f6a3</td>
+      <td>2026-06-29 08:16</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>16.5</td>
+      <td>14,138</td>
+      <td>1,641</td>
+      <td>12,398</td>
+      <td>1,513</td>
+      <td>$0.0032</td>
+      <td>11</td>
+      <td>8</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>0e27e803</td>
+      <td>2026-06-29 08:19</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>139.4</td>
+      <td>146,949</td>
+      <td>10,508</td>
+      <td>75,884</td>
+      <td>4,586</td>
+      <td>$0.9974</td>
+      <td>40</td>
       <td>13</td>
       <td>0</td>
       <td>yes</td>
     </tr>
     <tr class="verdict-found">
-      <td>217bbc0d</td>
-      <td>2026-06-01 08:14</td>
-      <td>qwen/qwen3.6-plus</td>
-      <td>client1-client3-communication</td>
-      <td>can client1 and client3 communicate with each other currentl</td>
+      <td>f600b82d</td>
+      <td>2026-06-29 08:23</td>
+      <td>openai/gpt-5.5</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
       <td>found</td>
-      <td>118.3</td>
-      <td>44414</td>
-      <td>4390</td>
-      <td>$0.0230</td>
-      <td>24</td>
-      <td>10</td>
+      <td>393.0</td>
+      <td>522,238</td>
+      <td>25,323</td>
+      <td>409,007</td>
+      <td>13,344</td>
+      <td>$3.3709</td>
+      <td>163</td>
+      <td>35</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>4146cac8</td>
+      <td>2026-06-29 08:32</td>
+      <td>z-ai/glm-5.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>408.1</td>
+      <td>189,421</td>
+      <td>10,759</td>
+      <td>138,156</td>
+      <td>9,571</td>
+      <td>$0.2122</td>
+      <td>62</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>79717d04</td>
+      <td>2026-06-29 08:38</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>376.3</td>
+      <td>289,596</td>
+      <td>17,957</td>
+      <td>208,242</td>
+      <td>13,096</td>
+      <td>$0.4293</td>
+      <td>100</td>
+      <td>21</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>f1f117f6</td>
+      <td>2026-06-29 08:43</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>460.2</td>
+      <td>367,270</td>
+      <td>15,169</td>
+      <td>284,632</td>
+      <td>12,561</td>
+      <td>$0.0892</td>
+      <td>52</td>
+      <td>60</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>16d0ab4a</td>
+      <td>2026-06-29 08:53</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>missed</td>
+      <td>36.2</td>
+      <td>40,563</td>
+      <td>2,699</td>
+      <td>35,842</td>
+      <td>2,502</td>
+      <td>$0.0087</td>
+      <td>15</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>044dffcc</td>
+      <td>2026-06-29 08:56</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>291.0</td>
+      <td>209,033</td>
+      <td>22,803</td>
+      <td>107,227</td>
+      <td>7,496</td>
+      <td>$1.6152</td>
+      <td>74</td>
+      <td>13</td>
+      <td>8</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>7be27bdf</td>
+      <td>2026-06-29 09:02</td>
+      <td>openai/gpt-5.5</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>402.3</td>
+      <td>981,651</td>
+      <td>25,327</td>
+      <td>798,019</td>
+      <td>15,274</td>
+      <td>$5.6681</td>
+      <td>178</td>
+      <td>39</td>
+      <td>12</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>823e6e08</td>
+      <td>2026-06-29 09:09</td>
+      <td>z-ai/glm-5.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>418.2</td>
+      <td>291,733</td>
+      <td>17,206</td>
+      <td>272,449</td>
+      <td>15,699</td>
+      <td>$0.3288</td>
+      <td>116</td>
+      <td>18</td>
+      <td>26</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>40995766</td>
+      <td>2026-06-29 09:28</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>523.6</td>
+      <td>687,321</td>
+      <td>12,276</td>
+      <td>511,626</td>
+      <td>10,015</td>
+      <td>$0.1615</td>
+      <td>38</td>
+      <td>41</td>
+      <td>6</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>d54061c2</td>
+      <td>2026-06-29 09:40</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>33.8</td>
+      <td>20,938</td>
+      <td>2,669</td>
+      <td>19,349</td>
+      <td>2,539</td>
+      <td>$0.0047</td>
+      <td>8</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>dc6855e0</td>
+      <td>2026-06-29 09:42</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>163.1</td>
+      <td>113,899</td>
+      <td>13,226</td>
+      <td>56,889</td>
+      <td>5,515</td>
+      <td>$0.9001</td>
+      <td>49</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>bfb0a463</td>
+      <td>2026-06-29 09:46</td>
+      <td>openai/gpt-5.5</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>230.3</td>
+      <td>381,798</td>
+      <td>17,201</td>
+      <td>307,184</td>
+      <td>8,711</td>
+      <td>$2.4250</td>
+      <td>124</td>
+      <td>23</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6323d532</td>
+      <td>2026-06-29 09:50</td>
+      <td>z-ai/glm-5.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>228.7</td>
+      <td>90,715</td>
+      <td>9,695</td>
+      <td>81,307</td>
+      <td>8,399</td>
+      <td>$0.1153</td>
+      <td>40</td>
+      <td>12</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>10310977</td>
+      <td>2026-06-29 09:54</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>272.3</td>
+      <td>128,890</td>
+      <td>13,454</td>
+      <td>87,384</td>
+      <td>8,816</td>
+      <td>$0.2116</td>
+      <td>71</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>693920ce</td>
+      <td>2026-06-29 09:59</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>missed</td>
+      <td>688.2</td>
+      <td>826,087</td>
+      <td>24,439</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$0.1974</td>
+      <td>110</td>
+      <td>109</td>
+      <td>6</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>620c2af3</td>
+      <td>2026-06-29 10:11</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>missed</td>
+      <td>42.3</td>
+      <td>11,310</td>
+      <td>1,692</td>
+      <td>10,300</td>
+      <td>1,604</td>
+      <td>$0.0026</td>
+      <td>5</td>
+      <td>6</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>581af8c8</td>
+      <td>2026-06-29 10:14</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>208.4</td>
+      <td>134,826</td>
+      <td>17,353</td>
+      <td>66,553</td>
+      <td>6,841</td>
+      <td>$1.1080</td>
+      <td>75</td>
+      <td>20</td>
       <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>1063d08b</td>
+      <td>2026-06-29 10:18</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>253.3</td>
+      <td>418,532</td>
+      <td>19,621</td>
+      <td>332,106</td>
+      <td>11,471</td>
+      <td>$2.6813</td>
+      <td>147</td>
+      <td>28</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>494e1839</td>
+      <td>2026-06-29 10:24</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>388.9</td>
+      <td>82,147</td>
+      <td>10,341</td>
+      <td>70,013</td>
+      <td>9,676</td>
+      <td>$0.1091</td>
+      <td>30</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>48fe941e</td>
+      <td>2026-06-29 10:31</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>673.6</td>
+      <td>350,996</td>
+      <td>33,865</td>
+      <td>276,013</td>
+      <td>25,483</td>
+      <td>$0.5657</td>
+      <td>143</td>
+      <td>38</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>62633e80</td>
+      <td>2026-06-29 10:39</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>804.5</td>
+      <td>868,106</td>
+      <td>21,519</td>
+      <td>630,284</td>
+      <td>16,883</td>
+      <td>$0.2060</td>
+      <td>81</td>
+      <td>90</td>
+      <td>8</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d9c5c300</td>
+      <td>2026-06-29 10:51</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>91.6</td>
+      <td>108,622</td>
+      <td>10,100</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$0.0237</td>
+      <td>38</td>
+      <td>18</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a3c1e654</td>
+      <td>2026-06-29 10:56</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>120.8</td>
+      <td>58,295</td>
+      <td>7,936</td>
+      <td>33,365</td>
+      <td>3,264</td>
+      <td>$0.4899</td>
+      <td>22</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d5cdc696</td>
+      <td>2026-06-29 11:00</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>300.9</td>
+      <td>631,200</td>
+      <td>19,692</td>
+      <td>480,936</td>
+      <td>12,162</td>
+      <td>$3.7468</td>
+      <td>123</td>
+      <td>29</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>85b01a26</td>
+      <td>2026-06-29 11:05</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>820.7</td>
+      <td>178,203</td>
+      <td>22,139</td>
+      <td>153,783</td>
+      <td>20,015</td>
+      <td>$0.2357</td>
+      <td>89</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>12a1e103</td>
+      <td>2026-06-29 11:17</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>392.5</td>
+      <td>246,404</td>
+      <td>19,312</td>
+      <td>174,453</td>
+      <td>15,247</td>
+      <td>$0.3804</td>
+      <td>77</td>
+      <td>24</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>3c135267</td>
+      <td>2026-06-29 11:24</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>386.3</td>
+      <td>508,379</td>
+      <td>12,024</td>
+      <td>380,250</td>
+      <td>8,707</td>
+      <td>$0.1204</td>
+      <td>43</td>
+      <td>47</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>1e8b4372</td>
+      <td>2026-06-29 11:38</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>169.7</td>
+      <td>115,316</td>
+      <td>12,347</td>
+      <td>62,769</td>
+      <td>5,304</td>
+      <td>$0.8853</td>
+      <td>65</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>bbdd166e</td>
+      <td>2026-06-29 11:41</td>
+      <td>openai/gpt-5.5</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>286.9</td>
+      <td>610,096</td>
+      <td>20,936</td>
+      <td>479,847</td>
+      <td>12,178</td>
+      <td>$3.6786</td>
+      <td>137</td>
+      <td>26</td>
+      <td>6</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>10c02b96</td>
+      <td>2026-06-29 11:48</td>
+      <td>z-ai/glm-5.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>256.6</td>
+      <td>80,671</td>
+      <td>10,661</td>
+      <td>68,903</td>
+      <td>8,945</td>
+      <td>$0.1086</td>
+      <td>50</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d80f01ff</td>
+      <td>2026-06-29 11:52</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>726.8</td>
+      <td>431,635</td>
+      <td>36,348</td>
+      <td>356,176</td>
+      <td>27,468</td>
+      <td>$0.6758</td>
+      <td>170</td>
+      <td>39</td>
+      <td>35</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>6c66f76f</td>
+      <td>2026-06-29 12:01</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>missed</td>
+      <td>472.6</td>
+      <td>301,180</td>
+      <td>16,817</td>
+      <td>237,981</td>
+      <td>14,797</td>
+      <td>$0.0747</td>
+      <td>32</td>
+      <td>39</td>
+      <td>2</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>b392fdb6</td>
+      <td>2026-06-29 12:12</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>missed</td>
+      <td>65.4</td>
+      <td>48,765</td>
+      <td>5,304</td>
+      <td>43,509</td>
+      <td>5,047</td>
+      <td>$0.0108</td>
+      <td>29</td>
+      <td>14</td>
+      <td>6</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>46a9fb00</td>
+      <td>2026-06-29 12:15</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>190.9</td>
+      <td>148,942</td>
+      <td>13,432</td>
+      <td>78,632</td>
+      <td>6,157</td>
+      <td>$1.0805</td>
+      <td>48</td>
+      <td>17</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>2cf21a4a</td>
+      <td>2026-06-29 12:19</td>
+      <td>openai/gpt-5.5</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>266.8</td>
+      <td>421,297</td>
+      <td>19,814</td>
+      <td>329,207</td>
+      <td>11,005</td>
+      <td>$2.7009</td>
+      <td>128</td>
+      <td>22</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>03aa7aaf</td>
+      <td>2026-06-29 12:24</td>
+      <td>z-ai/glm-5.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>525.4</td>
+      <td>192,244</td>
+      <td>15,908</td>
+      <td>145,665</td>
+      <td>13,725</td>
+      <td>$0.2304</td>
+      <td>79</td>
+      <td>21</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>b378ca9e</td>
+      <td>2026-06-29 12:32</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>505.2</td>
+      <td>195,830</td>
+      <td>25,222</td>
+      <td>143,772</td>
+      <td>18,936</td>
+      <td>$0.3394</td>
+      <td>86</td>
+      <td>25</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>f1675a38</td>
+      <td>2026-06-29 12:39</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>622.8</td>
+      <td>540,760</td>
+      <td>16,569</td>
+      <td>425,440</td>
+      <td>13,281</td>
+      <td>$0.1294</td>
+      <td>60</td>
+      <td>66</td>
+      <td>3</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>8ddec3a0</td>
+      <td>2026-06-29 12:51</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>71.5</td>
+      <td>31,759</td>
+      <td>4,408</td>
+      <td>26,862</td>
+      <td>3,665</td>
+      <td>$0.0072</td>
+      <td>22</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>7783e119</td>
+      <td>2026-06-29 12:53</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>122.5</td>
+      <td>101,458</td>
+      <td>9,431</td>
+      <td>53,520</td>
+      <td>5,061</td>
+      <td>$0.7431</td>
+      <td>25</td>
+      <td>11</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>4b6b25fa</td>
+      <td>2026-06-29 12:56</td>
+      <td>openai/gpt-5.5</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>244.0</td>
+      <td>378,968</td>
+      <td>16,138</td>
+      <td>297,582</td>
+      <td>10,074</td>
+      <td>$2.3790</td>
+      <td>110</td>
+      <td>22</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>1eabbe59</td>
+      <td>2026-06-29 13:00</td>
+      <td>z-ai/glm-5.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>351.0</td>
+      <td>173,503</td>
+      <td>11,571</td>
+      <td>122,188</td>
+      <td>9,809</td>
+      <td>$0.1995</td>
+      <td>59</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6c2c7643</td>
+      <td>2026-06-29 13:05</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>433.0</td>
+      <td>281,683</td>
+      <td>22,406</td>
+      <td>207,899</td>
+      <td>16,375</td>
+      <td>$0.4361</td>
+      <td>101</td>
+      <td>18</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>40a387d1</td>
+      <td>2026-06-29 13:10</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>missed</td>
+      <td>581.2</td>
+      <td>525,762</td>
+      <td>14,746</td>
+      <td>424,975</td>
+      <td>11,447</td>
+      <td>$0.1254</td>
+      <td>61</td>
+      <td>68</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>bb616f8b</td>
+      <td>2026-06-29 13:22</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>missed</td>
+      <td>220.4</td>
+      <td>41,922</td>
+      <td>3,491</td>
+      <td>37,609</td>
+      <td>3,259</td>
+      <td>$0.0091</td>
+      <td>19</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a6809d38</td>
+      <td>2026-06-29 13:26</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>211.8</td>
+      <td>142,722</td>
+      <td>16,924</td>
+      <td>78,841</td>
+      <td>6,708</td>
+      <td>$1.1367</td>
+      <td>51</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>dc768127</td>
+      <td>2026-06-29 13:30</td>
+      <td>openai/gpt-5.5</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>271.5</td>
+      <td>384,505</td>
+      <td>18,755</td>
+      <td>303,962</td>
+      <td>11,947</td>
+      <td>$2.4852</td>
+      <td>89</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6027128f</td>
+      <td>2026-06-29 13:35</td>
+      <td>z-ai/glm-5.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>300.5</td>
+      <td>95,209</td>
+      <td>12,717</td>
+      <td>82,247</td>
+      <td>11,183</td>
+      <td>$0.1286</td>
+      <td>44</td>
+      <td>12</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>dc4e1699</td>
+      <td>2026-06-29 13:39</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>489.4</td>
+      <td>484,694</td>
+      <td>24,860</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$0.6991</td>
+      <td>100</td>
+      <td>25</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>b09e1a0e</td>
+      <td>2026-06-29 13:49</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>445.3</td>
+      <td>466,300</td>
+      <td>11,604</td>
+      <td>356,059</td>
+      <td>8,181</td>
+      <td>$0.1107</td>
+      <td>51</td>
+      <td>46</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>dcd2b3f9</td>
+      <td>2026-06-29 14:01</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>28.8</td>
+      <td>12,710</td>
+      <td>2,559</td>
+      <td>11,750</td>
+      <td>2,535</td>
+      <td>$0.0031</td>
+      <td>8</td>
+      <td>7</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>432224e6</td>
+      <td>2026-06-30 06:55</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>875.8</td>
+      <td>785,345</td>
+      <td>39,269</td>
+      <td>667,733</td>
+      <td>29,057</td>
+      <td>$1.1289</td>
+      <td>208</td>
+      <td>47</td>
+      <td>56</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>06c05854</td>
+      <td>2026-06-30 07:21</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>42.3</td>
+      <td>27,790</td>
+      <td>3,173</td>
+      <td>25,551</td>
+      <td>2,908</td>
+      <td>$0.0062</td>
+      <td>18</td>
+      <td>11</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>e212be8e</td>
+      <td>2026-06-30 08:35</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>418.6</td>
+      <td>394,766</td>
+      <td>32,030</td>
+      <td>213,672</td>
+      <td>13,392</td>
+      <td>$2.7746</td>
+      <td>110</td>
+      <td>42</td>
+      <td>21</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>fdf121f0</td>
+      <td>2026-06-30 08:47</td>
+      <td>openai/gpt-5.5</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>212.9</td>
+      <td>420,400</td>
+      <td>14,155</td>
+      <td>334,273</td>
+      <td>7,105</td>
+      <td>$2.5267</td>
+      <td>79</td>
+      <td>17</td>
+      <td>5</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>111cc42c</td>
+      <td>2026-06-30 08:54</td>
+      <td>z-ai/glm-5.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>4.7</td>
+      <td>831</td>
+      <td>201</td>
+      <td>881</td>
+      <td>101</td>
+      <td>$0.0014</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d373ad54</td>
+      <td>2026-06-30 08:56</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>291.8</td>
+      <td>293,967</td>
+      <td>12,946</td>
+      <td>223,359</td>
+      <td>9,569</td>
+      <td>$0.4160</td>
+      <td>56</td>
+      <td>14</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>643b27c4</td>
+      <td>2026-06-30 09:02</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>350.4</td>
+      <td>82,633</td>
+      <td>5,807</td>
+      <td>61,599</td>
+      <td>4,327</td>
+      <td>$0.0209</td>
+      <td>15</td>
+      <td>8</td>
+      <td>3</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>813e9bfd</td>
+      <td>2026-06-30 09:13</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>102.1</td>
+      <td>63,801</td>
+      <td>4,784</td>
+      <td>54,837</td>
+      <td>4,083</td>
+      <td>$0.0137</td>
+      <td>25</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>c199e379</td>
+      <td>2026-06-30 09:16</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>65.0</td>
+      <td>66,926</td>
+      <td>4,773</td>
+      <td>35,383</td>
+      <td>2,635</td>
+      <td>$0.4540</td>
+      <td>12</td>
+      <td>8</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>3b019edb</td>
+      <td>2026-06-30 09:19</td>
+      <td>openai/gpt-5.5</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>251.8</td>
+      <td>451,615</td>
+      <td>17,381</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$2.7795</td>
+      <td>142</td>
+      <td>31</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>1862bb50</td>
+      <td>2026-06-30 09:26</td>
+      <td>z-ai/glm-5.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>missed</td>
+      <td>8.6</td>
+      <td>838</td>
+      <td>217</td>
+      <td>892</td>
+      <td>76</td>
+      <td>$0.0014</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>2f9e95d2</td>
+      <td>2026-06-30 09:28</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>321.2</td>
+      <td>172,837</td>
+      <td>15,889</td>
+      <td>127,873</td>
+      <td>11,417</td>
+      <td>$0.2756</td>
+      <td>80</td>
+      <td>20</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>d44ad2ac</td>
+      <td>2026-06-30 09:33</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>missed</td>
+      <td>404.0</td>
+      <td>296,729</td>
+      <td>13,402</td>
+      <td>212,104</td>
+      <td>10,950</td>
+      <td>$0.0725</td>
+      <td>45</td>
+      <td>50</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>e01f41f3</td>
+      <td>2026-06-30 09:45</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>missed</td>
+      <td>16.0</td>
+      <td>12,841</td>
+      <td>1,409</td>
+      <td>11,149</td>
+      <td>1,317</td>
+      <td>$0.0029</td>
+      <td>13</td>
+      <td>7</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>7d621df7</td>
+      <td>2026-06-30 09:47</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>358.4</td>
+      <td>314,379</td>
+      <td>28,385</td>
+      <td>163,711</td>
+      <td>10,768</td>
+      <td>$2.2815</td>
+      <td>83</td>
+      <td>28</td>
+      <td>10</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a34edacb</td>
+      <td>2026-06-30 09:54</td>
+      <td>openai/gpt-5.5</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>356.1</td>
+      <td>712,113</td>
+      <td>24,877</td>
+      <td>583,120</td>
+      <td>13,029</td>
+      <td>$4.3069</td>
+      <td>153</td>
+      <td>33</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>13cc34f2</td>
+      <td>2026-06-30 10:01</td>
+      <td>z-ai/glm-5.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>7.1</td>
+      <td>892</td>
+      <td>306</td>
+      <td>933</td>
+      <td>156</td>
+      <td>$0.0018</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>a84b7c1a</td>
+      <td>2026-06-30 10:03</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>850.8</td>
+      <td>698,231</td>
+      <td>35,806</td>
+      <td>595,304</td>
+      <td>28,253</td>
+      <td>$1.0071</td>
+      <td>169</td>
+      <td>45</td>
+      <td>37</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>f27c6ae8</td>
+      <td>2026-06-30 10:15</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>1059.1</td>
+      <td>1,441,081</td>
+      <td>30,818</td>
+      <td>1,090,251</td>
+      <td>24,467</td>
+      <td>$0.3403</td>
+      <td>111</td>
+      <td>111</td>
+      <td>17</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>8fef91ef</td>
+      <td>2026-06-30 10:27</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>80.7</td>
+      <td>58,594</td>
+      <td>6,256</td>
+      <td>53,013</td>
+      <td>5,487</td>
+      <td>$0.0130</td>
+      <td>21</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>19944d35</td>
+      <td>2026-06-30 10:31</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>62.5</td>
+      <td>51,870</td>
+      <td>5,017</td>
+      <td>27,932</td>
+      <td>2,756</td>
+      <td>$0.3848</td>
+      <td>13</td>
+      <td>7</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>2e28b601</td>
+      <td>2026-06-30 10:34</td>
+      <td>openai/gpt-5.5</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>235.3</td>
+      <td>381,089</td>
+      <td>18,024</td>
+      <td>301,063</td>
+      <td>10,718</td>
+      <td>$2.4462</td>
+      <td>116</td>
+      <td>22</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>4cf7b48d</td>
+      <td>2026-06-30 10:38</td>
+      <td>z-ai/glm-5.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>342.4</td>
+      <td>125,423</td>
+      <td>9,402</td>
+      <td>97,606</td>
+      <td>8,245</td>
+      <td>$0.1461</td>
+      <td>30</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d9ba787c</td>
+      <td>2026-06-30 10:44</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>221.3</td>
+      <td>87,385</td>
+      <td>11,830</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$0.1536</td>
+      <td>42</td>
+      <td>11</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>4407ac3f</td>
+      <td>2026-06-30 10:51</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>610.9</td>
+      <td>260,679</td>
+      <td>19,575</td>
+      <td>203,224</td>
+      <td>16,088</td>
+      <td>$0.0664</td>
+      <td>46</td>
+      <td>47</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>05aa3401</td>
+      <td>2026-06-30 10:59</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>70.1</td>
+      <td>44,187</td>
+      <td>4,473</td>
+      <td>40,144</td>
+      <td>3,872</td>
+      <td>$0.0097</td>
+      <td>28</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ebebd135</td>
+      <td>2026-06-30 11:02</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>196.7</td>
+      <td>157,103</td>
+      <td>16,405</td>
+      <td>85,842</td>
+      <td>7,229</td>
+      <td>$1.1956</td>
+      <td>55</td>
+      <td>17</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>3b53d9a1</td>
+      <td>2026-06-30 11:06</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>338.1</td>
+      <td>718,500</td>
+      <td>23,434</td>
+      <td>537,470</td>
+      <td>15,152</td>
+      <td>$4.2955</td>
+      <td>152</td>
+      <td>31</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>55528b27</td>
+      <td>2026-06-30 11:12</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>638.9</td>
+      <td>151,624</td>
+      <td>16,711</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$0.1927</td>
+      <td>89</td>
+      <td>19</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d0ffe64d</td>
+      <td>2026-06-30 11:23</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>436.0</td>
+      <td>213,742</td>
+      <td>21,398</td>
+      <td>165,159</td>
+      <td>16,604</td>
+      <td>$0.3474</td>
+      <td>72</td>
+      <td>27</td>
+      <td>5</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>71b2cfad</td>
+      <td>2026-06-30 11:31</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>789.1</td>
+      <td>781,314</td>
+      <td>24,972</td>
+      <td>563,629</td>
+      <td>20,294</td>
+      <td>$0.1873</td>
+      <td>86</td>
+      <td>92</td>
+      <td>10</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>710cb138</td>
+      <td>2026-06-30 11:43</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>77.1</td>
+      <td>52,735</td>
+      <td>5,621</td>
+      <td>45,691</td>
+      <td>4,624</td>
+      <td>$0.0117</td>
+      <td>32</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>5db222d0</td>
+      <td>2026-06-30 11:46</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>96.6</td>
+      <td>68,583</td>
+      <td>7,646</td>
+      <td>38,521</td>
+      <td>3,558</td>
+      <td>$0.5341</td>
+      <td>21</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>3d6d8ef8</td>
+      <td>2026-06-30 11:49</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>223.3</td>
+      <td>330,953</td>
+      <td>16,634</td>
+      <td>262,596</td>
+      <td>9,255</td>
+      <td>$2.1538</td>
+      <td>103</td>
+      <td>21</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>00899566</td>
+      <td>2026-06-30 11:53</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>335.8</td>
+      <td>88,993</td>
+      <td>15,178</td>
+      <td>69,315</td>
+      <td>13,226</td>
+      <td>$0.1292</td>
+      <td>71</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>86bd5859</td>
+      <td>2026-06-30 12:00</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>237.1</td>
+      <td>108,716</td>
+      <td>11,883</td>
+      <td>78,309</td>
+      <td>9,166</td>
+      <td>$0.1805</td>
+      <td>33</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>9de8fb46</td>
+      <td>2026-06-30 12:04</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>428.4</td>
+      <td>356,487</td>
+      <td>12,404</td>
+      <td>282,704</td>
+      <td>10,426</td>
+      <td>$0.0858</td>
+      <td>40</td>
+      <td>46</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>0fc9a6fc</td>
+      <td>2026-06-30 12:16</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>80.9</td>
+      <td>49,603</td>
+      <td>5,773</td>
+      <td>40,124</td>
+      <td>5,055</td>
+      <td>$0.0111</td>
+      <td>25</td>
+      <td>22</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ee1be2b1</td>
+      <td>2026-06-30 12:19</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>151.9</td>
+      <td>112,137</td>
+      <td>12,650</td>
+      <td>61,769</td>
+      <td>5,592</td>
+      <td>$0.8769</td>
+      <td>56</td>
+      <td>14</td>
+      <td>6</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ae159b4a</td>
+      <td>2026-06-30 12:23</td>
+      <td>openai/gpt-5.5</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>336.4</td>
+      <td>688,342</td>
+      <td>22,801</td>
+      <td>547,497</td>
+      <td>13,081</td>
+      <td>$4.1257</td>
+      <td>154</td>
+      <td>26</td>
+      <td>5</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>5c381383</td>
+      <td>2026-06-30 12:29</td>
+      <td>z-ai/glm-5.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>288.3</td>
+      <td>171,885</td>
+      <td>13,234</td>
+      <td>140,875</td>
+      <td>11,459</td>
+      <td>$0.2013</td>
+      <td>77</td>
+      <td>16</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>e13c4205</td>
+      <td>2026-06-30 12:33</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>538.1</td>
+      <td>337,332</td>
+      <td>25,970</td>
+      <td>276,068</td>
+      <td>20,014</td>
+      <td>$0.5191</td>
+      <td>139</td>
+      <td>32</td>
+      <td>28</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>c92ecfb5</td>
+      <td>2026-06-30 12:42</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>missed</td>
+      <td>453.5</td>
+      <td>391,444</td>
+      <td>14,002</td>
+      <td>281,771</td>
+      <td>10,810</td>
+      <td>$0.0944</td>
+      <td>46</td>
+      <td>51</td>
+      <td>2</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>95acbcb3</td>
+      <td>2026-06-30 12:53</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>missed</td>
+      <td>77.3</td>
+      <td>45,961</td>
+      <td>5,552</td>
+      <td>41,303</td>
+      <td>5,118</td>
+      <td>$0.0103</td>
+      <td>24</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>516afbf7</td>
+      <td>2026-06-30 12:56</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>194.0</td>
+      <td>204,750</td>
+      <td>15,295</td>
+      <td>106,352</td>
+      <td>6,688</td>
+      <td>$1.4061</td>
+      <td>60</td>
+      <td>19</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>7a6d94c0</td>
+      <td>2026-06-30 13:00</td>
+      <td>openai/gpt-5.5</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>203.5</td>
+      <td>250,266</td>
+      <td>14,403</td>
+      <td>193,397</td>
+      <td>9,325</td>
+      <td>$1.6834</td>
+      <td>77</td>
+      <td>19</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>61db0a01</td>
+      <td>2026-06-30 13:05</td>
+      <td>z-ai/glm-5.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>8.4</td>
+      <td>829</td>
+      <td>204</td>
+      <td>881</td>
+      <td>89</td>
+      <td>$0.0014</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>9b0c9e99</td>
+      <td>2026-06-30 13:07</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>282.9</td>
+      <td>87,324</td>
+      <td>14,458</td>
+      <td>66,811</td>
+      <td>9,994</td>
+      <td>$0.1634</td>
+      <td>58</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>d41ce969</td>
+      <td>2026-06-30 13:25</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>84.1</td>
+      <td>43,149</td>
+      <td>4,731</td>
+      <td>39,347</td>
+      <td>4,034</td>
+      <td>$0.0096</td>
+      <td>22</td>
+      <td>13</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>03444535</td>
+      <td>2026-06-30 13:28</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>73.6</td>
+      <td>43,666</td>
+      <td>5,110</td>
+      <td>25,310</td>
+      <td>2,814</td>
+      <td>$0.3461</td>
+      <td>14</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>2e9fd8d4</td>
+      <td>2026-06-30 13:31</td>
+      <td>openai/gpt-5.5</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>254.6</td>
+      <td>489,084</td>
+      <td>17,915</td>
+      <td>386,733</td>
+      <td>11,815</td>
+      <td>$2.9829</td>
+      <td>139</td>
+      <td>26</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>b6e801c2</td>
+      <td>2026-06-30 13:36</td>
+      <td>z-ai/glm-5.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>378.5</td>
+      <td>97,437</td>
+      <td>10,207</td>
+      <td>82,205</td>
+      <td>9,244</td>
+      <td>$0.1222</td>
+      <td>54</td>
+      <td>19</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>e377b070</td>
+      <td>2026-06-30 13:42</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>319.8</td>
+      <td>158,402</td>
+      <td>16,303</td>
+      <td>103,285</td>
+      <td>11,639</td>
+      <td>$0.2591</td>
+      <td>64</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>47af2344</td>
+      <td>2026-06-30 13:49</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>703.8</td>
+      <td>433,948</td>
+      <td>13,753</td>
+      <td>298,630</td>
+      <td>10,991</td>
+      <td>$0.1040</td>
+      <td>41</td>
+      <td>41</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>be14b910</td>
+      <td>2026-06-30 14:00</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>missed</td>
+      <td>74.0</td>
+      <td>39,869</td>
+      <td>3,969</td>
+      <td>36,021</td>
+      <td>3,640</td>
+      <td>$0.0088</td>
+      <td>21</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>804d21de</td>
+      <td>2026-06-30 14:02</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>294.0</td>
+      <td>222,149</td>
+      <td>23,013</td>
+      <td>120,341</td>
+      <td>8,974</td>
+      <td>$1.6861</td>
+      <td>51</td>
+      <td>21</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>fc3a9921</td>
+      <td>2026-06-30 14:07</td>
+      <td>openai/gpt-5.5</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>223.5</td>
+      <td>455,829</td>
+      <td>17,933</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$2.8171</td>
+      <td>115</td>
+      <td>23</td>
+      <td>8</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>e9a6936c</td>
+      <td>2026-06-30 14:14</td>
+      <td>z-ai/glm-5.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>209.4</td>
+      <td>85,255</td>
+      <td>10,486</td>
+      <td>75,637</td>
+      <td>8,827</td>
+      <td>$0.1116</td>
+      <td>52</td>
+      <td>10</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>828d7e62</td>
+      <td>2026-06-30 14:18</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>505.8</td>
+      <td>280,798</td>
+      <td>25,649</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$0.4472</td>
+      <td>113</td>
+      <td>25</td>
+      <td>7</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>9591aa16</td>
+      <td>2026-06-30 14:32</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>746.3</td>
+      <td>996,014</td>
+      <td>27,527</td>
+      <td>780,389</td>
+      <td>20,441</td>
+      <td>$0.2373</td>
+      <td>106</td>
+      <td>100</td>
+      <td>5</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ee7c5c60</td>
+      <td>2026-06-30 14:44</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>95.8</td>
+      <td>48,048</td>
+      <td>5,385</td>
+      <td>38,959</td>
+      <td>3,952</td>
+      <td>$0.0107</td>
+      <td>29</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>f6cb112c</td>
+      <td>2026-07-02 16:33</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>918.7</td>
+      <td>799,102</td>
+      <td>29,956</td>
+      <td>601,816</td>
+      <td>24,999</td>
+      <td>$0.1931</td>
+      <td>98</td>
+      <td>91</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>85b39a72</td>
+      <td>2026-07-02 19:50</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>77.8</td>
+      <td>66,919</td>
+      <td>5,097</td>
+      <td>36,414</td>
+      <td>2,620</td>
+      <td>$0.4620</td>
+      <td>12</td>
+      <td>9</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>82f01006</td>
+      <td>2026-07-02 19:53</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>185.0</td>
+      <td>181,603</td>
+      <td>13,239</td>
+      <td>99,486</td>
+      <td>6,452</td>
+      <td>$1.2390</td>
+      <td>42</td>
+      <td>16</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>5c0f248b</td>
+      <td>2026-07-02 19:56</td>
+      <td>openai/gpt-5.5</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>264.2</td>
+      <td>499,992</td>
+      <td>21,401</td>
+      <td>407,132</td>
+      <td>12,786</td>
+      <td>$3.1420</td>
+      <td>130</td>
+      <td>25</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>9d6b693c</td>
+      <td>2026-07-02 20:02</td>
+      <td>openai/gpt-5.5</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>297.5</td>
+      <td>739,990</td>
+      <td>22,667</td>
+      <td>595,366</td>
+      <td>11,182</td>
+      <td>$4.3800</td>
+      <td>130</td>
+      <td>29</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>29c87c24</td>
+      <td>2026-07-02 20:07</td>
+      <td>z-ai/glm-5.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>443.9</td>
+      <td>183,600</td>
+      <td>16,713</td>
+      <td>158,114</td>
+      <td>15,423</td>
+      <td>$0.2209</td>
+      <td>86</td>
+      <td>26</td>
+      <td>11</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>ddea9d3f</td>
+      <td>2026-07-02 20:15</td>
+      <td>z-ai/glm-5.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>330.0</td>
+      <td>140,398</td>
+      <td>15,640</td>
+      <td>118,635</td>
+      <td>13,369</td>
+      <td>$0.1775</td>
+      <td>62</td>
+      <td>14</td>
+      <td>7</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>aaeef189</td>
+      <td>2026-07-02 20:27</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>532.6</td>
+      <td>239,356</td>
+      <td>23,495</td>
+      <td>193,782</td>
+      <td>19,417</td>
+      <td>$0.3873</td>
+      <td>67</td>
+      <td>34</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>a0e1aee6</td>
+      <td>2026-07-02 20:34</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>478.8</td>
+      <td>307,641</td>
+      <td>24,372</td>
+      <td>237,240</td>
+      <td>18,895</td>
+      <td>$0.4759</td>
+      <td>124</td>
+      <td>25</td>
+      <td>12</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>835bc92d</td>
+      <td>2026-07-02 20:45</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>675.4</td>
+      <td>655,821</td>
+      <td>25,668</td>
+      <td>526,580</td>
+      <td>20,721</td>
+      <td>$0.1589</td>
+      <td>84</td>
+      <td>90</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>ca5a0c61</td>
+      <td>2026-07-02 20:57</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>508.2</td>
+      <td>1,081,855</td>
+      <td>19,410</td>
+      <td>765,687</td>
+      <td>13,515</td>
+      <td>$0.2542</td>
+      <td>99</td>
+      <td>66</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>7453f786</td>
+      <td>2026-07-02 21:09</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>73.3</td>
+      <td>37,307</td>
+      <td>4,664</td>
+      <td>32,403</td>
+      <td>3,832</td>
+      <td>$0.0084</td>
+      <td>26</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>5a6abc54</td>
+      <td>2026-07-02 21:11</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>92.7</td>
+      <td>65,060</td>
+      <td>5,185</td>
+      <td>56,382</td>
+      <td>4,536</td>
+      <td>$0.0140</td>
+      <td>25</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ca015fc2</td>
+      <td>2026-07-02 21:14</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>175.7</td>
+      <td>97,916</td>
+      <td>13,351</td>
+      <td>41,113</td>
+      <td>4,618</td>
+      <td>$0.8234</td>
+      <td>54</td>
+      <td>12</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>dcfe3024</td>
+      <td>2026-07-02 21:18</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>161.0</td>
+      <td>107,544</td>
+      <td>12,319</td>
+      <td>46,931</td>
+      <td>4,768</td>
+      <td>$0.8457</td>
+      <td>47</td>
+      <td>12</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>bd31fe17</td>
+      <td>2026-07-02 21:22</td>
+      <td>openai/gpt-5.5</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>249.2</td>
+      <td>423,776</td>
+      <td>19,515</td>
+      <td>334,977</td>
+      <td>11,629</td>
+      <td>$2.7043</td>
+      <td>141</td>
+      <td>27</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>80f6e88e</td>
+      <td>2026-07-02 21:26</td>
+      <td>openai/gpt-5.5</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>268.8</td>
+      <td>402,107</td>
+      <td>22,356</td>
+      <td>320,411</td>
+      <td>13,340</td>
+      <td>$2.6812</td>
+      <td>149</td>
+      <td>30</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>02d27f6b</td>
+      <td>2026-07-02 21:34</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>200.4</td>
+      <td>98,219</td>
+      <td>10,096</td>
+      <td>67,636</td>
+      <td>7,112</td>
+      <td>$0.1606</td>
+      <td>40</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>9e419aea</td>
+      <td>2026-07-02 21:38</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>203.2</td>
+      <td>88,196</td>
+      <td>9,199</td>
+      <td>67,871</td>
+      <td>7,797</td>
+      <td>$0.1447</td>
+      <td>29</td>
+      <td>21</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a472c643</td>
+      <td>2026-07-02 21:42</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>450.9</td>
+      <td>572,804</td>
+      <td>17,784</td>
+      <td>418,087</td>
+      <td>13,586</td>
+      <td>$0.1372</td>
+      <td>67</td>
+      <td>61</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>c5073ee8</td>
+      <td>2026-07-02 21:50</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>282.7</td>
+      <td>214,955</td>
+      <td>11,696</td>
+      <td>160,336</td>
+      <td>8,998</td>
+      <td>$0.0532</td>
+      <td>40</td>
+      <td>36</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>f7f019a9</td>
+      <td>2026-07-02 21:55</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>103.9</td>
+      <td>57,874</td>
+      <td>4,673</td>
+      <td>52,348</td>
+      <td>4,330</td>
+      <td>$0.0125</td>
+      <td>29</td>
+      <td>19</td>
+      <td>5</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>20315e33</td>
+      <td>2026-07-02 21:58</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>76.0</td>
+      <td>36,668</td>
+      <td>3,050</td>
+      <td>32,576</td>
+      <td>2,864</td>
+      <td>$0.0079</td>
+      <td>20</td>
+      <td>15</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>fb953f56</td>
+      <td>2026-07-02 22:00</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>602.2</td>
+      <td>787,376</td>
+      <td>44,567</td>
+      <td>402,517</td>
+      <td>15,700</td>
+      <td>$5.0511</td>
+      <td>121</td>
+      <td>33</td>
+      <td>12</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>9eef20b8</td>
+      <td>2026-07-02 22:11</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>451.0</td>
+      <td>420,795</td>
+      <td>33,398</td>
+      <td>220,356</td>
+      <td>12,474</td>
+      <td>$2.9389</td>
+      <td>95</td>
+      <td>29</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>081b422d</td>
+      <td>2026-07-02 22:20</td>
+      <td>openai/gpt-5.5</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>279.4</td>
+      <td>576,250</td>
+      <td>21,402</td>
+      <td>501,142</td>
+      <td>11,539</td>
+      <td>$3.5233</td>
+      <td>131</td>
+      <td>29</td>
+      <td>8</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d8dc1de4</td>
+      <td>2026-07-02 22:26</td>
+      <td>openai/gpt-5.5</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>283.8</td>
+      <td>742,375</td>
+      <td>22,737</td>
+      <td>647,810</td>
+      <td>13,854</td>
+      <td>$4.3940</td>
+      <td>158</td>
+      <td>31</td>
+      <td>8</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>76c78a57</td>
+      <td>2026-07-02 22:33</td>
+      <td>z-ai/glm-5.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>415.0</td>
+      <td>254,967</td>
+      <td>18,102</td>
+      <td>INVALID</td>
+      <td>INVALID</td>
+      <td>$0.2914</td>
+      <td>124</td>
+      <td>19</td>
+      <td>21</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>b40932bc</td>
+      <td>2026-07-02 22:43</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>900.5</td>
+      <td>684,403</td>
+      <td>46,606</td>
+      <td>597,529</td>
+      <td>32,597</td>
+      <td>$1.0303</td>
+      <td>210</td>
+      <td>47</td>
+      <td>42</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>b6310198</td>
+      <td>2026-07-02 22:55</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>786.0</td>
+      <td>704,163</td>
+      <td>40,930</td>
+      <td>605,363</td>
+      <td>30,468</td>
+      <td>$1.0337</td>
+      <td>212</td>
+      <td>36</td>
+      <td>49</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>1873156b</td>
+      <td>2026-07-02 23:06</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>425.1</td>
+      <td>791,493</td>
+      <td>17,782</td>
+      <td>639,573</td>
+      <td>14,477</td>
+      <td>$0.1872</td>
+      <td>68</td>
+      <td>72</td>
+      <td>17</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>9888eae6</td>
+      <td>2026-07-02 23:26</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>47.2</td>
+      <td>18,586</td>
+      <td>3,389</td>
+      <td>15,644</td>
+      <td>2,886</td>
+      <td>$0.0044</td>
+      <td>9</td>
+      <td>7</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>13bfb1e5</td>
+      <td>2026-07-02 23:28</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>112.4</td>
+      <td>246,434</td>
+      <td>7,329</td>
+      <td>209,147</td>
+      <td>6,418</td>
+      <td>$0.0508</td>
+      <td>49</td>
+      <td>23</td>
+      <td>8</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>8cfc24a9</td>
+      <td>2026-07-02 23:31</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>117.4</td>
+      <td>91,631</td>
+      <td>8,810</td>
+      <td>48,255</td>
+      <td>4,343</td>
+      <td>$0.6784</td>
+      <td>23</td>
+      <td>12</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6bac4962</td>
+      <td>2026-07-02 23:34</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>71.8</td>
+      <td>59,983</td>
+      <td>5,428</td>
+      <td>32,538</td>
+      <td>3,006</td>
+      <td>$0.4356</td>
+      <td>11</td>
+      <td>7</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>28c18fc5</td>
+      <td>2026-07-02 23:36</td>
+      <td>openai/gpt-5.5</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>95.4</td>
+      <td>68,817</td>
+      <td>8,568</td>
+      <td>55,645</td>
+      <td>5,460</td>
+      <td>$0.6011</td>
+      <td>41</td>
+      <td>8</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6ebab446</td>
+      <td>2026-07-02 23:39</td>
+      <td>openai/gpt-5.5</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>165.3</td>
+      <td>306,389</td>
+      <td>14,544</td>
+      <td>253,372</td>
+      <td>9,063</td>
+      <td>$1.9683</td>
+      <td>115</td>
+      <td>21</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>0186f3f3</td>
+      <td>2026-07-02 23:44</td>
+      <td>z-ai/glm-5.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>127.7</td>
+      <td>39,759</td>
+      <td>7,301</td>
+      <td>34,710</td>
+      <td>6,857</td>
+      <td>$0.0589</td>
+      <td>20</td>
+      <td>10</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6a0d16eb</td>
+      <td>2026-07-02 23:48</td>
+      <td>z-ai/glm-5.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>291.5</td>
+      <td>79,083</td>
+      <td>9,605</td>
+      <td>69,715</td>
+      <td>8,645</td>
+      <td>$0.1024</td>
+      <td>32</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>fda8857a</td>
+      <td>2026-07-02 23:54</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>218.4</td>
+      <td>86,103</td>
+      <td>11,294</td>
+      <td>51,420</td>
+      <td>7,287</td>
+      <td>$0.1500</td>
+      <td>48</td>
+      <td>11</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>799b76d8</td>
+      <td>2026-07-03 00:02</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>missed</td>
+      <td>532.5</td>
+      <td>225,858</td>
+      <td>16,016</td>
+      <td>180,220</td>
+      <td>13,950</td>
+      <td>$0.0572</td>
+      <td>33</td>
+      <td>43</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>fca4db63</td>
+      <td>2026-07-03 00:14</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>628.3</td>
+      <td>378,252</td>
+      <td>15,591</td>
+      <td>290,473</td>
+      <td>13,018</td>
+      <td>$0.0919</td>
+      <td>45</td>
+      <td>50</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>cf6104ac</td>
+      <td>2026-07-03 00:25</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>missed</td>
+      <td>23.4</td>
+      <td>11,014</td>
+      <td>1,453</td>
+      <td>10,030</td>
+      <td>1,396</td>
+      <td>$0.0025</td>
+      <td>5</td>
+      <td>6</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>327e9561</td>
+      <td>2026-07-03 00:27</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>missed</td>
+      <td>20.8</td>
+      <td>11,148</td>
+      <td>1,371</td>
+      <td>10,183</td>
+      <td>1,351</td>
+      <td>$0.0025</td>
+      <td>5</td>
+      <td>6</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>941be4ee</td>
+      <td>2026-07-03 00:29</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>101.9</td>
+      <td>63,332</td>
+      <td>7,598</td>
+      <td>35,440</td>
+      <td>3,988</td>
+      <td>$0.5066</td>
+      <td>20</td>
+      <td>11</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ecd279e5</td>
+      <td>2026-07-03 00:32</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>97.3</td>
+      <td>66,196</td>
+      <td>6,834</td>
+      <td>36,619</td>
+      <td>3,384</td>
+      <td>$0.5018</td>
+      <td>14</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>c2bb5418</td>
+      <td>2026-07-03 00:35</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>237.5</td>
+      <td>436,106</td>
+      <td>19,164</td>
+      <td>347,594</td>
+      <td>11,494</td>
+      <td>$2.7555</td>
+      <td>139</td>
+      <td>26</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>938af01a</td>
+      <td>2026-07-03 00:40</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>254.8</td>
+      <td>464,958</td>
+      <td>20,060</td>
+      <td>364,897</td>
+      <td>11,258</td>
+      <td>$2.9266</td>
+      <td>141</td>
+      <td>28</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>667cee06</td>
+      <td>2026-07-03 00:44</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>273.0</td>
+      <td>104,085</td>
+      <td>14,712</td>
+      <td>92,139</td>
+      <td>13,711</td>
+      <td>$0.1409</td>
+      <td>66</td>
+      <td>21</td>
+      <td>7</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>b1b73be0</td>
+      <td>2026-07-03 00:49</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>272.8</td>
+      <td>95,709</td>
+      <td>14,368</td>
+      <td>84,954</td>
+      <td>12,875</td>
+      <td>$0.1321</td>
+      <td>56</td>
+      <td>17</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>09af6d91</td>
+      <td>2026-07-03 00:53</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>458.1</td>
+      <td>207,504</td>
+      <td>23,134</td>
+      <td>164,561</td>
+      <td>18,028</td>
+      <td>$0.3461</td>
+      <td>85</td>
+      <td>29</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>47aebe35</td>
+      <td>2026-07-03 00:59</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>562.8</td>
+      <td>286,987</td>
+      <td>27,969</td>
+      <td>224,994</td>
+      <td>21,365</td>
+      <td>$0.4636</td>
+      <td>99</td>
+      <td>32</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>1784ca60</td>
+      <td>2026-07-03 01:05</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>449.3</td>
+      <td>300,310</td>
+      <td>11,243</td>
+      <td>241,836</td>
+      <td>8,731</td>
+      <td>$0.0726</td>
+      <td>35</td>
+      <td>39</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>af2f595d</td>
+      <td>2026-07-03 01:17</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>496.0</td>
+      <td>328,012</td>
+      <td>13,351</td>
+      <td>245,960</td>
+      <td>10,885</td>
+      <td>$0.0796</td>
+      <td>46</td>
+      <td>48</td>
+      <td>5</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>652a364c</td>
+      <td>2026-07-03 01:29</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>78.7</td>
+      <td>36,572</td>
+      <td>4,330</td>
+      <td>31,395</td>
+      <td>3,519</td>
+      <td>$0.0082</td>
+      <td>33</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>54c60f35</td>
+      <td>2026-07-03 01:32</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>123.3</td>
+      <td>63,219</td>
+      <td>7,411</td>
+      <td>56,345</td>
+      <td>6,514</td>
+      <td>$0.0141</td>
+      <td>51</td>
+      <td>20</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>72e90b96</td>
+      <td>2026-07-03 01:35</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>102.3</td>
+      <td>68,032</td>
+      <td>7,653</td>
+      <td>37,527</td>
+      <td>3,672</td>
+      <td>$0.5315</td>
+      <td>16</td>
+      <td>8</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>e3f4a15e</td>
+      <td>2026-07-03 01:38</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>141.7</td>
+      <td>88,753</td>
+      <td>10,009</td>
+      <td>49,015</td>
+      <td>5,045</td>
+      <td>$0.6940</td>
+      <td>20</td>
+      <td>12</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>c32e5b1f</td>
+      <td>2026-07-03 01:41</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>251.5</td>
+      <td>378,371</td>
+      <td>17,663</td>
+      <td>297,042</td>
+      <td>10,201</td>
+      <td>$2.4217</td>
+      <td>97</td>
+      <td>23</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>989eb5c0</td>
+      <td>2026-07-03 01:47</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>191.6</td>
+      <td>403,013</td>
+      <td>15,394</td>
+      <td>303,096</td>
+      <td>10,114</td>
+      <td>$2.4769</td>
+      <td>88</td>
+      <td>22</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>3958f622</td>
+      <td>2026-07-03 01:51</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>504.8</td>
+      <td>159,615</td>
+      <td>17,757</td>
+      <td>130,352</td>
+      <td>16,112</td>
+      <td>$0.2017</td>
+      <td>76</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>4a86d379</td>
+      <td>2026-07-03 01:58</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>405.1</td>
+      <td>107,180</td>
+      <td>16,343</td>
+      <td>88,172</td>
+      <td>15,134</td>
+      <td>$0.1487</td>
+      <td>45</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>39b0cf05</td>
+      <td>2026-07-03 02:05</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>307.6</td>
+      <td>152,403</td>
+      <td>15,275</td>
+      <td>107,787</td>
+      <td>11,948</td>
+      <td>$0.2478</td>
+      <td>57</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>1d8b55cf</td>
+      <td>2026-07-03 02:10</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>366.1</td>
+      <td>157,102</td>
+      <td>18,047</td>
+      <td>112,520</td>
+      <td>13,258</td>
+      <td>$0.2641</td>
+      <td>56</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>7ded0261</td>
+      <td>2026-07-03 02:16</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>389.3</td>
+      <td>439,683</td>
+      <td>13,349</td>
+      <td>336,459</td>
+      <td>10,982</td>
+      <td>$0.1052</td>
+      <td>48</td>
+      <td>52</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>fd45499a</td>
+      <td>2026-07-03 02:27</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>453.5</td>
+      <td>312,984</td>
+      <td>12,839</td>
+      <td>247,936</td>
+      <td>10,653</td>
+      <td>$0.0760</td>
+      <td>38</td>
+      <td>43</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>f2ff74f8</td>
+      <td>2026-07-03 02:39</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>45.5</td>
+      <td>29,958</td>
+      <td>2,943</td>
+      <td>27,181</td>
+      <td>2,757</td>
+      <td>$0.0066</td>
+      <td>14</td>
+      <td>11</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>3b6432e4</td>
+      <td>2026-07-03 02:42</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>24.5</td>
+      <td>12,940</td>
+      <td>1,668</td>
+      <td>11,310</td>
+      <td>1,535</td>
+      <td>$0.0029</td>
+      <td>7</td>
+      <td>7</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d5f447a6</td>
+      <td>2026-07-03 02:44</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>125.2</td>
+      <td>91,932</td>
+      <td>8,529</td>
+      <td>51,839</td>
+      <td>3,807</td>
+      <td>$0.6729</td>
+      <td>33</td>
+      <td>12</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d379c219</td>
+      <td>2026-07-03 02:47</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>151.4</td>
+      <td>124,710</td>
+      <td>11,629</td>
+      <td>68,877</td>
+      <td>5,061</td>
+      <td>$0.9143</td>
+      <td>61</td>
+      <td>16</td>
+      <td>9</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>b02d1b73</td>
+      <td>2026-07-03 02:50</td>
+      <td>openai/gpt-5.5</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>234.9</td>
+      <td>547,058</td>
+      <td>17,017</td>
+      <td>433,889</td>
+      <td>9,790</td>
+      <td>$3.2458</td>
+      <td>131</td>
+      <td>25</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6ef73c4a</td>
+      <td>2026-07-03 02:55</td>
+      <td>openai/gpt-5.5</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>242.3</td>
+      <td>606,859</td>
+      <td>19,492</td>
+      <td>476,238</td>
+      <td>10,881</td>
+      <td>$3.6191</td>
+      <td>123</td>
+      <td>26</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ea8511a1</td>
+      <td>2026-07-03 03:01</td>
+      <td>z-ai/glm-5.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>263.9</td>
+      <td>144,633</td>
+      <td>11,925</td>
+      <td>120,819</td>
+      <td>10,287</td>
+      <td>$0.1703</td>
+      <td>55</td>
+      <td>15</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>0bc49a21</td>
+      <td>2026-07-03 03:05</td>
+      <td>z-ai/glm-5.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>506.0</td>
+      <td>166,092</td>
+      <td>18,827</td>
+      <td>147,562</td>
+      <td>17,095</td>
+      <td>$0.2109</td>
+      <td>79</td>
+      <td>24</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>935c6d94</td>
+      <td>2026-07-03 03:13</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>620.9</td>
+      <td>367,080</td>
+      <td>31,198</td>
+      <td>293,222</td>
+      <td>24,856</td>
+      <td>$0.5758</td>
+      <td>122</td>
+      <td>34</td>
+      <td>14</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>81860668</td>
+      <td>2026-07-03 03:20</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>407.3</td>
+      <td>196,372</td>
+      <td>19,865</td>
+      <td>145,621</td>
+      <td>14,875</td>
+      <td>$0.3200</td>
+      <td>77</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>39a45d9a</td>
+      <td>2026-07-03 03:25</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>missed</td>
+      <td>868.7</td>
+      <td>323,846</td>
+      <td>14,192</td>
+      <td>246,862</td>
+      <td>12,360</td>
+      <td>$0.0790</td>
+      <td>29</td>
+      <td>33</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>132ffc92</td>
+      <td>2026-07-03 03:37</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>missed</td>
+      <td>307.6</td>
+      <td>168,237</td>
+      <td>8,364</td>
+      <td>134,607</td>
+      <td>7,081</td>
+      <td>$0.0414</td>
+      <td>19</td>
+      <td>23</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>815cefd0</td>
+      <td>2026-07-03 03:48</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>72.8</td>
+      <td>48,387</td>
+      <td>4,739</td>
+      <td>39,516</td>
+      <td>4,137</td>
+      <td>$0.0106</td>
+      <td>33</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>b9b461d8</td>
+      <td>2026-07-03 03:52</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>missed</td>
+      <td>103.7</td>
+      <td>112,479</td>
+      <td>8,130</td>
+      <td>98,172</td>
+      <td>7,452</td>
+      <td>$0.0241</td>
+      <td>50</td>
+      <td>21</td>
+      <td>12</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>bf2f3036</td>
+      <td>2026-07-03 03:55</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>201.3</td>
+      <td>145,368</td>
+      <td>15,168</td>
+      <td>76,489</td>
+      <td>6,764</td>
+      <td>$1.1060</td>
+      <td>60</td>
+      <td>20</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>247fd309</td>
+      <td>2026-07-03 03:59</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>264.8</td>
+      <td>283,936</td>
+      <td>19,280</td>
+      <td>140,877</td>
+      <td>8,132</td>
+      <td>$1.9017</td>
+      <td>59</td>
+      <td>21</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>1c5b74bf</td>
+      <td>2026-07-03 04:04</td>
+      <td>openai/gpt-5.5</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>183.1</td>
+      <td>221,965</td>
+      <td>13,476</td>
+      <td>177,572</td>
+      <td>8,429</td>
+      <td>$1.5141</td>
+      <td>79</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>e3f2c0aa</td>
+      <td>2026-07-03 04:09</td>
+      <td>openai/gpt-5.5</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>203.2</td>
+      <td>452,930</td>
+      <td>15,903</td>
+      <td>358,260</td>
+      <td>9,287</td>
+      <td>$2.7417</td>
+      <td>112</td>
+      <td>27</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>17346564</td>
+      <td>2026-07-03 04:13</td>
+      <td>z-ai/glm-5.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>512.3</td>
+      <td>217,357</td>
+      <td>12,850</td>
+      <td>177,276</td>
+      <td>11,213</td>
+      <td>$0.2407</td>
+      <td>79</td>
+      <td>19</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>9bd4029d</td>
+      <td>2026-07-03 04:20</td>
+      <td>z-ai/glm-5.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>547.9</td>
+      <td>165,827</td>
+      <td>14,997</td>
+      <td>136,000</td>
+      <td>13,383</td>
+      <td>$0.1992</td>
+      <td>67</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>45f3ed7f</td>
+      <td>2026-07-03 04:27</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>489.0</td>
+      <td>271,379</td>
+      <td>24,280</td>
+      <td>204,276</td>
+      <td>17,901</td>
+      <td>$0.4303</td>
+      <td>119</td>
+      <td>26</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6bc1888e</td>
+      <td>2026-07-03 04:34</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>632.7</td>
+      <td>271,585</td>
+      <td>31,009</td>
+      <td>222,801</td>
+      <td>22,714</td>
+      <td>$0.4558</td>
+      <td>107</td>
+      <td>44</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>8ba616ee</td>
+      <td>2026-07-03 04:41</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>957.5</td>
+      <td>1,169,383</td>
+      <td>25,912</td>
+      <td>825,789</td>
+      <td>21,633</td>
+      <td>$0.2764</td>
+      <td>74</td>
+      <td>79</td>
+      <td>3</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>95cb1bfa</td>
+      <td>2026-07-03 04:54</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>286.3</td>
+      <td>128,672</td>
+      <td>6,588</td>
+      <td>103,482</td>
+      <td>5,641</td>
+      <td>$0.0317</td>
+      <td>16</td>
+      <td>19</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>ed1b3701</td>
+      <td>2026-07-03 05:06</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>93.8</td>
+      <td>91,413</td>
+      <td>6,963</td>
+      <td>81,701</td>
+      <td>6,086</td>
+      <td>$0.0197</td>
+      <td>30</td>
+      <td>24</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>0c838664</td>
+      <td>2026-07-03 05:09</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>104.8</td>
+      <td>86,526</td>
+      <td>7,001</td>
+      <td>72,762</td>
+      <td>5,790</td>
+      <td>$0.0187</td>
+      <td>37</td>
+      <td>19</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>991e97c3</td>
+      <td>2026-07-03 05:11</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>195.7</td>
+      <td>109,403</td>
+      <td>15,975</td>
+      <td>51,668</td>
+      <td>5,747</td>
+      <td>$0.9464</td>
+      <td>63</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>0f062766</td>
+      <td>2026-07-03 05:16</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>104.9</td>
+      <td>92,880</td>
+      <td>7,264</td>
+      <td>51,321</td>
+      <td>4,067</td>
+      <td>$0.6460</td>
+      <td>16</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>f853a7e7</td>
+      <td>2026-07-03 05:19</td>
+      <td>openai/gpt-5.5</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>206.2</td>
+      <td>255,440</td>
+      <td>17,030</td>
+      <td>208,355</td>
+      <td>10,674</td>
+      <td>$1.7881</td>
+      <td>126</td>
+      <td>19</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>fc058c51</td>
+      <td>2026-07-03 05:23</td>
+      <td>openai/gpt-5.5</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>221.7</td>
+      <td>224,870</td>
+      <td>15,515</td>
+      <td>186,633</td>
+      <td>9,754</td>
+      <td>$1.5898</td>
+      <td>113</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>36a87737</td>
+      <td>2026-07-03 05:27</td>
+      <td>z-ai/glm-5.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>239.2</td>
+      <td>60,227</td>
+      <td>9,948</td>
+      <td>43,275</td>
+      <td>8,112</td>
+      <td>$0.0859</td>
+      <td>56</td>
+      <td>11</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>81e53985</td>
+      <td>2026-07-03 05:32</td>
+      <td>z-ai/glm-5.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>366.3</td>
+      <td>120,006</td>
+      <td>16,218</td>
+      <td>102,270</td>
+      <td>14,240</td>
+      <td>$0.1603</td>
+      <td>75</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>6dad015b</td>
+      <td>2026-07-03 05:38</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>320.9</td>
+      <td>162,099</td>
+      <td>15,725</td>
+      <td>108,848</td>
+      <td>11,131</td>
+      <td>$0.2616</td>
+      <td>60</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>c922ea04</td>
+      <td>2026-07-03 05:43</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>287.9</td>
+      <td>134,332</td>
+      <td>13,741</td>
+      <td>104,697</td>
+      <td>10,756</td>
+      <td>$0.2194</td>
+      <td>51</td>
+      <td>21</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>4b64b313</td>
+      <td>2026-07-03 05:46</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>missed</td>
+      <td>497.4</td>
+      <td>457,070</td>
+      <td>11,423</td>
+      <td>339,510</td>
+      <td>8,754</td>
+      <td>$0.1085</td>
+      <td>44</td>
+      <td>47</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>4386b9ef</td>
+      <td>2026-07-03 05:58</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>missed</td>
+      <td>646.4</td>
+      <td>517,281</td>
+      <td>13,122</td>
+      <td>402,033</td>
+      <td>9,830</td>
+      <td>$0.1229</td>
+      <td>55</td>
+      <td>59</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>ac622779</td>
+      <td>2026-07-03 06:10</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>missed</td>
+      <td>65.3</td>
+      <td>17,762</td>
+      <td>2,638</td>
+      <td>16,391</td>
+      <td>2,654</td>
+      <td>$0.0041</td>
+      <td>9</td>
+      <td>8</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>ddf1ddac</td>
+      <td>2026-07-03 06:12</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>missed</td>
+      <td>42.8</td>
+      <td>15,462</td>
+      <td>2,082</td>
+      <td>13,680</td>
+      <td>2,000</td>
+      <td>$0.0035</td>
+      <td>9</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>386fc53a</td>
+      <td>2026-07-03 06:14</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>216.6</td>
+      <td>170,256</td>
+      <td>16,395</td>
+      <td>93,133</td>
+      <td>6,819</td>
+      <td>$1.2612</td>
+      <td>44</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>73419816</td>
+      <td>2026-07-03 06:18</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>357.6</td>
+      <td>267,120</td>
+      <td>24,706</td>
+      <td>143,635</td>
+      <td>10,124</td>
+      <td>$1.9532</td>
+      <td>64</td>
+      <td>26</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a4b39e26</td>
+      <td>2026-07-03 06:23</td>
+      <td>openai/gpt-5.5</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>236.1</td>
+      <td>252,263</td>
+      <td>19,127</td>
+      <td>201,155</td>
+      <td>10,000</td>
+      <td>$1.8351</td>
+      <td>97</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>0af6b84f</td>
+      <td>2026-07-03 06:27</td>
+      <td>openai/gpt-5.5</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>203.4</td>
+      <td>176,010</td>
+      <td>16,803</td>
+      <td>145,233</td>
+      <td>10,810</td>
+      <td>$1.3841</td>
+      <td>80</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>345ad852</td>
+      <td>2026-07-03 06:33</td>
+      <td>z-ai/glm-5.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>432.4</td>
+      <td>123,768</td>
+      <td>17,233</td>
+      <td>105,521</td>
+      <td>15,517</td>
+      <td>$0.1668</td>
+      <td>61</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>2051c10a</td>
+      <td>2026-07-03 06:40</td>
+      <td>z-ai/glm-5.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>436.1</td>
+      <td>78,976</td>
+      <td>7,006</td>
+      <td>69,451</td>
+      <td>5,878</td>
+      <td>$0.0945</td>
+      <td>36</td>
+      <td>9</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a0d4cc5b</td>
+      <td>2026-07-03 06:51</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>757.2</td>
+      <td>341,786</td>
+      <td>39,072</td>
+      <td>263,382</td>
+      <td>28,834</td>
+      <td>$0.5738</td>
+      <td>117</td>
+      <td>31</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>68109aa2</td>
+      <td>2026-07-03 07:02</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>577.6</td>
+      <td>221,122</td>
+      <td>28,487</td>
+      <td>159,166</td>
+      <td>21,592</td>
+      <td>$0.3832</td>
+      <td>81</td>
+      <td>24</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>82455bd4</td>
+      <td>2026-07-03 07:10</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>943.4</td>
+      <td>791,501</td>
+      <td>29,463</td>
+      <td>601,035</td>
+      <td>22,889</td>
+      <td>$0.1912</td>
+      <td>97</td>
+      <td>88</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>4515b600</td>
+      <td>2026-07-03 07:20</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>369.9</td>
+      <td>356,249</td>
+      <td>9,792</td>
+      <td>282,420</td>
+      <td>7,599</td>
+      <td>$0.0849</td>
+      <td>39</td>
+      <td>42</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>bd5e05ed</td>
+      <td>2026-07-03 07:31</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>67.2</td>
+      <td>48,939</td>
+      <td>5,515</td>
+      <td>40,588</td>
+      <td>4,229</td>
+      <td>$0.0109</td>
+      <td>32</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a2b86cbf</td>
+      <td>2026-07-03 07:33</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>70.9</td>
+      <td>49,937</td>
+      <td>5,926</td>
+      <td>41,596</td>
+      <td>4,820</td>
+      <td>$0.0112</td>
+      <td>31</td>
+      <td>12</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>7d7064e5</td>
+      <td>2026-07-03 08:01</td>
+      <td>z-ai/glm-5.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>256.6</td>
+      <td>106,324</td>
+      <td>10,346</td>
+      <td>86,202</td>
+      <td>9,427</td>
+      <td>$0.1299</td>
+      <td>51</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>2fde6128</td>
+      <td>2026-07-03 08:06</td>
+      <td>z-ai/glm-5.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>missed</td>
+      <td>155.3</td>
+      <td>66,367</td>
+      <td>6,641</td>
+      <td>51,223</td>
+      <td>5,688</td>
+      <td>$0.0816</td>
+      <td>40</td>
+      <td>8</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>62bf0491</td>
+      <td>2026-07-03 08:35</td>
+      <td>z-ai/glm-5.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>627.3</td>
+      <td>448,164</td>
+      <td>21,312</td>
+      <td>406,035</td>
+      <td>19,438</td>
+      <td>$0.4807</td>
+      <td>136</td>
+      <td>25</td>
+      <td>28</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>14e4336c</td>
+      <td>2026-07-03 08:46</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>601.7</td>
+      <td>178,755</td>
+      <td>13,566</td>
+      <td>152,975</td>
+      <td>11,851</td>
+      <td>$0.0456</td>
+      <td>20</td>
+      <td>32</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>888bb63b</td>
+      <td>2026-07-03 09:00</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>217.0</td>
+      <td>88,003</td>
+      <td>10,105</td>
+      <td>53,519</td>
+      <td>6,819</td>
+      <td>$0.1479</td>
+      <td>47</td>
+      <td>10</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>4db0e17d</td>
+      <td>2026-07-03 09:10</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>406.0</td>
+      <td>395,960</td>
+      <td>30,769</td>
+      <td>193,988</td>
+      <td>10,793</td>
+      <td>$2.7490</td>
+      <td>99</td>
+      <td>24</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>8e0d50c3</td>
+      <td>2026-07-03 09:16</td>
+      <td>openai/gpt-5.5</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>found</td>
+      <td>299.9</td>
+      <td>636,989</td>
+      <td>23,330</td>
+      <td>504,607</td>
+      <td>13,468</td>
+      <td>$3.8848</td>
+      <td>167</td>
+      <td>29</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>6350d932</td>
+      <td>2026-07-03 09:22</td>
+      <td>z-ai/glm-5.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>770.5</td>
+      <td>231,979</td>
+      <td>30,618</td>
+      <td>209,493</td>
+      <td>27,694</td>
+      <td>$0.3076</td>
+      <td>127</td>
+      <td>39</td>
+      <td>8</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>900e71f3</td>
+      <td>2026-07-03 09:33</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>843.3</td>
+      <td>532,163</td>
+      <td>42,110</td>
+      <td>435,487</td>
+      <td>30,721</td>
+      <td>$0.8231</td>
+      <td>208</td>
+      <td>42</td>
+      <td>54</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>1de28a86</td>
+      <td>2026-07-03 09:45</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>464.0</td>
+      <td>811,979</td>
+      <td>14,936</td>
+      <td>597,237</td>
+      <td>11,015</td>
+      <td>$0.1909</td>
+      <td>63</td>
+      <td>66</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>79789d63</td>
+      <td>2026-07-03 09:56</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>acl-silent-drop</td>
+      <td>Pings from client1 to client3 fail. Investigate root cause (</td>
+      <td>missed</td>
+      <td>88.7</td>
+      <td>93,065</td>
+      <td>7,762</td>
+      <td>79,055</td>
+      <td>6,402</td>
+      <td>$0.0202</td>
+      <td>57</td>
+      <td>26</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>c1e6f72a</td>
+      <td>2026-07-03 09:59</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>173.0</td>
+      <td>97,596</td>
+      <td>12,950</td>
+      <td>46,649</td>
+      <td>5,221</td>
+      <td>$0.8117</td>
+      <td>54</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>78b453c3</td>
+      <td>2026-07-03 10:03</td>
+      <td>openai/gpt-5.5</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>263.8</td>
+      <td>314,363</td>
+      <td>19,206</td>
+      <td>257,719</td>
+      <td>9,447</td>
+      <td>$2.1480</td>
+      <td>119</td>
+      <td>27</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>77fe189c</td>
+      <td>2026-07-03 10:07</td>
+      <td>z-ai/glm-5.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>232.7</td>
+      <td>70,640</td>
+      <td>9,867</td>
+      <td>58,573</td>
+      <td>9,122</td>
+      <td>$0.0953</td>
+      <td>51</td>
+      <td>13</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>07e1d22e</td>
+      <td>2026-07-03 10:12</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>569.1</td>
+      <td>451,758</td>
+      <td>28,503</td>
+      <td>309,562</td>
+      <td>19,879</td>
+      <td>$0.6716</td>
+      <td>133</td>
+      <td>28</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>408a2f07</td>
+      <td>2026-07-03 10:19</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>423.0</td>
+      <td>198,971</td>
+      <td>13,925</td>
+      <td>144,314</td>
+      <td>12,428</td>
+      <td>$0.0503</td>
+      <td>32</td>
+      <td>39</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>3318b01d</td>
+      <td>2026-07-03 10:28</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>client3-port-down</td>
+      <td>Client3 appears to be offline and unreachable from the rest</td>
+      <td>found</td>
+      <td>55.5</td>
+      <td>41,612</td>
+      <td>3,657</td>
+      <td>37,918</td>
+      <td>3,237</td>
+      <td>$0.0091</td>
+      <td>28</td>
+      <td>14</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ec8ea5aa</td>
+      <td>2026-07-03 10:30</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>407.5</td>
+      <td>395,913</td>
+      <td>27,104</td>
+      <td>207,329</td>
+      <td>10,032</td>
+      <td>$2.6572</td>
+      <td>73</td>
+      <td>26</td>
+      <td>6</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d4e3bd34</td>
+      <td>2026-07-03 10:38</td>
+      <td>openai/gpt-5.5</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>found</td>
+      <td>308.7</td>
+      <td>842,419</td>
+      <td>22,625</td>
+      <td>709,867</td>
+      <td>13,322</td>
+      <td>$4.8908</td>
+      <td>147</td>
+      <td>40</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>d6b4ad7e</td>
+      <td>2026-07-03 10:43</td>
+      <td>z-ai/glm-5.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>512.5</td>
+      <td>214,370</td>
+      <td>21,872</td>
+      <td>199,245</td>
+      <td>19,587</td>
+      <td>$0.2650</td>
+      <td>151</td>
+      <td>23</td>
+      <td>32</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>fedb0806</td>
+      <td>2026-07-03 10:59</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>892.7</td>
+      <td>1,520,247</td>
+      <td>28,894</td>
+      <td>1,235,269</td>
+      <td>23,081</td>
+      <td>$0.3577</td>
+      <td>118</td>
+      <td>125</td>
+      <td>24</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>9668ff85</td>
+      <td>2026-07-03 11:11</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>162.6</td>
+      <td>168,233</td>
+      <td>10,445</td>
+      <td>144,970</td>
+      <td>8,664</td>
+      <td>$0.0357</td>
+      <td>52</td>
+      <td>30</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>26e217bc</td>
+      <td>2026-07-03 11:15</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>101.8</td>
+      <td>76,452</td>
+      <td>6,760</td>
+      <td>42,182</td>
+      <td>3,528</td>
+      <td>$0.5513</td>
+      <td>19</td>
+      <td>10</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>26e61df8</td>
+      <td>2026-07-03 11:18</td>
+      <td>openai/gpt-5.5</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>219.9</td>
+      <td>376,640</td>
+      <td>17,738</td>
+      <td>296,612</td>
+      <td>9,234</td>
+      <td>$2.4153</td>
+      <td>122</td>
+      <td>26</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>86f2e5bc</td>
+      <td>2026-07-03 11:22</td>
+      <td>z-ai/glm-5.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>261.0</td>
+      <td>47,369</td>
+      <td>7,747</td>
+      <td>38,073</td>
+      <td>6,660</td>
+      <td>$0.0673</td>
+      <td>40</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d02448df</td>
+      <td>2026-07-03 11:28</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>found</td>
+      <td>133.2</td>
+      <td>35,559</td>
+      <td>6,884</td>
+      <td>23,391</td>
+      <td>5,167</td>
+      <td>$0.0703</td>
+      <td>17</td>
+      <td>7</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>8b158417</td>
+      <td>2026-07-03 11:31</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>missed</td>
+      <td>445.4</td>
+      <td>283,389</td>
+      <td>8,304</td>
+      <td>224,209</td>
+      <td>6,587</td>
+      <td>$0.0677</td>
+      <td>33</td>
+      <td>36</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>01c076d8</td>
+      <td>2026-07-03 11:43</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>intf-down</td>
+      <td>Client1 reports it can no longer reach client3. Investigate</td>
+      <td>missed</td>
+      <td>20.4</td>
+      <td>11,062</td>
+      <td>1,697</td>
+      <td>10,126</td>
+      <td>1,715</td>
+      <td>$0.0026</td>
+      <td>5</td>
+      <td>6</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>687b0218</td>
+      <td>2026-07-03 11:44</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>93.3</td>
+      <td>52,986</td>
+      <td>6,238</td>
+      <td>29,728</td>
+      <td>3,307</td>
+      <td>$0.4209</td>
+      <td>15</td>
+      <td>10</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>70e281ed</td>
+      <td>2026-07-03 11:47</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>243.6</td>
+      <td>620,289</td>
+      <td>18,477</td>
+      <td>497,079</td>
+      <td>12,254</td>
+      <td>$3.6558</td>
+      <td>134</td>
+      <td>30</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>ab8e9d38</td>
+      <td>2026-07-03 11:53</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>305.1</td>
+      <td>81,703</td>
+      <td>11,922</td>
+      <td>73,832</td>
+      <td>10,486</td>
+      <td>$0.1117</td>
+      <td>33</td>
+      <td>17</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>4fa6383c</td>
+      <td>2026-07-03 11:57</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>found</td>
+      <td>460.2</td>
+      <td>276,680</td>
+      <td>22,683</td>
+      <td>200,965</td>
+      <td>17,349</td>
+      <td>$0.4309</td>
+      <td>81</td>
+      <td>30</td>
+      <td>2</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>094a6a00</td>
+      <td>2026-07-03 12:29</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>482.1</td>
+      <td>456,580</td>
+      <td>17,428</td>
+      <td>349,241</td>
+      <td>14,068</td>
+      <td>$0.1104</td>
+      <td>53</td>
+      <td>55</td>
+      <td>1</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>4d31a86d</td>
+      <td>2026-07-03 12:40</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-export-policy</td>
+      <td>Traffic from client1 to client3 fails. investigate the root</td>
+      <td>missed</td>
+      <td>73.2</td>
+      <td>65,948</td>
+      <td>6,555</td>
+      <td>57,131</td>
+      <td>5,719</td>
+      <td>$0.0145</td>
+      <td>38</td>
+      <td>15</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>4ad6e3e7</td>
+      <td>2026-07-03 12:43</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>108.3</td>
+      <td>66,206</td>
+      <td>7,676</td>
+      <td>37,251</td>
+      <td>3,438</td>
+      <td>$0.5229</td>
+      <td>20</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d2f2db62</td>
+      <td>2026-07-03 12:46</td>
+      <td>openai/gpt-5.5</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>192.7</td>
+      <td>221,544</td>
+      <td>15,502</td>
+      <td>176,057</td>
+      <td>8,285</td>
+      <td>$1.5728</td>
+      <td>84</td>
+      <td>17</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>1fbca582</td>
+      <td>2026-07-03 12:50</td>
+      <td>z-ai/glm-5.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>323.2</td>
+      <td>132,304</td>
+      <td>17,421</td>
+      <td>104,206</td>
+      <td>15,140</td>
+      <td>$0.1753</td>
+      <td>66</td>
+      <td>14</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>af4c79fa</td>
+      <td>2026-07-03 12:54</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>found</td>
+      <td>379.8</td>
+      <td>215,335</td>
+      <td>18,633</td>
+      <td>151,865</td>
+      <td>14,090</td>
+      <td>$0.3390</td>
+      <td>61</td>
+      <td>23</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>033cc0fc</td>
+      <td>2026-07-03 13:01</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>448.1</td>
+      <td>440,316</td>
+      <td>14,235</td>
+      <td>340,234</td>
+      <td>11,795</td>
+      <td>$0.1056</td>
+      <td>40</td>
+      <td>46</td>
+      <td>2</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>c0e642ff</td>
+      <td>2026-07-03 13:12</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>missing-vlan-on-trunk</td>
+      <td>client1 cannot reach its gateway or anything beyond its segm</td>
+      <td>missed</td>
+      <td>62.1</td>
+      <td>28,252</td>
+      <td>3,817</td>
+      <td>25,574</td>
+      <td>3,722</td>
+      <td>$0.0064</td>
+      <td>17</td>
+      <td>10</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d3cb16f7</td>
+      <td>2026-07-03 13:15</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>172.8</td>
+      <td>119,511</td>
+      <td>13,001</td>
+      <td>67,437</td>
+      <td>5,995</td>
+      <td>$0.9226</td>
+      <td>54</td>
+      <td>16</td>
+      <td>6</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>bfd6a841</td>
+      <td>2026-07-03 13:18</td>
+      <td>openai/gpt-5.5</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>271.9</td>
+      <td>420,975</td>
+      <td>20,313</td>
+      <td>327,918</td>
+      <td>10,024</td>
+      <td>$2.7143</td>
+      <td>122</td>
+      <td>24</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>544146ea</td>
+      <td>2026-07-03 13:23</td>
+      <td>z-ai/glm-5.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>307.4</td>
+      <td>138,976</td>
+      <td>12,445</td>
+      <td>131,029</td>
+      <td>11,414</td>
+      <td>$0.1666</td>
+      <td>73</td>
+      <td>15</td>
+      <td>12</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>352a7471</td>
+      <td>2026-07-03 13:28</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>519.3</td>
+      <td>442,286</td>
+      <td>25,083</td>
+      <td>368,248</td>
+      <td>18,713</td>
+      <td>$0.6469</td>
+      <td>96</td>
+      <td>36</td>
+      <td>5</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>c216857a</td>
+      <td>2026-07-03 13:36</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>744.2</td>
+      <td>744,690</td>
+      <td>24,478</td>
+      <td>546,908</td>
+      <td>21,871</td>
+      <td>$0.1788</td>
+      <td>57</td>
+      <td>62</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>1d25ba1c</td>
+      <td>2026-07-03 13:44</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>mtu-blackhole</td>
+      <td>Small pings between client1 and client3 succeed, but large t</td>
+      <td>found</td>
+      <td>90.2</td>
+      <td>67,555</td>
+      <td>6,594</td>
+      <td>58,588</td>
+      <td>5,770</td>
+      <td>$0.0148</td>
+      <td>72</td>
+      <td>16</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>5c5e3401</td>
+      <td>2026-07-03 13:47</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>251.7</td>
+      <td>209,962</td>
+      <td>19,252</td>
+      <td>106,171</td>
+      <td>8,030</td>
+      <td>$1.5311</td>
+      <td>71</td>
+      <td>18</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d0f22534</td>
+      <td>2026-07-03 13:51</td>
+      <td>openai/gpt-5.5</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>204.6</td>
+      <td>342,470</td>
+      <td>14,701</td>
+      <td>278,138</td>
+      <td>7,818</td>
+      <td>$2.1534</td>
+      <td>108</td>
+      <td>22</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>3a661262</td>
+      <td>2026-07-03 13:55</td>
+      <td>z-ai/glm-5.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>299.7</td>
+      <td>123,199</td>
+      <td>13,011</td>
+      <td>108,803</td>
+      <td>11,617</td>
+      <td>$0.1536</td>
+      <td>47</td>
+      <td>22</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>9e218ae0</td>
+      <td>2026-07-03 14:02</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>679.4</td>
+      <td>727,094</td>
+      <td>18,108</td>
+      <td>547,842</td>
+      <td>13,070</td>
+      <td>$0.1726</td>
+      <td>76</td>
+      <td>82</td>
+      <td>0</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>8ec47a30</td>
+      <td>2026-07-03 14:13</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>missed</td>
+      <td>31.3</td>
+      <td>11,093</td>
+      <td>1,568</td>
+      <td>10,124</td>
+      <td>1,463</td>
+      <td>$0.0025</td>
+      <td>5</td>
+      <td>6</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>d34a3bb7</td>
+      <td>2026-07-03 14:15</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>110.6</td>
+      <td>92,486</td>
+      <td>6,847</td>
+      <td>51,527</td>
+      <td>3,679</td>
+      <td>$0.6336</td>
+      <td>21</td>
+      <td>10</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>89e38def</td>
+      <td>2026-07-03 14:18</td>
+      <td>openai/gpt-5.5</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>197.1</td>
+      <td>263,456</td>
+      <td>16,015</td>
+      <td>212,714</td>
+      <td>8,830</td>
+      <td>$1.7977</td>
+      <td>110</td>
+      <td>21</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>84fc828e</td>
+      <td>2026-07-03 14:23</td>
+      <td>z-ai/glm-5.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>299.0</td>
+      <td>113,312</td>
+      <td>13,372</td>
+      <td>98,851</td>
+      <td>12,189</td>
+      <td>$0.1455</td>
+      <td>48</td>
+      <td>16</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>0a2d269f</td>
+      <td>2026-07-03 14:28</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>472.8</td>
+      <td>211,159</td>
+      <td>22,716</td>
+      <td>173,668</td>
+      <td>18,916</td>
+      <td>$0.3491</td>
+      <td>73</td>
+      <td>31</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>228215ec</td>
+      <td>2026-07-03 14:34</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>found</td>
+      <td>757.7</td>
+      <td>1,016,865</td>
+      <td>27,472</td>
+      <td>752,281</td>
+      <td>20,815</td>
+      <td>$0.2421</td>
+      <td>109</td>
+      <td>106</td>
+      <td>1</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>46763c95</td>
+      <td>2026-07-03 14:43</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>switch1-uplink-down</td>
+      <td>client1 and client2 have both lost connectivity to the rest</td>
+      <td>missed</td>
+      <td>30.2</td>
+      <td>19,281</td>
+      <td>2,018</td>
+      <td>17,133</td>
+      <td>1,839</td>
+      <td>$0.0043</td>
+      <td>12</td>
+      <td>9</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>2c8148e1</td>
+      <td>2026-07-03 14:44</td>
+      <td>anthropic/claude-opus-4.8</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>366.6</td>
+      <td>322,010</td>
+      <td>24,552</td>
+      <td>175,658</td>
+      <td>11,064</td>
+      <td>$2.2239</td>
+      <td>65</td>
+      <td>34</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a3f905b4</td>
+      <td>2026-07-03 14:49</td>
+      <td>openai/gpt-5.5</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>320.6</td>
+      <td>807,545</td>
+      <td>24,565</td>
+      <td>678,155</td>
+      <td>15,464</td>
+      <td>$4.7747</td>
+      <td>162</td>
+      <td>36</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>a57c565f</td>
+      <td>2026-07-03 14:56</td>
+      <td>z-ai/glm-5.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>354.6</td>
+      <td>107,884</td>
+      <td>17,101</td>
+      <td>91,326</td>
+      <td>14,600</td>
+      <td>$0.1516</td>
+      <td>57</td>
+      <td>13</td>
+      <td>3</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>3613aa22</td>
+      <td>2026-07-03 15:02</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>found</td>
+      <td>709.4</td>
+      <td>387,019</td>
+      <td>36,816</td>
+      <td>301,373</td>
+      <td>27,634</td>
+      <td>$0.6218</td>
+      <td>124</td>
+      <td>23</td>
+      <td>4</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>e4cf3134</td>
+      <td>2026-07-03 15:13</td>
+      <td>deepseek/deepseek-v3.2</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>652.5</td>
+      <td>1,266,770</td>
+      <td>23,912</td>
+      <td>1,009,914</td>
+      <td>17,861</td>
+      <td>$0.2980</td>
+      <td>97</td>
+      <td>103</td>
+      <td>9</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>2996a72d</td>
+      <td>2026-07-03 15:24</td>
+      <td>mistralai/ministral-14b-2512</td>
+      <td>basic-client-communication</td>
+      <td>Could client1, client2 and client3 communicate with each oth</td>
+      <td>missed</td>
+      <td>44.0</td>
+      <td>33,539</td>
+      <td>3,549</td>
+      <td>30,932</td>
+      <td>3,067</td>
+      <td>$0.0074</td>
+      <td>10</td>
+      <td>10</td>
+      <td>0</td>
+      <td>yes</td>
+    </tr>
+    <tr class="verdict-missed">
+      <td>d2741fc9</td>
+      <td>2026-07-06 06:52</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>duplicate-ip-arp</td>
+      <td>client1 can reach 10.10.10.10 (client3) by ping, but client3</td>
+      <td>missed</td>
+      <td>885.9</td>
+      <td>733,796</td>
+      <td>43,299</td>
+      <td>632,098</td>
+      <td>32,631</td>
+      <td>$1.0796</td>
+      <td>207</td>
+      <td>48</td>
+      <td>61</td>
+      <td>no</td>
+    </tr>
+    <tr class="verdict-found">
+      <td>9989edb8</td>
+      <td>2026-07-06 07:04</td>
+      <td>qwen/qwen3.7-max</td>
+      <td>one-way-route-filter</td>
+      <td>client1 cannot reach client3. investigate the root cause. (I</td>
+      <td>found</td>
+      <td>521.9</td>
+      <td>252,215</td>
+      <td>26,286</td>
+      <td>195,807</td>
+      <td>18,244</td>
+      <td>$0.4138</td>
+      <td>113</td>
+      <td>24</td>
+      <td>4</td>
       <td>yes</td>
     </tr>
   </tbody>
