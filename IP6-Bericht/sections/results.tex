@@ -1,4 +1,195 @@
 \section{Results}
 \label{sec:results}
 
-% TODO: Raw experiment results.
+This section reports the results from the conducted experiments of \cref{sec:experiments}.
+What they mean for the research questions is discussed in \cref{sec:evaluation}. The dataset
+consists of 300 runs (10 scenarios $\times$ 6 models $\times$ 5 repetitions). Every run was evaluated manually (by the author of this work) against the scenario's root cause as
+described in \cref{sec:evaluation-procedure}. 55 of the 300 runs hit the 600-second wall-clock
+cap and were stopped (DNF), 38 for DeepSeek-V3.2, 8 each for GLM-5.2 and Qwen3.7-Max, and 1 for
+Claude Opus 4.8. None of them figured out the correct root cause in time, they were cut off. So
+all 55 count as misses. Supplementary figures are collected in \cref{app:extra-figures}.
+
+\subsection{Correctness}
+\label{sec:results-correctness}
+
+\Cref{tab:found-rate-tier} shows how many runs ended with a correct result, per difficulty
+tier and model. \Cref{fig:found-rate-scenario} breaks the same data down to individual scenarios.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lcccc c@{}}
+\toprule
+ & \multicolumn{4}{c}{\textbf{Correct diagnoses / runs}} & \\
+\cmidrule(lr){2-5}
+\textbf{Model} & \textbf{baseline} & \textbf{easy} & \textbf{medium} & \textbf{hard} & \textbf{overall} \\
+\midrule
+claude-opus-4.8      & 5/5 & 15/15 & 14/15 & 14/15 & 96\,\% \\
+gpt-5.5              & 5/5 & 15/15 & 15/15 & 15/15 & 100\,\% \\
+glm-5.2              & 4/5 & 13/15 & 10/15 & 10/15 & 74\,\% \\
+qwen3.7-max          & 4/5 & 15/15 & 10/15 & 12/15 & 82\,\% \\
+deepseek-v3.2        & 1/5 &  8/15 &  0/15 &  2/15 & 22\,\% \\
+ministral-14b-2512   & 2/5 &  4/15 &  0/15 &  2/15 & 16\,\% \\
+\bottomrule
+\end{tabular}
+\caption{Correct diagnoses per difficulty tier and model.}
+\label{tab:found-rate-tier}
+\end{table}
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\linewidth]{graphics/correctness_found_rate.pdf}
+\end{center}
+\caption{Found rate per scenario and model.}
+\label{fig:found-rate-scenario}
+\end{figure}
+
+The two high-tier models diagnosed 98 of their 100 runs correctly (GPT-5.5 all 50, Claude Opus
+4.8 48 of 50). The mid tier reached 74\,\% (GLM-5.2) and 82\,\% (Qwen3.7-Max). The low tier
+22\,\% (DeepSeek-V3.2) and 16\,\% (Ministral-14B). Over all six models, the success rate
+per difficulty tier is 70\,\% (baseline), 78\,\% (easy), 54\,\% (medium) and 61\,\% (hard).
+
+At scenario level the misses are not spread evenly. \texttt{duplicate-ip-arp} was solved only by
+the high tier models. Every other model failed it in all five attempts. The scenario \texttt{acl-silent-drop} was
+almost the same (GLM-5.2 1/5, Qwen3.7-Max 2/5, low tier 0/5). The
+\texttt{mtu-blackhole} scenario (which was classified as hard), was solved in every run by all four high- and mid-tier
+models.
+
+One type of failure that only happened with GLM-5.2 is that in 4 of its 50 runs the orchestrator produced a final
+answer after a single LLM request without calling a single tool. This means that the run ended before any
+investigation had taken place. All four runs (one each on \texttt{acl-silent-drop},
+\texttt{client3-port-down}, \texttt{duplicate-ip-arp} and \texttt{one-way-route-filter}) were
+counted as misses. No other model showed this type of failure. The consequences for GLM-5.2's reported
+success rate are discussed in \cref{sec:eval-limitations}.
+
+On the healthy baseline scenario, where the correct result is that the network is healthy,
+the high-tier models were right in all 10 runs, GLM-5.2 and Qwen3.7-Max in 4 of 5 each,
+DeepSeek-V3.2 in 1 of 5 and Ministral-14B in 2 of 5. The nine wrong baseline runs split into
+two failure reasons. Six (4 DeepSeek-V3.2, 1 GLM-5.2, 1 Qwen3.7-Max) hit the 600-second cap
+without delivering any answer (DNF) and Ministral-14B's three wrong results each reported a fault that
+did not exist.
+
+\subsection{Time}
+\label{sec:results-time}
+
+Median wall-clock time per run, over all 50 runs of each model were Claude Opus 4.8 118\,s, GPT-5.5
+187\,s, GLM-5.2 248\,s, Qwen3.7-Max 292\,s, Ministral-14B 53\,s. DeepSeek-V3.2's median equals
+the 600-second cap because more than half of its runs were stopped due to the time limit. The true durations beyond the
+cap are unknown. The full wall-clock distribution over all 300 runs, with the stopped runs
+visible at the cap, is shown in \cref{fig:wall-clock-distribution} in the appendix.
+
+\Cref{fig:time-to-diagnosis} shows the runs that ended in a correct
+diagnosis and finished within the time limit. There the medians are: Claude Opus 4.8 114\,s (48 runs),
+GPT-5.5 187\,s (50), GLM-5.2 232\,s (37), Qwen3.7-Max 266\,s (41), DeepSeek-V3.2 442\,s (11) and
+Ministral-14B 57\,s (8).
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.85\linewidth]{graphics/time_to_diagnosis.pdf}
+\end{center}
+\caption{Wall-clock time to a correct diagnosis per model.}
+\label{fig:time-to-diagnosis}
+\end{figure}
+
+Interestingly comparing results for the same model, the time does not vary too much over the difficulty tiers. Claude Opus 4.8's median
+time to a correct diagnosis is 78\,s on easy and only 118\,s on hard scenarios, GPT-5.5 needed 170\,s and
+217\,s. For some models, figuring out that the healthy baseline is healthy took as long as or longer than
+locating an easy fault (Qwen3.7-Max: 477\,s versus 172\,s). A per-scenario breakdown (showing how much time each model took for a correct diagnosis) is shown in
+\cref{fig:scenario-ttd} in the appendix.
+
+Wall-clock time is not the same as LLM inference time. \Cref{fig:inference-time} shows the LLM
+inference time summed over all round-trips of a run next to the wall-clock time, over all 50
+runs of each model.\footnote{Summed
+from the per-request generation times reported by OpenRouter's Generation API. For the nine runs
+where the API did not resolve every round-trip (see \cref{sec:results-cost}), the missing requests
+are not part of the sum.} On average this sum exceeds the wall-clock time for every model because the orchestrator agent can launch multiple sub-agents, which then issue LLM requests in parallel. This means overlapping
+requests are each counted in full. The size of
+the gap between the two measures indicates how much of a model's work ran concurrently.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.85\linewidth]{graphics/model_comparison_time_metrics.pdf}
+\end{center}
+\caption{Mean LLM inference time per run (summed over all round-trips) and mean wall-clock
+time per run. Error bars show the standard deviation.}
+\label{fig:inference-time}
+\end{figure}
+
+\subsection{Cost and effort}
+\label{sec:results-cost}
+
+\Cref{tab:model-summary} summarises the main per-model numbers. \cref{fig:cost-vs-correctness}
+shows mean cost per run against found rate. ``Cost/correct'' is a model's total cost spent divided by
+its number of correct results. For Ministral-14B this rests on only 8 correct runs. The 300
+runs cost \$242 in API fees in total, \$145
+of which (60\,\%) went to GPT-5.5. All costs are OpenRouter list prices at run time. The exact
+rates used in the experiments are shown in \cref{app:model-prices}.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Found} & \textbf{Median time} & \textbf{Cost/run} & \textbf{Cost/correct} & \textbf{DNF} \\
+ & \textbf{rate} & \textbf{to correct (s)} & \textbf{(USD)} & \textbf{(USD)} & \\
+\midrule
+claude-opus-4.8    & 96\,\%  & 114 & 1.17  & 1.22 & 1  \\
+gpt-5.5            & 100\,\% & 187 & 2.91  & 2.91 & 0  \\
+glm-5.2            & 74\,\%  & 232 & 0.16  & 0.21 & 8  \\
+qwen3.7-max        & 82\,\%  & 266 & 0.45  & 0.55 & 8  \\
+deepseek-v3.2      & 22\,\%  & 442 & 0.14  & 0.64 & 38 \\
+ministral-14b-2512 & 16\,\%  & 57  & 0.01  & 0.07 & 0  \\
+\bottomrule
+\end{tabular}
+\caption{Per-model summary over all 50 runs each.}
+\label{tab:model-summary}
+\end{table}
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.75\linewidth]{graphics/cost_vs_correctness.pdf}
+\end{center}
+\caption{Mean cost per run against found rate.}
+\label{fig:cost-vs-correctness}
+\end{figure}
+
+Token usage is also very different across models. \Cref{fig:token-usage} shows the mean input and output
+volume per run in \emph{normalized} tokens. OpenRouter re-counts every request with its own
+model-agnostic tokenizer (\enquote{QuadChars}), which the Generation API reports alongside the
+provider's native token counts \parencite{openrouter-tokenizer}. Unlike the native counts used
+for billing, these numbers compare how much text each model actually processed before giving a
+final result, independent of its own tokenizer.\footnote{Normalized counts are missing for 9 of the 300 runs, where the Generation
+API did not return a resolved record for every LLM round-trip; those runs are omitted from the
+means. Native token counts and costs are unaffected.} The mean input tokens ranges from
+42\,000 tokens (Ministral-14B) and 85\,000 (Opus 4.8) over 105\,000 (GLM-5.2) and 229\,000
+(Qwen3.7-Max) to 375\,000 (GPT-5.5) and 441\,000 (DeepSeek-V3.2). Notable is how little input
+Opus 4.8 consumed, it reached the second-best found rate on less than a quarter of GPT-5.5's
+input tokens.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.85\linewidth]{graphics/model_comparison_tokens.pdf}
+\end{center}
+\caption{Mean normalized input and output tokens per run. Error bars show the standard
+deviation.}
+\label{fig:token-usage}
+\end{figure}
+
+The number of tool calls per run, shown in \cref{fig:tool-calls}, shows the same picture as input
+tokens (they correlate). GPT-5.5 issued by far the most calls (mean 124 per run), followed by Qwen3.7-Max (98),
+GLM-5.2 and DeepSeek-V3.2 (60 and 59) and Claude Opus 4.8 (46). Ministral-14B stopped after a
+mean of 24 calls. GPT-5.5's perfect found rate thus rests on roughly 2.7 times as many tool
+calls as Opus 4.8 needed for a nearly identical rate. Ministral-14B's low count means it did not retrieve a lot of information (by calling tools) before
+giving a final result.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=0.85\linewidth]{graphics/model_comparison_tool_calls.pdf}
+\end{center}
+\caption{Mean number of tool calls per run. Error bars show the standard deviation.}
+\label{fig:tool-calls}
+\end{figure}
+
+A figure showing the number of invalid commands executed is shown in
+\cref{fig:invalid-commands} in the appendix. Malformed commands were rarest for Ministral-14B
+and the high-tier models and by far most frequent for Qwen3.7-Max.
