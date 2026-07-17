@@ -24,7 +24,7 @@ complexity without adding anything that contributed to the project's goals.
 All models are accessed through \emph{OpenRouter}, a gateway that exposes models from different vendors
 behind one API \parencite{openrouter}. Switching the model an agent uses only means changing a
 model identifier (some text). This is what makes the experiment matrix of
-\cref{sec:experiment-matrix} practical, the model can be changed without touching the agent logic.
+\cref{sec:experiments} practical, the model can be changed without touching the agent logic.
 
 Two settings are applied to every agent. First, the reasoning effort is fixed to the same level
 for all models, so that model versus model comparisons are not influenced by each provider picking its own
@@ -57,7 +57,7 @@ main process.
 
 All interaction with the lab devices goes through the JSON-RPC interface of Nokia SR Linux
 \parencite{srlinux_jsonrpc}. The tools offer two routes to device
-data. The first is executing formatted \texttt{show} commands and the second is reading a specific YANG path directly from the state
+data. The first is executing formatted show commands and the second is reading a specific YANG path directly from the state
 or running-configuration datastore. As an attempt to keep
 the models from using invalid commands, a reference of valid SR Linux read
 commands is added in the network agent's system prompt. When a device still rejects a command, the

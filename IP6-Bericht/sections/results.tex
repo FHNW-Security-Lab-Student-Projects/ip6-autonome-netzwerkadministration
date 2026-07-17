@@ -50,8 +50,9 @@ The two high-tier models diagnosed 98 of their 100 runs correctly (GPT-5.5 all 5
 per difficulty tier is 70\,\% (baseline), 78\,\% (easy), 54\,\% (medium) and 61\,\% (hard).
 
 At scenario level the misses are not spread evenly. \texttt{duplicate-ip-arp} was solved only by
-the high tier models. Every other model failed it in all five attempts. The scenario \texttt{acl-silent-drop} was
-almost the same (GLM-5.2 1/5, Qwen3.7-Max 2/5, low tier 0/5). The
+the high tier models (GPT-5.5 5/5, Claude Opus 4.8 4/5). Every other model failed it in all five attempts. The scenario \texttt{acl-silent-drop} was
+almost the same (GPT-5.5 5/5, Claude Opus 4.8 4/5, GLM-5.2 1/5, Qwen3.7-Max 2/5, low tier 0/5). These
+two scenarios also account for the only two misses of Claude Opus 4.8. The
 \texttt{mtu-blackhole} scenario (which was classified as hard), was solved in every run by all four high- and mid-tier
 models.
 

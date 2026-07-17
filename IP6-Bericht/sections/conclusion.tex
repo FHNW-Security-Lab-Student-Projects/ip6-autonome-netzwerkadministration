@@ -1,4 +1,48 @@
 \section{Conclusion and Future Work}
 \label{sec:conclusion}
 
-% TODO: Summarize the findings and outline potential future work.
+\subsection{Conclusion}
+
+This project built an AI-driven multi-agent system that troubleshoots network problems by
+splitting and delegating work to specialised sub-agents. This system was used to
+run 300 experiments. The experiments consist of ten fault scenarios across three difficulty tiers, using six models from three
+price tiers, doing five runs each. Every run was scored manually against the known root cause.
+With respect to the research questions from \cref{sec:research-questions}, the experiment
+supports the following answers (within the limitations mentioned in \cref{sec:eval-limitations}).
+
+\begin{enumerate}
+    \item \textbf{Time}: With certain models the system delivers a correct result in two to
+          four minutes. Compared to an
+          estimated 10 minutes to 2 hours of manual work depending on the tier, the saving is
+          small for trivial faults but can be large for more difficult problems. The comparison rests on an
+          estimated manual troubleshooting time. No human trials were done.
+    \item \textbf{Difficulty}: Every difficulty tier was solvable, but only by
+          the high price tier models. Mid-tier models handled the easy tier reliably and failed
+          on harder faults, mostly by hitting the time cap without a result, not by concluding wrongly. The manually
+          assigned tiers predicted model behaviour only partially. 
+    \item \textbf{Success rate}: GPT-5.5 diagnosed 50/50 runs correctly and Claude Opus 4.8
+          48/50. The mid tier reached 74--82\,\% overall (near-perfect on easy, about two
+          thirds on medium and hard). The low tier models were unusable at 16--22\,\%. 
+    \item \textbf{Cost and model choice}: A complete investigation costs \$0.16--\$2.91 in API
+          fees depending on the model, or \$0.21--\$2.91 per correct diagnosis. Against an
+          example rate of CHF 100 per network operator hour, a correct automated diagnosis of a medium or
+          hard fault costs a fraction of the manual equivalent. The model is the deciding factor,
+          the same agent logic spans 16\,\% to 100\,\% success depending only on which model
+          drives it. 
+\end{enumerate}
+
+Overall, using a multi-agent system for network troubleshooting is technically feasible
+today and with a high-tier model the root cause detection was very good (in this lab). The
+open question is whether this holds up in a production network, with more devices, more alarms and multiple faults.
+
+\subsection{Future Work}
+
+The weakest assumption in this evaluation is the estimated manual baseline. A study in which
+network operators troubleshoot the same faults would replace it with measured
+data. The same work could also cover an interactive use case of the agent system, where network operators and agents are working
+together instead of the fully autonomous single-prompt mode measured here. The environment
+should also grow larger with more devices, mixed vendors, several concurrent faults,
+background noise in syslog, and scenarios where the root cause of the problem lies outside the network (DNS, host
+configuration). 
+
+

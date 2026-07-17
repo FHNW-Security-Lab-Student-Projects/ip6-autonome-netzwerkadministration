@@ -1,19 +1,19 @@
 \section{Introduction}
 \label{sec:introduction}
 
-Troubleshooting computer networks is a time-consuming, expertise-intensive and
-largely manual activity. When a service reports a problem or a host loses connectivity, an
+Troubleshooting computer networks is a time-consuming and still largely manual
+activity. When a service reports a problem or a host loses connectivity, an
 engineer needs to consult the available tools and check one device after another, running
-\texttt{show} commands, inspecting interface counters, routing tables, ARP caches
+show commands, inspecting interface counters, routing tables, ARP caches
 and syslog messages until a fault is localised. The path from the first symptom to the true root cause
 often requires a lot of steps and time. As networks
 grow in size and complexity, this diagnostic effort translates directly into
 operational cost and into mean-time-to-repair.
 
 Recent advances in large language models (LLMs) and, in particular, in
-\emph{agentic} systems that let an LLM call external tools, observe the results
+agentic systems that let an LLM call external tools, observe the results
 and decide on the next action, suggest a new way to support this work. Instead of
-a single agent model, a \emph{multi-agent} system can decompose the problem
+a single agent model, a multi-agent system can decompose the problem
 into smaller parts and assign them to specialised agents. 
 Whether such a system can be used to assist in troubleshooting or even find problems autonomously is an open
 and practically relevant question.
@@ -31,13 +31,13 @@ a system, and at what benefit and cost}.
 The project is guided by four research questions:
 
 \begin{enumerate}
-  \item \textbf{Time.} How much time can be saved in troubleshooting by using the
+  \item \textbf{Time}: How much time can be saved in troubleshooting by using the
         agent network compared to a manual workflow?
-  \item \textbf{Difficulty.} Problems of which difficulty level can be
+  \item \textbf{Difficulty}: Problems of which difficulty level can be
         troubleshooted by the agent network?
-  \item \textbf{Success rate.} What is the success rate for the correct analysis
+  \item \textbf{Success rate}: What is the success rate for the correct analysis
         of the problems at each difficulty level?
-  \item \textbf{Cost.} How much can potentially be saved or, conversely, how
+  \item \textbf{Cost}: How much can potentially be saved or, conversely, how
         much does it cost to use an agent network for troubleshooting network
         issues, and how does this depend on the chosen model?
 \end{enumerate}
