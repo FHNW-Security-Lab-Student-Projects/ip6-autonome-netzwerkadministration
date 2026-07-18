@@ -36,11 +36,12 @@ The biggest reason for distributing the work across several agents instead of us
 agent comes from the limitations discussed in \cref{sec:tokens-context-cost}. A single
 agent would have to hold the entire troubleshooting context (all tool definitions, all device output, the full
 conversation history) in one large context window. This approach runs the risk of hitting the context limit fast and
-thereby a degradation of quality through the "lost in the middle" effect (introduced in \cref{sec:tokens-context-cost}). In comparison, when using multiple specialised agents, they receive
+thereby a degradation of quality through the \enquote{lost in the middle} effect (introduced in \cref{sec:tokens-context-cost}). In comparison, when using multiple specialised agents, they receive
 only focused instructions and tools, which keeps the individual contexts small and reduces context-related quality degradation.
 
-Each agent in this architecture is an independent agent loop (see \cref{sec:agent-loop}), it runs its own
-loop over its own context and tools, using the same underlying agent harness. Delegation is itself realised as a
+Each LLM-driven agent in this architecture is an independent agent loop (see \cref{sec:agent-loop}), it runs its own
+loop over its own context and tools, using the same underlying agent harness. (The topology agent is the one
+exception, \cref{sec:tool-layer} explains why it is not LLM-driven.) Delegation is itself realised as a
 tool call, the orchestrator's loop invokes a sub-agent as a tool, the sub-agent runs its own loop to completion and
 returns its result, which the orchestrator then incorporates into its own context.
 
@@ -57,23 +58,23 @@ sub-tasks to the specialised sub-agents, each of which has its own tools.
 
 \subsection{Agent Roles and Responsibilities}
 \label{sec:agent-roles}
-Each agent has a single, defined responsibility and a small, fixed scope. The following roles make
+Each agent has one responsibility and a fixed, narrow scope. The following roles make
 up the system:
 
 \begin{itemize}
-    \item \textbf{Orchestrator (user-facing).} Receives user input and coordinates the sub-agents. It splits
-          the user's goal (task) into sub-tasks and delegates them to the sub-agents and combines their result to a final answer. Since the sub-agents are "stateless" the orchestrator
+    \item \textbf{Orchestrator (user-facing)}: Receives user input and coordinates the sub-agents. It splits
+          the user's goal (task) into sub-tasks and delegates them to the sub-agents and combines their result to a final answer. Since the sub-agents are \enquote{stateless} the orchestrator
           needs to supply all the required information to the sub-agents.
-    \item \textbf{Investigation orchestrator (autonomous).} Coordinates the autonomous syslog event based investigations.
+    \item \textbf{Investigation orchestrator (autonomous)}: Coordinates the autonomous syslog event based investigations.
           It runs the same delegation pattern as the user-facing
           orchestrator without access to the config agent.
-    \item \textbf{Network agent.} Retrieves live device state through read commands.
-    \item \textbf{State-snapshot agent.} Provides historical device state. The state-snapshot agent focuses on information which can't be retrieved via syslog or
+    \item \textbf{Network agent}: Retrieves live device state through read commands.
+    \item \textbf{State-snapshot agent}: Provides historical device state. The state-snapshot agent focuses on information which can't be retrieved via syslog or
           device live state but can be useful for troubleshooting (like past ARP entries or routing tables).
-    \item \textbf{Topology agent.} Supplies the (cached) network topology so other agents can reason about how
-          devices are connected. It compares the "should be" state of the topology with the actual "live" state of the network (via LLDP queries).
-    \item \textbf{Syslog agent.} Queries and analyses syslog data for the entire network.
-    \item \textbf{Configuration agent.} The only agent with \emph{write} access. It is able to apply
+    \item \textbf{Topology agent}: Supplies the (cached) network topology so other agents can reason about how
+          devices are connected. It compares the \enquote{should be} state of the topology with the actual \enquote{live} state of the network (via LLDP queries).
+    \item \textbf{Syslog agent}: Queries and analyses syslog data for the entire network.
+    \item \textbf{Configuration agent}: The only agent with \emph{write} access. It is able to apply
           configuration changes to devices.
 \end{itemize}
 
@@ -88,11 +89,13 @@ This split up of expertise is a design choice that supports the architecture of
 \cref{sec:architecture}. It keeps every agent's tool definitions, and therefore its context small and precise.
 
 Not every agent follows this pattern. Two agents, the topology agent and the state-snapshot agent,
-do not use an MCP server. Their tools are defined directly inside the agent framework as native
-function tools. The reason is that they use a background task running inside the
-application process itself, which collects and caches information (topology and device state). Their tools therefore only read state that already lives in the same process. Sending such calls
-through an MCP server would introduce an additional process boundary and serialization overhead without any
-of the benefits described in \cref{sec:mcp}. MCP-based tools biggest value is reusability, while in-process tools don't require serialization.
+do not use MCP servers. Their tools are defined directly inside the agent framework as native
+function tools, because both read state that a background task inside the same process already
+collects and caches (topology and device state). Sending such calls through an MCP server would
+add a process boundary and serialization overhead without any of the benefits described in
+\cref{sec:mcp}. The topology agent goes one step further. As \cref{sec:impl-delegation} describes,
+it has no model and no agent loop at all. The state-snapshot agent is a
+regular Pydantic AI agent, only its tools are in-process.
 
 \subsection{LLM-Tier Concept}
 \label{sec:model-tier-concept}
@@ -118,17 +121,19 @@ purpose is to answer whether an autonomous, event-driven investigation is possib
 can be integrated into the network operator's workflow. It
 builds on the autonomous investigation orchestrator introduced in \cref{sec:agent-roles}. 
 
-\paragraph{Autonomous reaction to syslog events.}
+\paragraph{Autonomous reaction to syslog events}
 The first question is whether the system can react to the network on its own. Instead of waiting for a human
 to describe a symptom, the system observes the incoming syslog events and, when a message matches the configured pattern, an automatic investigation is launched. The autonomous investigation
 orchestrator then follows the same pattern as the user-facing orchestrator with the exception of not having access to the configuration agent.
 It is also designed so investigations cannot be opened recursively. The result is a self-contained initial report produced from a syslog event without any human
 involvement.
 
-\paragraph{Handover without duplicating work.}
-The second question concerns what happens after an autonomous investigation has run. An autonomous
-report may be incomplete needs to be further investigated by a human (network operator). The operator must therefore be able to take over and continue troubleshooting from the
-point the autonomous investigation reached, while having the already investigated work in the context. The concept addresses this by treating the
-autonomous investigation's findings as reusable context (with a unique ID) that is handed to the user-facing orchestrator when
-the operator resumes the case, so that the interactive session continues from the existing state instead of
-starting from scratch. How this hand-over is realised concretely is described in \cref{sec:implementation}.
+\paragraph{Handover without duplicating work}
+The second question concerns what happens after an autonomous investigation has run. Such an
+autonomous report may be incomplete and need further investigation by a human (network operator).
+The operator must therefore be able to take over and continue troubleshooting from the point the
+autonomous investigation reached, without repeating the work it already did. The concept addresses
+this by keeping the autonomous investigation's findings as reusable context (with a unique ID). When
+the operator resumes the case, this context is fed back into the same investigation orchestrator that
+produced it, so the case continues from its existing state instead of starting from scratch. How this
+hand-over is realised concretely is described in \cref{sec:implementation}.

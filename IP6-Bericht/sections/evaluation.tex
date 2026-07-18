@@ -31,7 +31,7 @@ misses have a completely different cause, runs that ended without any investigat
 The nominally hard
 \texttt{mtu-blackhole} scenario was not a problem for them, so the manually
 assigned difficulty tiers only partially predicts what the models actually struggle with.
-There was no characteristic indentified, which determines if some scenario is truly difficult for an LLM or not. 
+No single characteristic was identified that reliably predicts whether a scenario is truly difficult for an LLM.
 
 
 \paragraph{Low tier} DeepSeek-V3.2 and Ministral-14B are not usable for this task (network troubleshooting) based on the results, and they
@@ -45,9 +45,9 @@ fault that did not exist in 3 of its 5 (\cref{sec:results-correctness}). In real
 false alarms would cost engineer time instead of saving it.
 
 The combined per-tier success rates (70--78\,\% baseline/easy, 54--61\,\% medium/hard) mostly
-reflects the different models that the difficutly tiers. The split by model in
-\cref{tab:found-rate-tier} is the more informative view, and it shows that the success rate
-depends far more on the model than on the scenario difficutly.
+reflect how the six models happen to be distributed across tiers, not the tiers themselves. The
+split by model in \cref{tab:found-rate-tier} is the more informative view, and it shows that the
+success rate depends far more on the model than on the scenario difficulty.
 
 \subsection{Time to Diagnosis}
 \label{sec:eval-time}
@@ -58,8 +58,8 @@ and someone has to notice and correct them. By this metric a correct
 diagnosis takes about two minutes with Claude Opus 4.8, three with GPT-5.5 and four to
 four-and-a-half with the mid-tier models. Ministral's one-minute looks impressive but
 covers only the 8 runs it got right, and DeepSeek's correct runs took over seven minutes. The
-time also almost does not increases with difficulty. For the high-tier models a hard scenario takes about a
-minute longer than an easy one (\cref{sec:results-time}).
+time also almost does not increases with difficulty. For the high-tier models a hard scenario takes only
+about 40--50 seconds longer than an easy one (\cref{sec:results-time}).
 
 Part of why the wall-clock time stays this low is the parallelism of the architecture. For
 every model, the LLM inference time summed over all round-trips exceeds the wall-clock time of
@@ -93,31 +93,31 @@ diagnosis has no value.
 Per correct diagnosis, GLM-5.2 is the cheapest usable option at \$0.21, Claude Opus 4.8 costs
 \$1.22 and GPT-5.5 \$2.91. DeepSeek-V3.2 illustrates why cost per run is misleading on its own,
 it is as cheap as GLM-5.2, but because it rarely succeeds, each correct answer
-effectively costs three times as much. In the cost--success plane of
-\cref{fig:cost-vs-correctness}, the found rate rises monotonically with cost, so no model is
-dominated outright; the useful part of the frontier, however, runs from GLM-5.2 over
-Qwen3.7-Max and Claude Opus 4.8 to GPT-5.5; the two low-tier models are cheaper still, but
-at found rates too low to be usable.
+effectively costs three times as much. In the cost--success plane of \cref{fig:cost-vs-correctness}, the found rate rises monotonically
+with cost. So every model buys some amount of additional found rate for its extra cost and none
+is simply worse on both axes than a cheaper one. The two low-tier models are very cheap, but their
+found rate is too low to be usable.
 
-\paragraph{A rough saving estimate} As an example we assume the cost of CHF 100 per network operator hour. 
+\paragraph{A saving estimate} As an example we assume the cost of CHF 100 per network operator hour. 
 With the manual-time estimates from \cref{sec:eval-time}, diagnosing a medium fault
 manually costs around CHF 50--100 and a hard one CHF 100--200. The same diagnosis by the agent
 system costs \$1--3 in API fees with a high-tier model plus a few minutes of network operator time to
 read and verify the report. Estimate it CHF 10--15 in total. Even under these assumptions
-the potential saving per medium or hard incident is about a factor of five to ten. The
+the potential saving per medium or hard incident is roughly a factor of three to ten, depending on
+the tier and the assumed manual time. The
 saving comes mostly from the replaced network operator time. The choice of model matters little here (in terms of cost),
 since the API fee is small compared to a single network operator hour either way. This is an
-illustration rather than an evidence based measurement (because the operator hours are just esitmates). 
+illustration rather than an evidence-based measurement, because the operator hours are only estimates.
 
 \paragraph{Price volatility} Two constraints apply to the cost figures. First, they are
 modelled from token counts and the models' advertised OpenRouter prices at run time and not from
 OpenRouters billing system. Provider routing and prompt caching can make the billed amount differ, typically
 downward because cached prompt tokens are not billed from a provider that applies caching.
 Caching was therefore excluded deliberately from the cost calculation because its availability varies by provider and models and is often
-best-effort, which would have made the cross-model comparison depend on routing luck and if a model even does implicit caching.
+best-effort, which would have made the cross-model comparison depend on routing luck and on whether a model even does implicit caching.
 Second, OpenRouter prices are volatile (based on provider) especially for open models, where multiple providers compete for the
 same model. During the window the experiments were run, GLM-5.2's input price
-moved from \$0.95 to \$0.93 per million tokens. Three days after GLM-5.2's last run, on 6 July
+moved from \$0.95 to \$0.94 and then \$0.93 per million tokens (\cref{app:model-prices}). Three days after GLM-5.2's last run, on 6 July
 2026, its advertised price was about 27\,\% lower than what the runs were logged at. The proprietary models
 (Opus 4.8, GPT-5.5, Qwen3.7-Max) kept a constant list price throughout. The exact rates in effect
 were recovered from the logs and are listed in \cref{app:model-prices}. Repricing the entire
@@ -127,34 +127,35 @@ are robust to this change.
 \subsection{Influence of the Model}
 \label{sec:eval-model}
 
-Across all metrics, model choice dominates every other factor, including the scenario difficulty. The found rate
+Across all metrics, model choice is a bigger factor than scenario difficulty. The found rate
 spans 16\,\% to 100\,\% across the model price tiers, while within one model the difference between
 easy and hard scenarios is comparatively small. The price tiers from \cref{sec:model-tier-concept}
-translate into three distinct behaviours. The high tier (Opus 4.8, GPT-5.5) deliver
-almost pefect success on every difficulty tier. They also invent no faults on the healthy network baseline and
-produced the fastest correct diagnoses, at \$1.22--\$2.91 per correct diagnosis versus
-\$0.21--\$0.55 for the mid tier models. About 2--14 times as much depending on the pairing. The
+translate into three distinct behaviours. The high tier (Opus 4.8, GPT-5.5) reaches
+near-perfect success on every difficulty tier, at \$1.22--\$2.91 per correct diagnosis versus
+\$0.21--\$0.55 for the mid tier, roughly 2--14 times as much depending on the pairing. It also
+invents no faults on the healthy baseline. The
 mid tier (GLM-5.2, Qwen3.7-Max) is the cost-effectiveness sweet spot for easy faults, but
-have misses in the hard-tier faults, mostly by hitting the 600-second
-cap on exactly those scenarios (8 DNFs each) instead of giving a wrong answer. 
-(DeepSeek-V3.2, Ministral-14B) are not usable, one model is too slow to finish, the other fast
-but most of the time wrong, and both are unreliable on the healthy baseline scenario.
+its 8 DNFs per model are concentrated on \texttt{duplicate-ip-arp} (medium tier) and
+\texttt{acl-silent-drop} (hard tier), with a few more spread across the baseline and easy
+scenarios. In almost all of these misses the model ran out of time rather than answering wrongly.
+The low tier
+(DeepSeek-V3.2, Ministral-14B) is not usable, one model is too slow to finish, the other fast
+but most of the time wrong and both are unreliable on the healthy baseline scenario.
 
-The models also differ in how they work, not only in what they achieve. GPT-5.5 owes its
-perfect found rate to heavy tool use, a mean of 124 tool calls and 375\,000 normalized input tokens
+The models also took different paths to their results. GPT-5.5 reaches its
+perfect found rate with heavy tool use, a mean of 124 tool calls and 375\,000 normalized input tokens
 per run (\cref{fig:tool-calls}, \cref{fig:token-usage}). Claude Opus 4.8 reaches a nearly
 identical rate with about a third of the tool calls and less than a quarter of the input
-tokens. This difference in tokens used, not only
-the price per token, drives the gap in cost per correct diagnosis (\$2.91 versus \$1.22). Even
-at identical token prices, GPT-5.5 would remain the more expensive diagnosis.
+tokens. This gap in tokens used is what mainly
+drives the difference in cost per correct diagnosis (\$2.91 versus \$1.22) -- the two models are
+priced similarly per token, so GPT-5.5 would remain more expensive even at Opus 4.8's token price.
 
 Robustness follows the same ordering with one exception, the number of malformed device commands
 per run (\cref{sec:results-cost}) is lowest for Ministral and the high tier and by far the
 highest for Qwen3.7-Max. Ministral's low count, is partly a consequence of its short
 runs, the model issues few commands has few opportunities to use an invalid one. The ability
 to issue syntactically valid commands and the ability to
-diagnose correctly appear to be independent. The practical consequence is that, with the agent
-logic fixed, the choice of model alone decides whether the agent system is usable as a network troubleshooting system. 
+diagnose correctly appear to be independent.
 
 \subsection{Limitations}
 \label{sec:eval-limitations}
@@ -174,7 +175,7 @@ autonomous mode.
 
 Three restrictions have to be concerned regarding the measurements. The time and cost savings compare against an estimate
 of how long an engineer would need. No human trials were run. Each scenario--model pair was
-repeated only five times, so a single run more or less shifts by 20 precent.
+repeated only five times, so a single run more or less shifts a rate by 20 percentage points.
 And the decisions were taken (if a run was successful or a miss) by one person against a fixed criterion. Borderline answers
 could be judged differently by another person.
 
@@ -188,7 +189,7 @@ Secondly, runs were capped at 600 seconds, and this cap does not weigh equally o
 Token generation speed differs between models, and for the open-weight models it
 is partly a property of the serving provider (compute power) rather than of the model itself. A slowly served
 model reaches the time limit, without being able to do as much work as a fast one, independent
-of its diagnostic ability. DeepSeek-V3.2 is the clearest case, its timeouts can for a big par be contributed to a slow
+of its diagnostic ability. DeepSeek-V3.2 is the clearest case, a large part of its timeouts can be attributed to a slow
 token generation rather than from a deeper investigation (\cref{sec:eval-time}), so its low
 found rate partly reflects serving speed instead of only diagnostic capability. Its true time
 and success numbers beyond the cap are unknown (more than half of its runs were cut off). Token and cost figures for DNF

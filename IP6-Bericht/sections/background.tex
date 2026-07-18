@@ -3,7 +3,7 @@
 This section gives the necessary background information about the technologies used in this work.
 
 \subsection{Agents and AI Agents}
-// TODO
+This subsection first defines the traditional term \emph{AI Agent} and then the newer \emph{AI Agent}.
 
 \subsubsection{Agent}
 From a very basic perspective, an agent is an entity which is able to produce some effect or make changes in its
@@ -11,7 +11,7 @@ environment \parencite{CASTELFRANCHI1998157}.
 
 \subsubsection{AI Agent}
 \label{sec:AI_Agent}
-With the rise of generative AI a new term "AI Agent" has emerged.
+With the rise of generative AI a new term \enquote{AI Agent} has emerged.
 An AI Agent is a piece of software that works towards a goal it has been given.
 It takes in information from its environment (structured or not), reasons about what it sees and then
 acts to get closer to that goal. A traditional agent executes a predetermined, deterministic
@@ -23,14 +23,10 @@ agent are made by an LLM (see \cref{sec:LLMs}) \parencite{Sapkota_2026}.
 
 \subsection{Large Language Models (LLMs)}
 \label{sec:LLMs}
-Large Language Models (LLMs) are an evolution
- in artificial intelligence, moving from
- rule-based systems to general-purpose generative models. An LLM is essentially
- a complex statistical system designed to predict the likelihood of
- a sequence of words. By training on massive amounts of text, often
- using lots of data from the public internet, these
- models learn to generate coherent and contextually appropriate
- continuations for a given input prompt \parencite{douglas2023largelanguagemodels}.
+An LLM is a statistical model that predicts the likelihood of the next token in
+a sequence of text. Trained on very large text corpora, largely taken from the
+public internet, it learns to produce plausible continuations for a given input
+prompt \parencite{douglas2023largelanguagemodels}.
 
 
 \subsection{Tokens, Context Windows and Cost}
@@ -43,8 +39,8 @@ Each model can only process a limited number of tokens at once. This upper bound
 response. Beyond being a hard limit, longer contexts also degrade the quality of the model's output:
 \textcite{liu-etal-2024-lost} show that models use information most reliably when it appears at the beginning or the
 end of the context and perform noticeably worse when relevant information is located in the middle, a
-phenomenon known as "lost in the middle". The degradation is not only a question of \emph{where} relevant
-information sits, but also of \emph{how much} context surrounds it: \textcite{hong2025context} evaluate a
+phenomenon known as \enquote{lost in the middle}. The degradation also depends on \emph{how much} context
+surrounds the relevant information, not only on \emph{where} it sits: \textcite{hong2025context} evaluate a
 range of state-of-the-art models on deliberately simple tasks and find that performance declines as the input grows longer, even when the task itself does not become harder. These two properties, the finite context window and the
 degradation over long contexts, are a central motivation for distributing work across several specialised
 agents rather than handling everything in a single, ever-growing context (see \cref{sec:multi-agent}).
@@ -74,7 +70,7 @@ LLMs have great generative capabilities but they lack the ability to perform any
 This means LLMs are not able to retrieve any external information in real time.
 Everything the model knows comes from its static training data, so an answer can sound convincing
 while actually being wrong or simply out of date, a behaviour commonly called hallucination \parencite{Qu_2025}.
-To address this limitation a paradigm named "Function Calling" has been developed. 
+To address this limitation a paradigm named \enquote{Function Calling} has been developed.
 It solves these problems by giving LLMs the ability to interact with external systems by invoking predefined blocks of code (functions) \parencite{wang2026FunctionCalling}.
 
 \subsubsection{Function Calling process example using OpenAI API}
@@ -83,7 +79,7 @@ The following image illustrates the function calling principle using the OpenAI 
 \begin{enumerate}
     \setlength{\itemsep}{8pt}
     \item The prompt message and all the tool definitions are sent to the model.
-    \item Based on the provided prompt and tools the model decides to call some function, providing the necessary arguments (in this example "paris").
+    \item Based on the provided prompt and tools the model decides to call some function, providing the necessary arguments (in this example \enquote{paris}).
     \item The function chosen by the model is executed.
     \item All prior messages together with the result (output) of the function execution are sent back to the model.
     \item Based on all the messages the model gives back a final response \parencite{openai_function_calling}.
@@ -110,8 +106,8 @@ repetition is captured by the term \emph{agent loop}, the core control cycle of 
 context, decides on an action (either calling a tool or producing a final answer), the chosen tool is executed, its
 result is appended to the context, and the cycle repeats until the model returns a final answer or a stop condition is
 reached \parencite{yao2023reactsynergizingreasoningacting,anthropic_effective_agents,strands_agent_loop}. These steps of reasoning and acting were introduced
-as the \emph{ReAct} pattern by \textcite{yao2023reactsynergizingreasoningacting}. The agent loop elevates a sequence of isolated
-function calls into goal-oriented behaviour that adapts to what the model observes while running, as introduced in
+as the \emph{ReAct} pattern by \textcite{yao2023reactsynergizingreasoningacting}. The agent loop is what turns isolated
+function calls into the adaptive, goal-oriented behaviour of an AI Agent as introduced in
 \cref{sec:AI_Agent}.
 
 \Cref{fig:agent-loop} shows this cycle: an initial input and context enter the loop, the model reasons and selects a
@@ -173,7 +169,7 @@ external system is exposed through an MCP server once. This reduces the integrat
 from a multiplicative $N \times M$ to an additive $N + M$ \parencite{mcp_nxm}.
 
 As illustrated in \cref{fig:mcp_architecture-overview}, MCP functions similarly to a
-"USB-C port for AI applications," providing a standardised way to connect AI
+\enquote{USB-C port for AI applications}, providing a standardised way to connect AI
 applications to external systems \parencite{mcp_intro}.
 
 \begin{figure}[htbp]

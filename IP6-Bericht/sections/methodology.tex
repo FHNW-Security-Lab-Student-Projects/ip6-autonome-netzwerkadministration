@@ -28,20 +28,20 @@ A scenario consists of:
     \item \texttt{setup.sh}: Injects the fault before the queries are sent.
     \item \texttt{teardown.sh}: Restores the baseline after experiment is done.
     \item \texttt{queries.txt}: The open-ended troubleshooting prompt given to the
-          orchestrator (for example "investigate the root cause"), giving no hint about where to look.
+          orchestrator (for example \enquote{investigate the root cause}), giving no hint about where to look.
     \item \texttt{ground\_truth.yaml}: A description of the true fault (root cause), used
           as the reference during manual evaluation (\cref{sec:evaluation-procedure}).
 \end{itemize}
 
 \subsubsection{Difficulty Criteria}
 \label{sec:difficulty-criteria}
-Difficulty is defined by how an agent needs to do from the obvious first check to reach the
-root cause. A fault being visible in syslog does not by itself make a fault easy. Three properties affect it, first whether the obvious
-signal tells the truth or is misleading (for example a link that is up while BGP is down). The second aspect is how far the fault hides
-from the symptom (for example the fault not being close to where the ), and how many
-signals must be correlated (a single \texttt{show} command versus comparing two route tables or varying a
-packet size). A secondary factor is how many plausible wrong answers exist, since a "no problem found"
-conclusion must count as a miss when the network is in fact broken.
+Difficulty is defined by how far an agent has to go from the obvious first check to reach the
+root cause. A fault being visible in syslog does not by itself make a fault easy. Three properties affect
+it: first, whether the obvious signal tells the truth or is misleading (for example a link that is up
+while BGP is down), second, how far the fault hides from the symptom (how many devices or layers
+lie between where the symptom shows and where the fault actually sits). Lastly, how many signals must
+be correlated (a single show command versus comparing two route tables or varying a packet
+size). 
 
 \subsubsection{Scenario Catalogue}
 \label{sec:scenario-catalogue}
@@ -78,9 +78,9 @@ The following paragraphs describe each scenario in \cref{tab:scenarios}: the fau
 \cref{sec:difficulty-criteria}.
 
 \paragraph{Baseline}
-\texttt{basic-client-communication} injects no fault, the network is healthy and all three
-clients can reach each other. The scenario verifies that the system confirms full reachability
-and does not invent a fault with is not there. This is a check against hallucinated
+\texttt{basic-client-communication} injects no fault, the network is healthy and the query asks
+the agent system if client1, client2 and client3 can reach each other. The scenario checks that the system reports full
+reachability and does not invent a fault that is not there. This is a check against hallucinated
 faults.
 
 \paragraph{Easy tier}
@@ -133,7 +133,7 @@ healthy.
     \item[\texttt{acl-silent-drop}] An ingress ACL on router2 silently drops ICMP traffic
           from client1's subnet. Routing and BGP are fully healthy. The drop
           happens in the data plane, the agent has to think and check counters or inspect for a specific configuration.
-          There is no syslog entry which get's triggered when an ACL entry is hit.
+          There is no syslog entry triggered when an ACL entry is hit.
     \item[\texttt{one-way-route-filter}] A BGP import policy on router1 rejects
           client3's prefix. The session is Established and router2 still
           learns client1's prefix, so every single-device check passes. The fault shows up only as an
@@ -160,10 +160,10 @@ tiers, with two models per tier:
 \end{itemize}
 
 The full matrix is the cross product of all scenarios and all models, with each combination
-repeated $R$ times because of the non-deterministic nature of the models. The same model is used
-across all agents. A wall-clock cap per run limits cost and time. A run that exceeds the cap is
-recorded as \emph{did-not-finish} (DNF) while keeping the statistics of any sub-agents that already
-completed.
+repeated 5 times because of the non-deterministic nature of the models. The same model is used
+across all agents. A wall-clock cap of 600 seconds per run limits cost and time. A run that exceeds
+the cap is recorded as \emph{did-not-finish} (DNF) while keeping the statistics of any sub-agents that
+already completed.
 
 \subsection{Experiment Execution}
 \label{sec:experiment-execution}
@@ -186,12 +186,13 @@ Each run follows the same procedure to guarantee a clean, comparable starting po
           contaminated. Additionally the containerlab is re-deployed between every run.
 \end{enumerate}
 
-One property of this setup matters for interpreting the results. Every run is \emph{describe once, then run}. The
-orchestrator receives a single symptom description (very broad) and is explicitly instructed not to ask for
+One property of this setup matters for interpreting the results. Each run gets a single, broad symptom
+description and no follow-up. The
+orchestrator receives this description and is explicitly instructed not to ask for
 further information. From there the system (multi-agent network) has to work autonomously to a final answer. This
 restriction exists because the matrix runs automated. There is no human who could reply.
-Real operation would be interactive, a network operator could answer clarifying questions, add
-observations, or direct the agents to check something specific. The experiments
+Real operation would be interactive, with a network operator able to guide the investigation.
+\Cref{sec:eval-limitations} discusses what this restriction likely costs in success rate. The experiments
 measure the system in its most restricted mode of use.
 
 Correctness for the experiments is scored separately (based on the final result of the orchestrator agent)
@@ -228,12 +229,13 @@ questions:
 \label{sec:evaluation-procedure}
 Correctness is scored manually. There is no LLM judge. Only the \textbf{final answer of each run} is
 evaluated. For each run the
-agent's final answer is compared to the scenario's root cause and decide if was \emph{found} or \emph{missed}. For the baseline scenario, correctly reporting the network
+agent's final answer is compared to the scenario's root cause and classified as \emph{found} or
+\emph{missed}. For the baseline scenario, correctly reporting the network
 as healthy counts as \emph{found}.
 
 The decision as to whether the root cause was correctly found is up to the human (author of this work) looking at the final answer of the agent (orchestrator).  
 
 \subsection{Aggregation}
 \label{sec:aggregation}
-The results of the evaluation is presented in \cref{sec:results} to, answer the 
-research questions across different models.
+The results of the evaluation are presented in \cref{sec:results} and used to answer the
+research questions across the different models in \cref{sec:evaluation}.

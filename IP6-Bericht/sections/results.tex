@@ -142,7 +142,8 @@ deepseek-v3.2      & 22\,\%  & 442 & 0.14  & 0.64 & 38 \\
 ministral-14b-2512 & 16\,\%  & 57  & 0.01  & 0.07 & 0  \\
 \bottomrule
 \end{tabular}
-\caption{Per-model summary over all 50 runs each.}
+\caption{Per-model summary. Found rate, cost/run and DNF count are over all 50 runs.  Median
+time to correct and cost/correct are over the correct, finished runs only.}
 \label{tab:model-summary}
 \end{table}
 
@@ -179,8 +180,8 @@ deviation.}
 The number of tool calls per run, shown in \cref{fig:tool-calls}, shows the same picture as input
 tokens (they correlate). GPT-5.5 issued by far the most calls (mean 124 per run), followed by Qwen3.7-Max (98),
 GLM-5.2 and DeepSeek-V3.2 (60 and 59) and Claude Opus 4.8 (46). Ministral-14B stopped after a
-mean of 24 calls. GPT-5.5's perfect found rate thus rests on roughly 2.7 times as many tool
-calls as Opus 4.8 needed for a nearly identical rate. Ministral-14B's low count means it did not retrieve a lot of information (by calling tools) before
+mean of 24 calls. GPT-5.5 needed about 2.7 times as many tool
+calls as Opus 4.8 to reach a nearly identical found rate. Ministral-14B's low count means it did not retrieve a lot of information (by calling tools) before
 giving a final result.
 
 \begin{figure}[H]
