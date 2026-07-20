@@ -47,6 +47,7 @@ Using a multi-agent system for network troubleshooting is technically feasible t
 high-tier model, root-cause detection was very good in this lab. Whether this holds up in a
 production network, with more devices, more alarms and multiple faults, remains open.
 
+\newpage
 \subsection{Future Work}
 
 The weakest assumption in this evaluation is the estimated manual baseline. A study in which
@@ -56,5 +57,31 @@ together instead of the fully autonomous single-prompt mode measured here. Futur
 should also use a larger environment: more devices, mixed vendors, several concurrent faults,
 background noise in syslog, and scenarios where the root cause of the problem lies outside the network (DNS, host
 configuration).
+
+A second thing is the harness itself. The experiments varied the model while the harness
+stayed fixed, but the harness is a system of its own. One technique that was not applied in this
+work is \emph{agent skills}. They package instructions and reference material that an agent
+discovers through a name and a short description, whose full content is loaded into the
+context only when the task requires it. This is a principle called \emph{progressive
+disclosure} \parencite{anthropic_agent_skills}. Further harness-side improvements are explicit prompt caching (for models which allow client side steering), which would
+lower the real API cost per run (the cost metric of \cref{sec:metrics} deliberately prices
+uncached tokens). Additionally a finer history compaction that summarises older tool returns instead of
+replacing them entirely (\cref{sec:impl-context}).
+
+Three further experiments follow directly from the findings. The first is a check of the
+architecture itself. The multi-agent design was never compared against a single agent holding
+all tools in one context. Running the matrix with such a flattened variant would show whether
+the decomposition of \cref{sec:architecture} contributes to the success rate or whether the
+model would perform equally well without it. 
+
+The second is a sensitivity analysis of the wall-clock cap. 
+The mid-tier models failed mostly by hitting the 600-second cap without a
+result (\cref{sec:eval-limitations}), so their measured success rate depends partly on where
+the cap sits. Repeating the failed combinations with a higher cap would show better where the limits of these models are.
+
+The third is mixed-model configurations. In the
+experiments the same model was used across all agents (\cref{sec:experiments}), although the
+sub-agents work on narrower tasks than the orchestrator. A configuration with a high-tier
+orchestrator and cheaper sub-agent models was not tested.
 
 
