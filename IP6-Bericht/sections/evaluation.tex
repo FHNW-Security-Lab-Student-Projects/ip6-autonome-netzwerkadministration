@@ -18,7 +18,7 @@ Three patterns stand out in the correctness numbers
 difficulty tiers for the problems barely matter for GPT-5.5 and Claude Opus 4.8. Hard scenarios such as the MTU
 blackhole or the one-way route filter were found as reliably as a downed interface. Within this
 lab, the answer to the difficulty question is that all difficulty tiers from the defined scenarios can be
-troubleshooted, but only by the most expensive models.
+troubleshooted, but only the most expensive models handle every tier reliably.
 
 \paragraph{Mid tier} GLM-5.2 and
 Qwen3.7-Max are reliable on easy faults, handling that tier almost perfectly (28 of 30 runs),
@@ -103,7 +103,7 @@ With the manual-time estimates from \cref{sec:eval-time}, diagnosing a medium fa
 manually costs around CHF 50--100 and a hard one CHF 100--200. The same diagnosis by the agent
 system costs \$1--3 in API fees with a high-tier model plus a few minutes of network operator time to
 read and verify the report. Estimate it CHF 10--15 in total. Even under these assumptions
-the potential saving per medium or hard incident is roughly a factor of three to ten, depending on
+the potential saving per medium or hard incident is roughly a factor of three to twenty, depending on
 the tier and the assumed manual time. The
 saving comes mostly from the replaced network operator time. The choice of model matters little here (in terms of cost),
 since the API fee is small compared to a single network operator hour either way. This is an
@@ -190,7 +190,8 @@ Token generation speed differs between models, and for the open-weight models it
 is partly a property of the serving provider (compute power) rather than of the model itself. A slowly served
 model reaches the time limit, without being able to do as much work as a fast one, independent
 of its diagnostic ability. DeepSeek-V3.2 is the clearest case, a large part of its timeouts can be attributed to a slow
-token generation rather than from a deeper investigation (\cref{sec:eval-time}), so its low
+token generation rather than from a deeper investigation, its tool-call count is close to
+GLM-5.2's (\cref{fig:tool-calls}) while far more of its runs hit the cap, so its low
 found rate partly reflects serving speed instead of only diagnostic capability. Its true time
 and success numbers beyond the cap are unknown (more than half of its runs were cut off). Token and cost figures for DNF
 runs are even a bit undercounted. Usage is recorded only when an agent run returns, so the cap

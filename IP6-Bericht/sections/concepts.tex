@@ -41,7 +41,7 @@ only focused instructions and tools, which keeps the individual contexts small a
 
 Each LLM-driven agent in this architecture is an independent agent loop (see \cref{sec:agent-loop}), it runs its own
 loop over its own context and tools, using the same underlying agent harness. (The topology agent is the one
-exception, \cref{sec:tool-layer} explains why it is not LLM-driven.) Delegation is itself realised as a
+exception, \cref{sec:impl-delegation} explains why it is not LLM-driven.) Delegation is itself realised as a
 tool call, the orchestrator's loop invokes a sub-agent as a tool, the sub-agent runs its own loop to completion and
 returns its result, which the orchestrator then incorporates into its own context.
 
@@ -81,8 +81,8 @@ up the system:
 \subsection{Tool and Capability Layer}
 \label{sec:tool-layer}
 Agents gain the ability to interact with the outside environment through the function-calling mechanism described in
-\cref{sec:func-calling}, exposed via the Model Context Protocol introduced in \cref{sec:mcp}. Each
-agent is served by its own MCP server, so every agent only gets the tools that are required
+\cref{sec:func-calling}, exposed via the Model Context Protocol introduced in \cref{sec:mcp}. Most
+agents are served by their own MCP server, so every agent only gets the tools that are required
 for its specific task.
 
 This split up of expertise is a design choice that supports the architecture of

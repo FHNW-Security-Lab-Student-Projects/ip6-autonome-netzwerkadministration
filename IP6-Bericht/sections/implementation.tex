@@ -12,9 +12,10 @@ exposes the tools of each agent.
 
 Every LLM-driven agent of \cref{sec:agent-roles} is one Pydantic AI agent, defined by four things, a
 name, an instruction text (its system prompt), a model and tools. The only exception is the topology
-agent, which has no model and is described separately below. The entire multi-agent system runs in a
+agent, which has no model and is described separately below. All agents run in a
 single Python process. Agents are plain objects that call each other directly. There is no network protocol
-or separate service per agent. At the start of the project, the plan was to use the A2A
+or separate service per agent, only the MCP tool servers of \cref{sec:impl-tools} run as separate
+subprocesses. At the start of the project, the plan was to use the A2A
 protocol\footnote{Agent2Agent (A2A), an open protocol for communication between AI agents,
 \url{https://a2a-protocol.org/}.} for communication between the agents. This would have allowed the agents
 to run in separate processes or even on different machines. A2A was dropped because it would have added
