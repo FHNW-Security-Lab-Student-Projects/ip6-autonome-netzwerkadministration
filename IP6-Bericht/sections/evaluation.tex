@@ -4,7 +4,7 @@
 The results of \cref{sec:results} are interpreted here with focus on the four research
 questions from \cref{sec:research-questions}. One caveat applies to everything, the test
 lab is small, with four SR Linux nodes, four clients and only one injected fault at a
-time. Additionally each problem is only described by one open prompt, there is not real human interacting (giving directions or generally more information)
+time. Additionally each problem is only described by one open prompt, there is no real human interacting (giving directions or generally more information)
 with the agent system. The results show what the system can do in such an environment. This work does not claim the same results would be achieved for
 large enterprise networks (see \cref{sec:eval-limitations}).
 
@@ -18,7 +18,7 @@ Three patterns stand out in the correctness numbers
 difficulty tiers for the problems barely matter for GPT-5.5 and Claude Opus 4.8. Hard scenarios such as the MTU
 blackhole or the one-way route filter were found as reliably as a downed interface. Within this
 lab, the answer to the difficulty question is that all difficulty tiers from the defined scenarios can be
-troubleshooted, but only the most expensive models handle every tier reliably.
+troubleshot, but only the most expensive models handle every tier reliably.
 
 \paragraph{Mid tier} GLM-5.2 and
 Qwen3.7-Max are reliable on easy faults, handling that tier almost perfectly (28 of 30 runs),
@@ -58,7 +58,7 @@ and someone has to notice and correct them. By this metric a correct
 diagnosis takes about two minutes with Claude Opus 4.8, three with GPT-5.5 and four to
 four-and-a-half with the mid-tier models. Ministral's one-minute looks impressive but
 covers only the 8 runs it got right, and DeepSeek's correct runs took over seven minutes. The
-time also almost does not increases with difficulty. For the high-tier models a hard scenario takes only
+time also almost does not increase with difficulty. For the high-tier models a hard scenario takes only
 about 40--50 seconds longer than an easy one (\cref{sec:results-time}).
 
 Part of why the wall-clock time stays this low is the parallelism of the architecture. For
@@ -152,8 +152,8 @@ priced similarly per token, so GPT-5.5 would remain more expensive even at Opus 
 
 Robustness follows the same ordering with one exception, the number of malformed device commands
 per run (\cref{sec:results-cost}) is lowest for Ministral and the high tier and by far the
-highest for Qwen3.7-Max. Ministral's low count, is partly a consequence of its short
-runs, the model issues few commands has few opportunities to use an invalid one. The ability
+highest for Qwen3.7-Max. Ministral's low count is partly a consequence of its short
+runs: a model that issues few commands has few opportunities to use an invalid one. The ability
 to issue syntactically valid commands and the ability to
 diagnose correctly appear to be independent.
 

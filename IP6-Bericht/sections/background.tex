@@ -74,7 +74,7 @@ To address this limitation a paradigm named \enquote{Function Calling} has been 
 It solves these problems by giving LLMs the ability to interact with external systems by invoking predefined blocks of code (functions) \parencite{wang2026FunctionCalling}.
 
 \subsubsection{Function Calling process example using OpenAI API}
-The following image illustrates the function calling principle using the OpenAI function calling API as an example. The function calling API is an optional part of the new \emph{Responses API} or the older \emph{Chat Completions API} \parencite{openai_responses_create,openai_function_calling}.
+\Cref{fig:function-calling-procedure} illustrates the function calling principle using the OpenAI function calling API as an example. The function calling API is an optional part of the new \emph{Responses API} or the older \emph{Chat Completions API} \parencite{openai_responses_create,openai_function_calling}.
 
 \begin{enumerate}
     \setlength{\itemsep}{8pt}
@@ -169,8 +169,8 @@ external system is exposed through an MCP server once. This reduces the integrat
 from a multiplicative $N \times M$ to an additive $N + M$ \parencite{mcp_nxm}.
 
 As illustrated in \cref{fig:mcp_architecture-overview}, MCP functions similarly to a
-\enquote{USB-C port for AI applications}, providing a standardised way to connect AI
-applications to external systems \parencite{mcp_intro}.
+\enquote{USB-C port for AI applications} \parencite{mcp_intro}, one standard interface
+through which an AI application can reach many different external systems.
 
 \begin{figure}[htbp]
 \begin{center}

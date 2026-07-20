@@ -13,7 +13,7 @@ The work described in this report consists of two distinct and largely independe
 important to keep apart conceptually.
 
 The first part is the core of the project and addresses the research questions stated in
-\cref{sec:introduction}, which network problems can be troubleshooted by a multi-agent system, with what
+\cref{sec:introduction}, which network problems can be troubleshot by a multi-agent system, with what
 success rate across difficulty levels and at what cost. This part is driven by a human operator who poses a
 troubleshooting goal to the orchestrator agent and it is evaluated against multiple fault scenarios (see \cref{sec:evaluation-concept,sec:model-tier-concept}).
 
@@ -30,7 +30,7 @@ agent building blocks shown in \cref{fig:architecture-overview} but uses a diffe
 \label{sec:architecture}
 The system is structured as a \emph{hierarchical}, \emph{role-based} multi-agent system, the collaboration
 pattern introduced in \cref{sec:multi-agent}. The \emph{orchestrator} agent receives a troubleshooting
-goal and delegates sub-tasks to specialised sub-agents, each responsible for a specific taks or domain. (see \cref{sec:agent-roles}).
+goal and delegates sub-tasks to specialised sub-agents, each responsible for a specific task or domain (see \cref{sec:agent-roles}).
 
 The biggest reason for distributing the work across several agents instead of using one monolithic
 agent comes from the limitations discussed in \cref{sec:tokens-context-cost}. A single
@@ -107,7 +107,7 @@ The concrete models assigned to each tier are described in \cref{sec:methodology
 
 \subsection{Evaluation Concept}
 \label{sec:evaluation-concept}
-To answer which problem difficulties can be troubleshooted and at what success rate, the system is evaluated
+To answer which problem difficulties can be troubleshot and at what success rate, the system is evaluated
 against different fault scenarios. Each scenario injects a specific, known fault into
 the network (for example a downed interface, a missing VLAN on a trunk, or a silently dropping ACL) and is
 assigned a \emph{difficulty level}. The difficulty level conceptually captures how much correlation across

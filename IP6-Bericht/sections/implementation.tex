@@ -95,11 +95,11 @@ how to avoid repeating the same mistake. This keeps long runs inside the context
 \label{sec:impl-investigations}
 The syslog use case of \cref{sec:autonomous-syslog-usecase} is driven by a background task that polls Loki
 every 30 seconds and starts whenever logs matching the specified severity arrive. A matching event opens an investigation, keyed
-by device and a normalized message so that a repeating log lines don't open multiple investigations for the same type of log message.
+by device and a normalized message so that repeating log lines don't open multiple investigations for the same type of log message.
 The investigation is then run as a background task via the investigation orchestrator agent (\enquote{investigation\_orchestrator} in \Cref{fig:architecture-overview}). Because this orchestrator lacks the tools to open or
 continue investigations (only the user-facing orchestrator agent has them), an investigation can never trigger further investigations recursively.
 
-Each investigation is persisted to disk as a record containing an the complete
+Each investigation is persisted to disk as a record containing the complete
 serialized message history of the agent run. This history is what realises the handover described in
 \cref{sec:autonomous-syslog-usecase}, the user-facing orchestrator has tools to list, inspect and continue
 investigations and continuing a case loads the stored history and feeds it back to the investigation orchestrator, which
