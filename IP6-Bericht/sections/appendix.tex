@@ -6,11 +6,8 @@
 \label{app:model-prices}
 
 The per-run costs in the experiment log are computed as native token counts times the model's
-advertised OpenRouter price at run time; the rates themselves are not stored in the log. Because
-all runs of one model on one day share the same rate pair, the rates could be recovered exactly
-from the logged costs and token counts (\texttt{derive\_model\_prices.py}); every logged cost is
-reproduced by its period's rate pair. \Cref{tab:recovered-rates} lists the rates in effect.
-Only GLM-5.2 changed price during the window; the open-weight models (GLM-5.2, DeepSeek-V3.2,
+advertised OpenRouter price at run time. \Cref{tab:recovered-rates} lists the rates in effect.
+Only GLM-5.2 changed price during the window. The open-weight models (GLM-5.2, DeepSeek-V3.2,
 Ministral-14B) are served by multiple competing providers on OpenRouter, so their advertised
 price is whatever the cheapest provider currently charges and can move at any time.
 
@@ -40,9 +37,9 @@ z-ai/glm-5.2                 & 2026-07-02 -- 07-03   & 0.93   & 3.00  \\
 
 \Cref{fig:invalid-commands} shows the malformed device commands as totals over the five runs of
 each scenario--model pair. \Cref{fig:scenario-ttd} breaks the time to a correct diagnosis down
-to scenario level (correct, completed runs only); a missing row means the model never solved
+to scenario level (correct, completed runs only). A missing row means the model never solved
 that scenario. \Cref{fig:wall-clock-distribution} shows the wall-clock time of all 300 runs,
-including wrong diagnoses and DNFs; the runs stopped by the time limit form the clusters at
+including wrong diagnoses and DNFs. The runs stopped by the time limit form the clusters at
 the 600-second cap.
 
 \begin{figure}[htbp]
@@ -55,7 +52,7 @@ the 600-second cap.
 
 \begin{figure}[htbp]
 \begin{center}
-\includegraphics[width=\linewidth]{graphics/scenario_time_to_diagnosis.pdf}
+\includegraphics[width=0.8\linewidth]{graphics/scenario_time_to_diagnosis.pdf}
 \end{center}
 \caption{Wall-clock time to a correct diagnosis per scenario and model.}
 \label{fig:scenario-ttd}
@@ -66,7 +63,7 @@ the 600-second cap.
 \includegraphics[width=0.85\linewidth]{graphics/distribution_wall_clock.pdf}
 \end{center}
 \caption{Wall-clock time per run over all 300 runs, including wrong diagnoses and DNFs.
-Boxes show median and interquartile range; dots are individual runs. The clusters at 600\,s
+Boxes show median and interquartile range. Dots are individual runs. The clusters at 600\,s
 are the 55 runs stopped at the wall-clock cap.}
 \label{fig:wall-clock-distribution}
 \end{figure}
