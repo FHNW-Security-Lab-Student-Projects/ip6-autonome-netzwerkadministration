@@ -1,5 +1,27 @@
 \section*{Abstract}
 
-This is some text.
+Troubleshooting computer networks is a complex, mostly manual activity. A network operator
+works from the first symptom through device after device until a root cause is found. This
+project investigates whether an AI-driven multi-agent system can take over this troubleshooting work
+and at what benefit and cost. A system was built in which an orchestrator agent splits a
+troubleshooting request and delegates the tasks to specialised agents, all operating against live network devices.
+
+The system was evaluated in a containerlab environment of Nokia SR Linux devices using ten reproducible 
+scenarios (a healthy baseline plus nine injected faults across three
+difficulty tiers) and six language models from three price tiers. Each of the 300 runs
+(10 scenarios $\times$ 6 models $\times$ 5 repetitions) was evaluated manually against the
+scenario's known root cause.
+
+The results show that the outcome depends mainly on the model used. With identical
+agent logic, the success rate spans 16\,\% to 100\,\%. The high-tier models diagnosed 98 of 100
+runs correctly across all difficulty tiers. They were typically within about two to three minutes and almost
+independently of fault difficulty. Mid-tier models were reliable on easy faults (74--82\,\%
+overall) but failed on harder faults, mostly
+by hitting the time cap rather than by giving a wrong result. Low-tier models were
+unusable and one of them repeatedly invented faults in a healthy network. With the mid- and high-tier
+models, a correct diagnosis cost \$0.21--\$2.91 in API fees, a fraction of the
+network operator time it replaces. Within the limits of a small single-fault lab, the experiments
+show that autonomous multi-agent network troubleshooting works today when a sufficiently capable
+model is used.
 
 \vspace{2ex}
