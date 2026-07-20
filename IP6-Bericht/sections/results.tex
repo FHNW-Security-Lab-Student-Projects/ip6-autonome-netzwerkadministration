@@ -6,14 +6,16 @@ What they mean for the research questions is discussed in \cref{sec:evaluation}.
 consists of 300 runs (10 scenarios $\times$ 6 models $\times$ 5 repetitions). Every run was evaluated manually (by the author of this work) against the scenario's root cause as
 described in \cref{sec:evaluation-procedure}. 55 of the 300 runs hit the 600-second wall-clock
 cap and were stopped (DNF), 38 for DeepSeek-V3.2, 8 each for GLM-5.2 and Qwen3.7-Max, and 1 for
-Claude Opus 4.8. None of them figured out the correct root cause in time, they were cut off. So
+Claude Opus 4.8. None of them had delivered a correct final answer when stopped, so
 all 55 count as misses. Supplementary figures are collected in \cref{app:extra-figures}.
 
 \subsection{Correctness}
 \label{sec:results-correctness}
 
 \Cref{tab:found-rate-tier} shows how many runs ended with a correct result, per difficulty
-tier and model. \Cref{fig:found-rate-scenario} breaks the same data down to individual scenarios.
+tier and model. The share of runs with a correct result is called the \emph{found rate} in
+the following. It is the success rate of the research questions
+(\cref{sec:research-questions}). \Cref{fig:found-rate-scenario} breaks the same data down to individual scenarios.
 
 \begin{table}[H]
 \centering
@@ -46,14 +48,14 @@ ministral-14b-2512   & 2/5 &  4/15 &  0/15 &  2/15 & 16\,\% \\
 
 The two high-tier models diagnosed 98 of their 100 runs correctly (GPT-5.5 all 50, Claude Opus
 4.8 48 of 50). The mid tier reached 74\,\% (GLM-5.2) and 82\,\% (Qwen3.7-Max). The low tier
-22\,\% (DeepSeek-V3.2) and 16\,\% (Ministral-14B). Over all six models, the success rate
+reached 22\,\% (DeepSeek-V3.2) and 16\,\% (Ministral-14B). Over all six models, the success rate
 per difficulty tier is 70\,\% (baseline), 78\,\% (easy), 54\,\% (medium) and 61\,\% (hard).
 
 At scenario level the misses are not spread evenly. \texttt{duplicate-ip-arp} was solved only by
-the high tier models (GPT-5.5 5/5, Claude Opus 4.8 4/5). Every other model failed it in all five attempts. The scenario \texttt{acl-silent-drop} was
+the high-tier models (GPT-5.5 5/5, Claude Opus 4.8 4/5). Every other model failed it in all five attempts. The scenario \texttt{acl-silent-drop} was
 almost the same (GPT-5.5 5/5, Claude Opus 4.8 4/5, GLM-5.2 1/5, Qwen3.7-Max 2/5, low tier 0/5). These
 two scenarios also account for the only two misses of Claude Opus 4.8. The
-\texttt{mtu-blackhole} scenario (which was classified as hard), was solved in every run by all four high- and mid-tier
+\texttt{mtu-blackhole} scenario (which was classified as hard) was solved in every run by all four high- and mid-tier
 models.
 
 One type of failure that only happened with GLM-5.2 is that in 4 of its 50 runs the orchestrator produced a final
@@ -69,12 +71,12 @@ DeepSeek-V3.2 in 1 of 5 and Ministral-14B in 2 of 5. The nine wrong baseline run
 two failure reasons. Six (4 DeepSeek-V3.2, 1 GLM-5.2, 1 Qwen3.7-Max) hit the 600-second cap
 without delivering any answer (DNF) and Ministral-14B's three wrong results each reported a fault that
 did not exist.
-
+\newpage
 \subsection{Time}
 \label{sec:results-time}
 
-Median wall-clock time per run, over all 50 runs of each model were Claude Opus 4.8 118\,s, GPT-5.5
-187\,s, GLM-5.2 248\,s, Qwen3.7-Max 292\,s, Ministral-14B 53\,s. DeepSeek-V3.2's median equals
+The median wall-clock times per run, over all 50 runs of each model, were: Claude Opus 4.8 118\,s, GPT-5.5
+187\,s, GLM-5.2 248\,s, Qwen3.7-Max 292\,s and Ministral-14B 53\,s. DeepSeek-V3.2's median equals
 the 600-second cap because more than half of its runs were stopped due to the time limit. The true durations beyond the
 cap are unknown. The full wall-clock distribution over all 300 runs, with the stopped runs
 visible at the cap, is shown in \cref{fig:wall-clock-distribution} in the appendix.
@@ -92,10 +94,11 @@ Ministral-14B 57\,s (8).
 \label{fig:time-to-diagnosis}
 \end{figure}
 
-Interestingly comparing results for the same model, the time does not vary too much over the difficulty tiers. Claude Opus 4.8's median
+Interestingly, for a given model the time varies little across the difficulty tiers. Claude Opus 4.8's median
 time to a correct diagnosis is 78\,s on easy and only 118\,s on hard scenarios, GPT-5.5 needed 170\,s and
 217\,s. For some models, figuring out that the healthy baseline is healthy took as long as or longer than
-locating an easy fault (Qwen3.7-Max: 477\,s versus 172\,s). A per-scenario breakdown (showing how much time each model took for a correct diagnosis) is shown in
+locating an easy fault (Qwen3.7-Max: 477\,s versus 172\,s, though its baseline median rests on only
+four correct runs). A per-scenario breakdown (showing how much time each model took for a correct diagnosis) is shown in
 \cref{fig:scenario-ttd} in the appendix.
 
 Wall-clock time is not the same as LLM inference time. \Cref{fig:inference-time} shows the LLM
@@ -116,11 +119,11 @@ time per run.}
 \label{fig:inference-time}
 \end{figure}
 
-\subsection{Cost and effort}
+\subsection{Cost and Effort}
 \label{sec:results-cost}
 
 \Cref{tab:model-summary} summarises the main per-model numbers. \cref{fig:cost-vs-correctness}
-shows mean cost per run against found rate. ``Cost/correct'' is a model's total cost spent divided by
+shows mean cost per run against found rate. ``Cost/correct'' is a model's total cost divided by
 its number of correct results. For Ministral-14B this rests on only 8 correct runs. The 300
 runs cost \$242 in API fees in total, \$145
 of which (60\,\%) went to GPT-5.5. All costs are OpenRouter list prices at run time. The exact
@@ -156,24 +159,24 @@ time to correct is over the correct, finished runs only. Cost/correct is the tot
 \label{fig:cost-vs-correctness}
 \end{figure}
 
-Token usage is also very different across models. \Cref{fig:token-usage} shows the mean input and output
-volume per run in \emph{normalized} tokens. OpenRouter re-counts every request with its own
+Token usage differs widely across models. \Cref{fig:token-usage} shows the mean input and output
+volume per run in \emph{normalised} tokens. OpenRouter re-counts every request with its own
 model-agnostic tokenizer (\enquote{QuadChars}), which the Generation API reports alongside the
 provider's native token counts \parencite{openrouter-tokenizer}. Unlike the native counts used
 for billing, these numbers compare how much text each model actually processed before giving a
-final result, independent of its own tokenizer.\footnote{Normalized counts are missing for 9 of the 300 runs, where the Generation
+final result, independent of its own tokenizer.\footnote{Normalised counts are missing for 9 of the 300 runs, where the Generation
 API did not return a resolved record for every LLM round-trip. Those runs are omitted from the
 means. Native token counts and costs are unaffected.} The mean input token count ranges from
-42\,000 (Ministral-14B) and 85\,000 (Opus 4.8), through 105\,000 (GLM-5.2) and 229\,000
-(Qwen3.7-Max), to 375\,000 (GPT-5.5) and 441\,000 (DeepSeek-V3.2). Notable is how little input
-Opus 4.8 consumed, it reached the second-best found rate on less than a quarter of GPT-5.5's
-input tokens.
+42\,000 (Ministral-14B) at the low end, through 85\,000 (Opus 4.8), 105\,000 (GLM-5.2) and
+229\,000 (Qwen3.7-Max), up to 375\,000 (GPT-5.5) and 441\,000 (DeepSeek-V3.2). It is notable
+how little input Opus 4.8 consumed. It reached the second-best found rate on less than a
+quarter of GPT-5.5's input tokens.
 
 \begin{figure}[H]
 \begin{center}
 \includegraphics[width=0.85\linewidth]{graphics/model_comparison_tokens.pdf}
 \end{center}
-\caption{Mean normalized input and output tokens per run.}
+\caption{Mean normalised input and output tokens per run.}
 \label{fig:token-usage}
 \end{figure}
 
@@ -182,7 +185,7 @@ ranking. The exception is DeepSeek-V3.2, which processed the most input tokens o
 a mid-field tool-call count. GPT-5.5 issued by far the most calls (mean 124 per run), followed by Qwen3.7-Max (98),
 GLM-5.2 and DeepSeek-V3.2 (60 and 59) and Claude Opus 4.8 (46). Ministral-14B stopped after a
 mean of 24 calls. GPT-5.5 needed about 2.7 times as many tool
-calls as Opus 4.8 to reach a nearly identical found rate. Ministral-14B's low count means it did not retrieve a lot of information (by calling tools) before
+calls as Opus 4.8 to reach a nearly identical found rate. Ministral-14B's low count means it did not retrieve much information (by calling tools) before
 giving a final result.
 
 \begin{figure}[H]

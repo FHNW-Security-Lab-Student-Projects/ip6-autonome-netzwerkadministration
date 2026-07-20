@@ -25,11 +25,11 @@ additional complexity, without helping answer the project's research questions.
 \label{sec:impl-models}
 All models are accessed through \emph{OpenRouter}, a gateway that exposes models from different vendors
 behind one API \parencite{openrouter}. Switching the model an agent uses only means changing a
-model identifier (some text). This is what makes the experiment matrix of
-\cref{sec:experiments} practical, the model can be changed without touching the agent logic.
+model identifier (a string). This is what makes the experiment matrix of
+\cref{sec:experiments} practical, because the model can be changed without touching the agent logic.
 
 Two settings are applied to every agent. First, the reasoning effort is fixed to the same level
-for all models, so that model versus model comparisons are not influenced by each provider picking its own
+(\enquote{high}) for all models, so that model versus model comparisons are not influenced by each provider picking its own
 default reasoning depth. Second, usage accounting is enabled on every request, so each model response
 carries its usage information. This usage information is the basis for the cost and token metrics of
 \cref{sec:metrics}.
@@ -37,14 +37,14 @@ carries its usage information. This usage information is the basis for the cost 
 \subsection{Delegation as Tool Calls}
 \label{sec:impl-delegation}
 Delegation between the orchestrator and its sub-agents (\cref{sec:architecture}) is realised as ordinary
-function calling, each sub-agent is registered on the orchestrator as a tool. The tool description tells
+function calling. Each sub-agent is registered on the orchestrator as a tool. The tool description tells
 the orchestrator's model what the sub-agent can do and when to use it. When the model calls the tool, the
 wrapper runs the sub-agent's own agent loop to completion and returns its final answer as the tool result.
 
-Sub-agents are stateless, they never see the orchestrator's conversation and keep no conversation history between calls.
+Sub-agents are stateless. They never see the orchestrator's conversation and keep no conversation history between calls.
 The orchestrator's instructions therefore require every delegated request to be self-contained, carrying
 the user's goal, the relevant details and any important information from earlier sub-agent calls. Read-only sub-agents
-can be called in parallel when a request involves independent lookups (the decision is up the LLM).
+can be called in parallel when a request involves independent lookups (the decision is up to the LLM).
 
 One agent is not based on an LLM making decisions. The topology agent is implemented as a background task
 that queries the LLDP neighbours of every device once a minute. Then it compares the \enquote{live} state against the \enquote{should be} topology
@@ -53,7 +53,7 @@ Since topology retrieval is deterministic and follows a strict order of events, 
 
 \subsection{Tool Servers and Device Access}
 \label{sec:impl-tools}
-Following the design of \cref{sec:tool-layer}, each agent using tools via MCP, is served by its own MCP server
+Following the design of \cref{sec:tool-layer}, each agent using tools via MCP is served by its own MCP server
 (\cref{sec:mcp}), implemented with \emph{FastMCP} \parencite{fastmcp} and started as a subprocess of the
 main process.
 
@@ -67,18 +67,18 @@ failure is detected in the tool output and recorded. This is the source of the i
 \cref{sec:metrics}.
 
 For syslog, all devices log to a central \emph{Loki} instance \parencite{grafana_loki}, which the syslog
-agent queries through its MCP tool. A practical challenge here is time, an LLM has no reliable clock and its
+agent queries through its MCP tool. A practical challenge here is time. An LLM has no reliable clock and its
 prompt may be minutes old by the time a tool runs. The tools accept time values such as
 \enquote{now}, a relative offset (\enquote{15m ago}) or an absolute timestamp, and resolve them against the
 real clock at tool runtime (so the time of the device where the tool code runs is used), so the model never has to compute a timestamp itself.
 
 \subsection{Context Management}
 \label{sec:impl-context}
-Device command output is the biggest factor in terms of context growth in this project. Every iteration of an agent loop the full
-message history is sent again, so large tool returns are paid for again on every subsequent step (without prompt caching). 
+Device command output is the biggest factor in terms of context growth in this project. On every iteration of an agent loop, the full
+message history is sent again, so large tool returns are paid for again on every subsequent step (without prompt caching).
 Two actions were taken to address this, both following from \cref{sec:tokens-context-cost}.
 
-The first acts at the source. Tool responses are cut off at a fixed size. A
+The first acts at the source. Tool responses are cut off at a fixed size of 15\,000 characters. A
 truncated response ends with a note telling the model to retry with a more narrowly scoped query
 (for example to query interfaces directly rather than doing summary queries).
 
@@ -90,17 +90,17 @@ and all error messages are kept unchanged, because an error message tells the mo
 how to avoid repeating the same mistake. This keeps long runs inside the context window and reduces the
 \enquote{lost in the middle} effect, while still letting the model re-fetch anything it needs.
 
-
+\newpage
 \subsection{Autonomous Investigations and Handover}
 \label{sec:impl-investigations}
 The syslog use case of \cref{sec:autonomous-syslog-usecase} is driven by a background task that polls Loki
-every 30 seconds and starts whenever logs matching the specified severity arrive. A matching event opens an investigation, keyed
-by device and a normalized message so that repeating log lines don't open multiple investigations for the same type of log message.
+every 30 seconds. A log event matching the configured severity opens an investigation, keyed
+by device and a normalised message so that repeating log lines do not open multiple investigations for the same type of log message.
 The investigation is then run as a background task via the investigation orchestrator agent (\enquote{investigation\_orchestrator} in \Cref{fig:architecture-overview}). Because this orchestrator lacks the tools to open or
 continue investigations (only the user-facing orchestrator agent has them), an investigation can never trigger further investigations recursively.
 
 Each investigation is persisted to disk as a record containing the complete
-serialized message history of the agent run. This history is what realises the handover described in
+serialised message history of the agent run. This history is what realises the handover described in
 \cref{sec:autonomous-syslog-usecase}, the user-facing orchestrator has tools to list, inspect and continue
 investigations and continuing a case loads the stored history and feeds it back to the investigation orchestrator, which
 is the agent that produced it (\cref{sec:agent-roles}).

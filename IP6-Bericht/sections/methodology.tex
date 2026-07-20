@@ -8,7 +8,15 @@ following describes how the experiments are run.
 \label{sec:experiment-environment}
 All experiments are run against a virtual network using \emph{containerlab} \parencite{containerlab}, so that the agents interact
 with real device behaviour. The lab consists of Nokia SR Linux \parencite{srlinux} nodes with a predefined configuration and topology in which the test clients can reach each other
-(\cref{fig:testlab-topology}). This means the base is a fully functional network.
+(\cref{fig:testlab-topology}). This means the baseline is a fully functional network.
+
+The topology contains four SR Linux nodes and four Linux clients. On one side, switch1
+connects client1 (VLAN 10, 192.168.1.0/24) and client2 (VLAN 20, 192.168.10.0/24) and
+carries both VLANs over a trunk to router1, which acts as their gateway. On the other side,
+switch2 connects client3 and client4, which share VLAN 30 (10.10.10.0/24) with router2 as
+their gateway. router1 (AS 65001) and router2 (AS 65002) exchange the client prefixes over
+an eBGP session on the link between them. All devices send their syslog messages to a
+central log store (see \cref{sec:impl-tools}).
 
 \begin{figure}[htbp]
 \begin{center}
@@ -20,13 +28,13 @@ with real device behaviour. The lab consists of Nokia SR Linux \parencite{srlinu
 
 \subsection{Fault Scenarios and Difficulty Levels}
 \label{sec:scenarios-difficulty}
-The system is evaluated against a set of fault scenarios. Each scenario is
-a folder that injects exactly one known fault into the healthy baseline configuration (topology).
+The system is evaluated against a set of fault scenarios. Each scenario is packaged as a
+folder. Its setup script injects exactly one known fault into the healthy baseline configuration (topology).
 A scenario consists of:
 
 \begin{itemize}
     \item \texttt{setup.sh}: Injects the fault before the queries are sent.
-    \item \texttt{teardown.sh}: Restores the baseline after experiment is done.
+    \item \texttt{teardown.sh}: Restores the baseline after the experiment is done.
     \item \texttt{queries.txt}: The open-ended troubleshooting prompt given to the
           orchestrator (for example \enquote{investigate the root cause}), giving no hint about where to look.
     \item \texttt{ground\_truth.yaml}: A description of the true fault (root cause), used
@@ -36,12 +44,11 @@ A scenario consists of:
 \subsubsection{Difficulty Criteria}
 \label{sec:difficulty-criteria}
 Difficulty is defined by how far an agent has to go from the obvious first check to reach the
-root cause. A fault being visible in syslog does not by itself make a fault easy. Three properties affect
-it: first, whether the obvious signal tells the truth or is misleading (for example a link that is up
-while BGP is down), second, how far the fault hides from the symptom (how many devices or layers
-lie between where the symptom shows and where the fault actually sits). Lastly, how many signals must
-be correlated (a single show command versus comparing two route tables or varying a packet
-size). 
+root cause. A fault being visible in syslog does not by itself make a fault easy. Three properties determine
+the difficulty: (1) whether the obvious signal tells the truth or is misleading (for example a link that is up
+while BGP is down), (2) how many devices or layers lie between where the symptom shows up and
+where the fault actually sits and (3) how many signals must be correlated (a single show
+command versus comparing two route tables or varying a packet size).
 
 \subsubsection{Scenario Catalogue}
 \label{sec:scenario-catalogue}
@@ -78,7 +85,7 @@ The following paragraphs describe each scenario in \cref{tab:scenarios}: the fau
 \cref{sec:difficulty-criteria}.
 
 \paragraph{Baseline}
-\texttt{basic-client-communication} injects no fault, the network is healthy and the query asks
+\texttt{basic-client-communication} injects no fault. The network is healthy and the query asks
 the agent system if client1, client2 and client3 can reach each other. The scenario checks that the system reports full
 reachability and does not invent a fault that is not there. This is a check against hallucinated
 faults.
@@ -100,8 +107,8 @@ the truth. A single \texttt{show} command on the right device reveals it, and th
 \end{description}
 
 \paragraph{Medium tier}
-In the medium scenarios the obvious signal is misleading, the fault is one step from the
-obvious signal, so the agent has to look one layer deeper.
+In the medium scenarios the obvious signal is misleading. The fault sits one step away from
+it, so the agent has to look one layer deeper.
 
 \begin{description}
     \item[\texttt{missing-export-policy}] The eBGP export policy on router1 is removed.
@@ -144,8 +151,15 @@ healthy.
           packets with the do-not-fragment flag are silently dropped. A normal ping
           succeeds, so the agent can wrongly conclude the network is fine. Finding the
           fault requires varying an input (trying with increasing packet sizes) and then
-          inspecting the interface MTU. 
+          inspecting the interface MTU.
 \end{description}
+
+A fourth, \emph{history-required} tier was originally planned: faults that are visible only
+by comparing the current state against a recorded baseline, which would have made the
+state-snapshot agent (\cref{sec:agent-roles}) strictly necessary. Its intended use-case,
+\texttt{duplicate-ip-arp}, turned out to be visible in syslog on real SR Linux gear and was
+therefore classified as medium instead. As a consequence, no scenario in the final catalogue
+strictly requires the state-snapshot agent.
 
 \subsection{Experiments}
 \label{sec:experiments}
@@ -159,19 +173,21 @@ tiers, with two models per tier:
     \item \textbf{Low:} \texttt{deepseek/deepseek-v3.2}, \texttt{mistralai/ministral-14b-2512}
 \end{itemize}
 
-The full matrix is the cross product of all scenarios and all models, with each combination
+The full matrix is the cartesian product of all scenarios and all models, with each combination
 repeated 5 times because of the non-deterministic nature of the models. The same model is used
-across all agents. A wall-clock cap of 600 seconds per run limits cost and time. A run that exceeds
+across all agents. A wall-clock cap
+of 600 seconds per run bounds the cost and duration of the 300-run matrix. Its influence on
+the results is discussed in \cref{sec:eval-limitations}. A run that exceeds
 the cap is recorded as \emph{did-not-finish} (DNF) while keeping the statistics of any sub-agents that
 already completed.
 
 \subsection{Experiment Execution}
 \label{sec:experiment-execution}
 The system under test is restricted to the read-only troubleshooting core of
-\cref{sec:architecture}. The user-facing orchestrator and its sub-agents. The configuration
+\cref{sec:architecture}: the user-facing orchestrator and its sub-agents. The configuration
 agent and the syslog-triggered autonomous investigation (\cref{sec:autonomous-syslog-usecase}) are
 disabled for all runs (\cref{sec:impl-interfaces}), since the experiments measure
-the system's ability to find a fault, applying a fix or detecting the fault unprompted are
+the system's ability to find a fault. Applying a fix or detecting a fault unprompted are
 separate capabilities outside the scope of this evaluation.
 
 Each run follows the same procedure to guarantee a clean, comparable starting point.
@@ -183,14 +199,14 @@ Each run follows the same procedure to guarantee a clean, comparable starting po
           through the agent pipeline of \cref{sec:architecture} (restricted as described above).
     \item Each turn of the run is appended to a structured log, together with a shared run identifier.
     \item \texttt{teardown.sh} restores the baseline in a finally block, so the next run is not
-          contaminated. Additionally the containerlab is re-deployed between every run.
+          contaminated. Additionally the lab is redeployed between every run.
 \end{enumerate}
 
 One property of this setup matters for interpreting the results. Each run gets a single, broad symptom
 description and no follow-up. The
 orchestrator receives this description and is explicitly instructed not to ask for
 further information. From there the system (multi-agent network) has to work autonomously to a final answer. This
-restriction exists because the matrix runs automated. There is no human who could reply.
+restriction exists because the matrix runs unattended. There is no human who could reply.
 Real operation would be interactive, with a network operator able to guide the investigation.
 \Cref{sec:eval-limitations} discusses what this restriction likely costs in success rate. The experiments
 measure the system in its most restricted mode of use.
@@ -209,8 +225,8 @@ questions:
           tracing spans so that the tooling around the run (lab redeployment, cost polling) is
           not counted. It is the basis for the time-saving question. The \emph{inference
           duration}, the summed model generation time across all agent runs as reported by
-          OpenRouter per generation, compares model speed but is not a troubleshooting time,
-          agents running in parallel can make it exceed the wall clock.
+          OpenRouter per generation, compares model speed but is not a troubleshooting time.
+          Agents running in parallel can make it exceed the wall clock.
     \item \textbf{Token usage} (prompt and completion) and \textbf{cost}, which is computed from the
           token counts and the model's advertised price per million tokens on OpenRouter. These are the basis for the cost question.
           Prompt caching is deliberately left out of this calculation. Not every provider applies
@@ -233,7 +249,7 @@ agent's final answer is compared to the scenario's root cause and classified as 
 \emph{missed}. For the baseline scenario, correctly reporting the network
 as healthy counts as \emph{found}.
 
-The decision as to whether the root cause was correctly found is up to the human (author of this work) looking at the final answer of the agent (orchestrator).  
+The decision as to whether the root cause was correctly found is up to the human (author of this work) looking at the final answer of the agent (orchestrator).
 
 \subsection{Aggregation}
 \label{sec:aggregation}

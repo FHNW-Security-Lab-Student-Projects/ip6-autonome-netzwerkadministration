@@ -5,8 +5,8 @@
 
 This project built an AI-driven multi-agent system that troubleshoots network problems by
 splitting and delegating work to specialised sub-agents. This system was used to
-run 300 experiments. The experiments consist of a healthy baseline plus nine fault scenarios across
-three difficulty tiers, using six models from three price tiers, doing five runs each. Every run was scored manually against the known root cause.
+run 300 experiments. The experiments consisted of a healthy baseline plus nine fault scenarios across
+three difficulty tiers, using six models from three price tiers, with five runs each. Every run was scored manually against the known root cause.
 With respect to the research questions from \cref{sec:research-questions}, the experiment
 supports the following answers (within the limitations mentioned in \cref{sec:eval-limitations}).
 
@@ -17,24 +17,34 @@ supports the following answers (within the limitations mentioned in \cref{sec:ev
           small for trivial faults but can be large for more difficult problems. The comparison rests on an
           estimated manual troubleshooting time. No human trials were done.
     \item \textbf{Difficulty}: Every difficulty tier was solvable, but only the
-          high price tier models solved every tier reliably. Mid-tier models handled the easy tier reliably and mostly
-          failed on two scenarios, the medium-tier \texttt{duplicate-ip-arp} and the hard-tier
+          high-tier models solved every tier reliably. Mid-tier models handled the easy tier reliably but
+          failed mostly on two scenarios, the medium-tier \texttt{duplicate-ip-arp} and the hard-tier
           \texttt{acl-silent-drop}, by hitting the time cap without a result rather than
           concluding wrongly. The manually assigned tiers predicted model behaviour only partially.
     \item \textbf{Success rate}: GPT-5.5 diagnosed 50/50 runs correctly and Claude Opus 4.8
           48/50. The mid tier reached 74--82\,\% overall (near-perfect on easy, about 70\,\%
           on medium and hard combined). The low tier models were unusable at 16--22\,\%.
-    \item \textbf{Cost and model choice}: A complete investigation costs \$0.01--\$2.91 in API
+    \item \textbf{Cost}: A complete investigation costs \$0.01--\$2.91 in API
           fees per run depending on the model, or \$0.07--\$2.91 per correct diagnosis
           (\$0.21--\$2.91 for the mid- and high-tier models that are actually usable). Against an
           example rate of CHF 100 per network operator hour, a correct automated diagnosis of a medium or
-          hard fault costs a fraction of the manual equivalent. The model is the deciding factor,
-          with the same agent logic, success ranges from 16\,\% to 100\,\% depending only on which
-          model is used.
+          hard fault costs a fraction of the manual equivalent.
+    \item \textbf{Model influence}: The model is the deciding factor.
+          With the same agent logic, success ranges from 16\,\% to 100\,\% depending only on which
+          model is used, while the API fee per correct diagnosis spans \$0.21--\$2.91 across the
+          usable models.
 \end{enumerate}
 
+Beyond the measured experiments, the project's second part, the automatic syslog
+investigation (\cref{sec:autonomous-syslog-usecase}), proved feasible. During development the
+system reacted to real syslog events without any human trigger, opened self-contained
+investigations, produced initial triage reports and persisted them so that an operator can
+take over the case later without repeating the completed work
+(\cref{sec:impl-investigations}). This part was validated qualitatively and was deliberately
+not part of the quantitative evaluation.
+
 Using a multi-agent system for network troubleshooting is technically feasible today. With a
-high-tier model, root cause detection was very good in this lab. Whether this holds up in a
+high-tier model, root-cause detection was very good in this lab. Whether this holds up in a
 production network, with more devices, more alarms and multiple faults, remains open.
 
 \subsection{Future Work}
@@ -42,9 +52,9 @@ production network, with more devices, more alarms and multiple faults, remains 
 The weakest assumption in this evaluation is the estimated manual baseline. A study in which
 network operators troubleshoot the same faults would replace it with measured
 data. The same work could also cover an interactive use case of the agent system, where network operators and agents are working
-together instead of the fully autonomous single-prompt mode measured here. The environment
-should also grow larger with more devices, mixed vendors, several concurrent faults,
+together instead of the fully autonomous single-prompt mode measured here. Future evaluations
+should also use a larger environment: more devices, mixed vendors, several concurrent faults,
 background noise in syslog, and scenarios where the root cause of the problem lies outside the network (DNS, host
-configuration). 
+configuration).
 
 

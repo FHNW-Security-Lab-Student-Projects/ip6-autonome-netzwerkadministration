@@ -6,29 +6,29 @@ activity. When a service reports a problem or a host loses connectivity, an
 engineer needs to consult the available tools and check one device after another, running
 show commands, inspecting interface counters, routing tables, ARP caches
 and syslog messages until a fault is localised. The path from the first symptom to the true root cause
-often requires a lot of steps and time. As networks
+often requires many steps and much time. As networks
 grow in size and complexity, this diagnostic effort translates directly into
-operational cost and into mean-time-to-repair.
+operational cost and a longer mean time to repair (MTTR).
 
 Recent advances in large language models (LLMs) and, in particular, in
 agentic systems that let an LLM call external tools, observe the results
 and decide on the next action, suggest a new way to support this work. Instead of
-a single agent model, a multi-agent system can decompose the problem
-into smaller parts and assign them to specialised agents. 
+a single-agent design, a multi-agent system can split the problem
+into smaller parts and assign them to specialised agents.
 Whether such a system can be used to assist in troubleshooting or even find problems autonomously is an open
 and practically relevant question.
 
-\subsection{Project goal}
+\subsection{Project Goal}
 
 The goal of this project is to design and build an AI-driven multi-agent system
 for network troubleshooting and to use it as an instrument to evaluate
 \emph{which kinds of network problems can realistically be troubleshot by such
 a system, and at what benefit and cost}. 
 
-\subsection{Research questions}
+\subsection{Research Questions}
 \label{sec:research-questions}
 
-The project is guided by four research questions:
+The project is guided by five research questions:
 
 \begin{enumerate}
   \item \textbf{Time}: How much time can be saved in troubleshooting by using the
@@ -39,13 +39,15 @@ The project is guided by four research questions:
         of the problems at each difficulty level?
   \item \textbf{Cost}: How much can potentially be saved or, conversely, how
         much does it cost to use an agent network for troubleshooting network
-        issues, and how does this depend on the chosen model?
+        issues?
+  \item \textbf{Model influence}: How much do the success rate and the cost of
+        the agent network depend on the choice of model?
 \end{enumerate}
 
 
 \subsection{Outline}
 
-\Cref{sec:background} introduces the underlying technologies. LLMs, AI agents,
+\Cref{sec:background} introduces the underlying technologies: LLMs, AI agents,
 function calling, the agent loop and the Model Context Protocol.
 \Cref{sec:concepts} explains how these building blocks are combined into the
 multi-agent troubleshooting system and \cref{sec:implementation} describes its
