@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HARD: a wrong / duplicate-IP ARP binding that PERSISTS through the whole investigation.
+# MEDIUM: a wrong / duplicate-IP ARP binding that PERSISTS through the whole investigation.
 #
 # router2 is client3's gateway (ethernet-1/2.30 = 10.10.10.1). client3 (10.10.10.10) and
 # client4 (10.10.10.11) are both normal hosts on the VLAN30 segment. We stage a *real*
@@ -10,14 +10,16 @@
 # 10.10.10.10 remains a live duplicate on the segment -- client1 <-> client3 fails and
 # STAYS failed.
 #
-# Why this is hard:
+# Why this is medium (not hard):
 #   * The fault lives in runtime ARP state -- it is NOT in any device config the agent would
-#     read as "wrong" (no static ARP entry, no VLAN/IP misconfig) and NOT in syslog.
+#     read as "wrong" (no static ARP entry, no VLAN/IP misconfig).
 #   * The poisoned MAC is client4's genuine, live MAC on the same segment, so a live
 #     `show arpnd arp-entries` shows an entry that looks perfectly valid in isolation.
-#   * The ONLY record that 10.10.10.10 used to resolve to client3's real MAC is the snapshot
-#     baseline captured here BEFORE the fault. That is what the snapshot agent uniquely
-#     provides.
+#   * BUT SR Linux names the conflict in syslog (`AddNbr Duplicate add 10.10.10.10,<mac>`
+#     with both competing MACs), so an agent that checks the logs is pointed straight at the
+#     duplicate -- which is why the scenario is classified medium (see scenario-guide.md).
+#   * The snapshot baseline captured here BEFORE the fault additionally retains the correct
+#     MAC (10.10.10.10 -> client3), letting the snapshot agent corroborate the change.
 set -euo pipefail
 
 # Clear snapshot history so the evaluation starts from a fresh state.

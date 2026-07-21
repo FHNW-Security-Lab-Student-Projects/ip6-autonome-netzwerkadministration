@@ -15,15 +15,18 @@ root_cause: >
   client3's actual service is dead -- not a hard ping failure. The fault is STILL PRESENT
   during the investigation.
 
-  Why the snapshot history is needed: the poisoned MAC is client4's genuine, live MAC on
+  Why live state alone is not enough: the poisoned MAC is client4's genuine, live MAC on
   the same segment, so a live `show arpnd arp-entries` shows a dynamic entry for 10.10.10.10
   that looks perfectly valid in isolation -- nothing in current state says "this MAC is
-  wrong", the binding is not in any device config, and there is no syslog event. The
-  decisive evidence is the SNAPSHOT HISTORY of router2's arp table: 10.10.10.10 used to
-  resolve to client3's REAL MAC and now resolves to client4's MAC. The recorded baseline is
-  the only place the correct MAC is retained -- it is in neither the running config nor the
-  logs.
+  wrong" and the binding is not in any device config. The decisive evidence is historical:
+  SR Linux names the conflict in syslog (an `AddNbr Duplicate add 10.10.10.10,<mac>` event
+  listing both competing MACs), and the SNAPSHOT HISTORY of router2's arp table corroborates
+  it: 10.10.10.10 used to resolve to client3's REAL MAC and now resolves to client4's MAC.
+  The recorded baseline is the only place the correct MAC itself is retained -- it is in
+  neither the running config nor the live state. (The syslog visibility is why this scenario
+  is classified medium rather than hard.)
 
   A correct answer identifies router2's ARP entry for 10.10.10.10 as bound to the wrong MAC
-  (client4's MAC rather than client3's) and uses the recorded baseline to establish that the
-  MAC changed -- recognising the duplicate-IP / ARP-poisoning nature on the VLAN30 segment.
+  (client4's MAC rather than client3's) and uses the syslog duplicate-address event and/or
+  the recorded baseline to establish that the MAC changed -- recognising the duplicate-IP /
+  ARP-poisoning nature on the VLAN30 segment.
