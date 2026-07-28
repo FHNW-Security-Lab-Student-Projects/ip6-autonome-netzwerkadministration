@@ -1,10 +1,10 @@
 \section{Concepts}
 \label{sec:concepts}
-While \cref{sec:background} introduced the underlying technologies in general terms, the
+While \Cref{sec:background} introduced the underlying technologies in general terms, the
 concepts section explains how they are applied to the problem of network troubleshooting and why the
 multi-agent troubleshooting system is designed the way it is. The realisation (implementation) in code is deferred to
-\cref{sec:implementation}, and the experimental procedure used to evaluate the design is described in
-\cref{sec:methodology}.
+\Cref{sec:implementation}, and the experimental procedure used to evaluate the design is described in
+\Cref{sec:methodology}.
 
 
 \subsection{Scope: Two Independent Parts}
@@ -13,9 +13,9 @@ The work described in this report consists of two distinct and largely independe
 important to keep apart conceptually.
 
 The first part is the core of the project and addresses the research questions stated in
-\cref{sec:introduction}, which network problems can be troubleshot by a multi-agent system, with what
+\Cref{sec:introduction}, which network problems can be troubleshot by a multi-agent system, with what
 success rate across difficulty levels and at what cost. This part is driven by a human operator who poses a
-troubleshooting goal to the orchestrator agent and it is evaluated against multiple fault scenarios (see \cref{sec:evaluation-concept,sec:model-tier-concept}).
+troubleshooting goal to the orchestrator agent and it is evaluated against multiple fault scenarios (see \Cref{sec:evaluation-concept,sec:model-tier-concept}).
 
 The second part is an independent feasibility use case rather than a measured research question, the
 \emph{automatic syslog investigation}. The question here is simply whether it is possible to build a system that reacts
@@ -23,25 +23,25 @@ autonomously to certain syslog messages and starts a self-contained initial inve
 human trigger. A second question is how such
 a mechanism works in practice and how a human operator can take over and continue the troubleshooting without
 repeating the work the autonomous investigation has already done. This use case reuses the same
-agent building blocks shown in \cref{fig:architecture-overview} but uses a different entry point (\texttt{investigation\_orchestrator}). It is described on its own in
-\cref{sec:autonomous-syslog-usecase} and is not part of the quantitative evaluation.
+agent building blocks shown in \Cref{fig:architecture-overview} but uses a different entry point (\texttt{investigation\_orchestrator}). It is described on its own in
+\Cref{sec:autonomous-syslog-usecase} and is not part of the quantitative evaluation.
 
 \subsection{Overall Architecture}
 \label{sec:architecture}
 The system is structured as a \emph{hierarchical}, \emph{role-based} multi-agent system, the collaboration
-pattern introduced in \cref{sec:multi-agent}. The \emph{orchestrator} agent receives a troubleshooting
-goal and delegates sub-tasks to specialised sub-agents, each responsible for a specific task or domain (see \cref{sec:agent-roles}).
+pattern introduced in \Cref{sec:multi-agent}. The \emph{orchestrator} agent receives a troubleshooting
+goal and delegates sub-tasks to specialised sub-agents, each responsible for a specific task or domain (see \Cref{sec:agent-roles}).
 
 The main reason for distributing the work across several agents instead of using one monolithic
-agent comes from the limitations discussed in \cref{sec:tokens-context-cost}. A single
+agent comes from the limitations discussed in \Cref{sec:tokens-context-cost}. A single
 agent would have to hold the entire troubleshooting context (all tool definitions, all device output, the full
 conversation history) in one large context window. This approach risks hitting the context limit quickly and
-thereby degrading output quality through the \enquote{lost in the middle} effect (introduced in \cref{sec:tokens-context-cost}). In comparison, when using multiple specialised agents, they receive
+thereby degrading output quality through the \enquote{lost in the middle} effect (introduced in \Cref{sec:tokens-context-cost}). In comparison, when using multiple specialised agents, they receive
 only focused instructions and tools, which keeps the individual contexts small and reduces context-related quality degradation.
 
-Each LLM-driven agent (AI agent) in this architecture is an independent agent loop (see \cref{sec:agent-loop}). It runs its own
+Each LLM-driven agent (AI agent) in this architecture is an independent agent loop (see \Cref{sec:agent-loop}). It runs its own
 loop over its own context and tools, using the same underlying agent harness. (The topology agent is the one
-exception, \cref{sec:impl-delegation} explains why it is not LLM-driven.) Delegation is itself realised as a
+exception, \Cref{sec:impl-delegation} explains why it is not LLM-driven.) Delegation is itself realised as a
 tool call. The orchestrator's loop invokes a sub-agent as a tool, the sub-agent runs its own loop to completion and
 returns its result, which the orchestrator then incorporates into its own context.
 
@@ -81,19 +81,19 @@ up the system:
 \subsection{Tool and Capability Layer}
 \label{sec:tool-layer}
 Agents gain the ability to interact with the outside environment through the function-calling mechanism described in
-\cref{sec:func-calling}, exposed via the Model Context Protocol introduced in \cref{sec:mcp}. Most
+\Cref{sec:func-calling}, exposed via the Model Context Protocol introduced in \Cref{sec:mcp}. Most
 agents are served by their own MCP server, so every agent only gets the tools that are required
 for its specific task.
 
 This split of expertise is a design choice that supports the architecture of
-\cref{sec:architecture}. It keeps every agent's tool definitions, and therefore its context, small and precise.
+\Cref{sec:architecture}. It keeps every agent's tool definitions, and therefore its context, small and precise.
 
 Not every agent follows this pattern. Two agents, the topology agent and the state-snapshot agent,
 do not use MCP servers. Their tools are defined directly inside the agent framework as native
 function tools, because both read state that a background task inside the same process already
 collects and caches (topology and device state). Sending such calls through an MCP server would
 add a process boundary and serialisation overhead without any of the benefits described in
-\cref{sec:mcp}. The topology agent goes one step further. As \cref{sec:impl-delegation} describes,
+\Cref{sec:mcp}. The topology agent goes one step further. As \Cref{sec:impl-delegation} describes,
 it has no model and no agent loop at all. The state-snapshot agent is a
 regular Pydantic AI agent. Only its tools are in-process.
 
@@ -103,7 +103,7 @@ LLMs can be compared to each other using a variety of metrics. This work uses th
 Models are grouped into \emph{tiers} according to their \emph{price} (low, mid and high). The system is
 designed so that the model tier can be changed independently of the agent logic, which makes it possible to
 study how model choice affects the success rate and cost in terms of troubleshooting networking issues.
-The concrete models assigned to each tier are described in \cref{sec:methodology}.
+The concrete models assigned to each tier are described in \Cref{sec:methodology}.
 
 \subsection{Evaluation Concept}
 \label{sec:evaluation-concept}
@@ -116,10 +116,10 @@ fault.
 
 \subsection{Use Case: Automatic Syslog Investigation}
 \label{sec:autonomous-syslog-usecase}
-As mentioned in \cref{sec:concepts-scope}, this use case is a separate, exploratory part of the project. Its
+As mentioned in \Cref{sec:concepts-scope}, this use case is a separate, exploratory part of the project. Its
 purpose is to answer whether an autonomous, event-driven investigation is possible at all and how it
 can be integrated into the network operator's workflow. It
-builds on the autonomous investigation orchestrator introduced in \cref{sec:agent-roles}. 
+builds on the autonomous investigation orchestrator introduced in \Cref{sec:agent-roles}. 
 
 \paragraph{Autonomous reaction to syslog events}
 The first question is whether the system can react to the network on its own. Instead of waiting for a human
@@ -136,4 +136,4 @@ autonomous investigation reached, without repeating the work it already did. The
 this by keeping the autonomous investigation's findings as reusable context (with a unique ID). When
 the operator resumes the case, this context is fed back into the same investigation orchestrator that
 produced it, so the case continues from its existing state instead of starting from scratch. How this
-handover is realised concretely is described in \cref{sec:implementation}.
+handover is realised concretely is described in \Cref{sec:implementation}.

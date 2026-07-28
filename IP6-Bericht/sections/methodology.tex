@@ -1,14 +1,14 @@
 \section{Methodology}
 \label{sec:methodology}
-The system designed in \cref{sec:concepts} is evaluated experimentally.
-Where \cref{sec:evaluation-concept} defined what a scenario and a difficulty level are, the
+The system designed in \Cref{sec:concepts} is evaluated experimentally.
+Where \Cref{sec:evaluation-concept} defined what a scenario and a difficulty level are, the
 following describes how the experiments are run.
 
 \subsection{Experimental Environment}
 \label{sec:experiment-environment}
 All experiments are run against a virtual network using \emph{containerlab} \parencite{containerlab}, so that the agents interact
 with real device behaviour. The lab consists of Nokia SR Linux \parencite{srlinux} nodes with a predefined configuration and topology in which the test clients can reach each other
-(\cref{fig:testlab-topology}). This means the baseline is a fully functional network.
+(\Cref{fig:testlab-topology}). This means the baseline is a fully functional network.
 
 The topology contains four SR Linux nodes and four Linux clients. On one side, switch1
 connects client1 (VLAN 10, 192.168.1.0/24) and client2 (VLAN 20, 192.168.10.0/24) and
@@ -16,7 +16,7 @@ carries both VLANs over a trunk to router1, which acts as their gateway. On the 
 switch2 connects client3 and client4, which share VLAN 30 (10.10.10.0/24) with router2 as
 their gateway. router1 (AS 65001) and router2 (AS 65002) exchange the client prefixes over
 an eBGP session on the link between them. All devices send their syslog messages to a
-central log store (see \cref{sec:impl-tools}).
+central log store (see \Cref{sec:impl-tools}).
 
 \begin{figure}[htbp]
 \begin{center}
@@ -38,7 +38,7 @@ A scenario consists of:
     \item \texttt{queries.txt}: The open-ended troubleshooting prompt given to the
           orchestrator (for example \enquote{investigate the root cause}), giving no hint about where to look.
     \item \texttt{ground\_truth.yaml}: A description of the true fault (root cause), used
-          as the reference during manual evaluation (\cref{sec:evaluation-procedure}).
+          as the reference during manual evaluation (\Cref{sec:evaluation-procedure}).
 \end{itemize}
 
 \subsubsection{Difficulty Criteria}
@@ -80,9 +80,9 @@ included to verify that the system does not invent problems in a healthy network
 
 \subsubsection{Scenario Descriptions}
 \label{sec:scenario-descriptions}
-The following paragraphs describe each scenario in \cref{tab:scenarios}: the fault that
+The following paragraphs describe each scenario in \Cref{tab:scenarios}: the fault that
 \texttt{setup.sh} injects and why the scenario sits in its tier according to the criteria of
-\cref{sec:difficulty-criteria}.
+\Cref{sec:difficulty-criteria}.
 
 \paragraph{Baseline}
 \texttt{basic-client-communication} injects no fault. The network is healthy and the query asks
@@ -156,7 +156,7 @@ healthy.
 
 A fourth, \emph{history-required} tier was originally planned: faults that are visible only
 by comparing the current state against a recorded baseline, which would have made the
-state-snapshot agent (\cref{sec:agent-roles}) strictly necessary. Its intended use-case,
+state-snapshot agent (\Cref{sec:agent-roles}) strictly necessary. Its intended use-case,
 \texttt{duplicate-ip-arp}, turned out to be visible in syslog on real SR Linux gear and was
 therefore classified as medium instead. As a consequence, no scenario in the final catalogue
 strictly requires the state-snapshot agent.
@@ -164,7 +164,7 @@ strictly requires the state-snapshot agent.
 \subsection{Experiments}
 \label{sec:experiments}
 To study the effect of model capability and cost (the model-tier concept of
-\cref{sec:model-tier-concept}), every scenario is run against different models taken from the three price
+\Cref{sec:model-tier-concept}), every scenario is run against different models taken from the three price
 tiers, with two models per tier:
 
 \begin{itemize}
@@ -177,16 +177,16 @@ The full matrix is the cartesian product of all scenarios and all models, with e
 repeated 5 times because of the non-deterministic nature of the models. The same model is used
 across all agents. A wall-clock cap
 of 600 seconds per run bounds the cost and duration of the 300-run matrix. Its influence on
-the results is discussed in \cref{sec:eval-limitations}. A run that exceeds
+the results is discussed in \Cref{sec:eval-limitations}. A run that exceeds
 the cap is recorded as \emph{did-not-finish} (DNF) while keeping the statistics of any sub-agents that
 already completed.
 
 \subsection{Experiment Execution}
 \label{sec:experiment-execution}
 The system under test is restricted to the read-only troubleshooting core of
-\cref{sec:architecture}: the user-facing orchestrator and its sub-agents. The configuration
-agent and the syslog-triggered autonomous investigation (\cref{sec:autonomous-syslog-usecase}) are
-disabled for all runs (\cref{sec:impl-interfaces}), since the experiments measure
+\Cref{sec:architecture}: the user-facing orchestrator and its sub-agents. The configuration
+agent and the syslog-triggered autonomous investigation (\Cref{sec:autonomous-syslog-usecase}) are
+disabled for all runs (\Cref{sec:impl-interfaces}), since the experiments measure
 the system's ability to find a fault. Applying a fix or detecting a fault unprompted are
 separate capabilities outside the scope of this evaluation.
 
@@ -196,7 +196,7 @@ Each run follows the same procedure to guarantee a clean, comparable starting po
     \item The lab is redeployed to a clean baseline and given time to settle (for example for BGP to come up).
     \item \texttt{setup.sh} injects the scenario's fault. 
     \item The orchestrator and all sub-agent tool servers are started, and the scenario's query is sent
-          through the agent pipeline of \cref{sec:architecture} (restricted as described above).
+          through the agent pipeline of \Cref{sec:architecture} (restricted as described above).
     \item Each turn of the run is appended to a structured log, together with a shared run identifier.
     \item \texttt{teardown.sh} restores the baseline in a finally block, so the next run is not
           contaminated. Additionally the lab is redeployed between every run.
@@ -212,7 +212,7 @@ Real operation would be interactive, with a network operator able to guide the i
 measure the system in its most restricted mode of use.
 
 Correctness for the experiments is scored separately (based on the final result of the orchestrator agent)
-afterwards by a human (\cref{sec:evaluation-procedure}).
+afterwards by a human (\Cref{sec:evaluation-procedure}).
 
 \subsection{Recorded Metrics}
 \label{sec:metrics}
@@ -237,7 +237,7 @@ questions:
           In practice, real costs would tend to be lower where caching applies.
     \item \textbf{Completion status} (completed vs.\ DNF) and \textbf{invalid command count}, recorded
           when an agent issues a malformed device command, as an indicator of robustness.
-    \item \textbf{Correctness verdict} per run, assigned manually (\cref{sec:evaluation-procedure}), the
+    \item \textbf{Correctness verdict} per run, assigned manually (\Cref{sec:evaluation-procedure}), the
           basis for the success-rate question.
 \end{itemize}
 
@@ -253,5 +253,5 @@ The decision as to whether the root cause was correctly found is up to the human
 
 \subsection{Aggregation}
 \label{sec:aggregation}
-The results of the evaluation are presented in \cref{sec:results} and used to answer the
-research questions across the different models in \cref{sec:evaluation}.
+The results of the evaluation are presented in \Cref{sec:results} and used to answer the
+research questions across the different models in \Cref{sec:evaluation}.

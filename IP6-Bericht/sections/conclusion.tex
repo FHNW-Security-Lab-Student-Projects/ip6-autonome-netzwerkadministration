@@ -7,8 +7,8 @@ This project built an AI-driven multi-agent system that troubleshoots network pr
 splitting and delegating work to specialised sub-agents. This system was used to
 run 300 experiments. The experiments consisted of a healthy baseline plus nine fault scenarios across
 three difficulty tiers, using six models from three price tiers, with five runs each. Every run was scored manually against the known root cause.
-With respect to the research questions from \cref{sec:research-questions}, the experiment
-supports the following answers (within the limitations mentioned in \cref{sec:eval-limitations}).
+With respect to the research questions from \Cref{sec:research-questions}, the experiment
+supports the following answers (within the limitations mentioned in \Cref{sec:eval-limitations}).
 
 \begin{enumerate}
     \item \textbf{Time}: With certain models the system delivers a correct result in two to
@@ -36,11 +36,11 @@ supports the following answers (within the limitations mentioned in \cref{sec:ev
 \end{enumerate}
 
 Beyond the measured experiments, the project's second part, the automatic syslog
-investigation (\cref{sec:autonomous-syslog-usecase}), proved feasible. During development the
+investigation (\Cref{sec:autonomous-syslog-usecase}), proved feasible. During development the
 system reacted to real syslog events without any human trigger, opened self-contained
 investigations, produced initial triage reports and persisted them so that an operator can
 take over the case later without repeating the completed work
-(\cref{sec:impl-investigations}). This part was validated qualitatively and was deliberately
+(\Cref{sec:impl-investigations}). This part was validated qualitatively and was deliberately
 not part of the quantitative evaluation.
 
 Using a multi-agent system for network troubleshooting is technically feasible today. With a
@@ -64,23 +64,23 @@ work is \emph{agent skills}. They package instructions and reference material th
 discovers through a name and a short description, whose full content is loaded into the
 context only when the task requires it. This is a principle called \emph{progressive
 disclosure} \parencite{anthropic_agent_skills}. Further harness-side improvements are explicit prompt caching (for models which allow client side steering), which would
-lower the real API cost per run (the cost metric of \cref{sec:metrics} deliberately prices
+lower the real API cost per run (the cost metric of \Cref{sec:metrics} deliberately prices
 uncached tokens). Additionally a finer history compaction that summarises older tool returns instead of
-replacing them entirely (\cref{sec:impl-context}).
+replacing them entirely (\Cref{sec:impl-context}).
 
 Three further experiments follow directly from the findings. The first is a check of the
 architecture itself. The multi-agent design was never compared against a single agent holding
 all tools in one context. Running the matrix with such a flattened variant would show whether
-the decomposition of \cref{sec:architecture} contributes to the success rate or whether the
+the decomposition of \Cref{sec:architecture} contributes to the success rate or whether the
 model would perform equally well without it. 
 
 The second is a sensitivity analysis of the wall-clock cap. 
 The mid-tier models failed mostly by hitting the 600-second cap without a
-result (\cref{sec:eval-limitations}), so their measured success rate depends partly on where
+result (\Cref{sec:eval-limitations}), so their measured success rate depends partly on where
 the cap sits. Repeating the failed combinations with a higher cap would show better where the limits of these models are.
 
 The third is mixed-model configurations. In the
-experiments the same model was used across all agents (\cref{sec:experiments}), although the
+experiments the same model was used across all agents (\Cref{sec:experiments}), although the
 sub-agents work on narrower tasks than the orchestrator. A configuration with a high-tier
 orchestrator and cheaper sub-agent models was not tested.
 

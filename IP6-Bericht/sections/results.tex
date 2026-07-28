@@ -1,13 +1,13 @@
 \section{Results}
 \label{sec:results}
 
-This section reports the results from the conducted experiments of \cref{sec:experiments}.
-What they mean for the research questions is discussed in \cref{sec:evaluation}. The dataset
+This section reports the results from the conducted experiments of \Cref{sec:experiments}.
+What they mean for the research questions is discussed in \Cref{sec:evaluation}. The dataset
 consists of 300 runs (10 scenarios $\times$ 6 models $\times$ 5 repetitions). Every run was evaluated manually (by the author of this work) against the scenario's root cause as
-described in \cref{sec:evaluation-procedure}. 55 of the 300 runs hit the 600-second wall-clock
+described in \Cref{sec:evaluation-procedure}. 55 of the 300 runs hit the 600-second wall-clock
 cap and were stopped (DNF), 38 for DeepSeek-V3.2, 8 each for GLM-5.2 and Qwen3.7-Max, and 1 for
 Claude Opus 4.8. None of them had delivered a correct final answer when stopped, so
-all 55 count as misses. Supplementary figures are collected in \cref{app:extra-figures}.
+all 55 count as misses. Supplementary figures are collected in \Cref{app:extra-figures}.
 
 \subsection{Correctness}
 \label{sec:results-correctness}
@@ -15,7 +15,7 @@ all 55 count as misses. Supplementary figures are collected in \cref{app:extra-f
 \Cref{tab:found-rate-tier} shows how many runs ended with a correct result, per difficulty
 tier and model. The share of runs with a correct result is called the \emph{found rate} in
 the following. It is the success rate of the research questions
-(\cref{sec:research-questions}). \Cref{fig:found-rate-scenario} breaks the same data down to individual scenarios.
+(\Cref{sec:research-questions}). \Cref{fig:found-rate-scenario} breaks the same data down to individual scenarios.
 
 \begin{table}[H]
 \centering
@@ -63,7 +63,7 @@ answer after a single LLM request without calling a single tool. This means that
 investigation had taken place. All four runs (one each on \texttt{acl-silent-drop},
 \texttt{client3-port-down}, \texttt{duplicate-ip-arp} and \texttt{one-way-route-filter}) were
 counted as misses. No other model showed this type of failure. The consequences for GLM-5.2's reported
-success rate are discussed in \cref{sec:eval-limitations}.
+success rate are discussed in \Cref{sec:eval-limitations}.
 
 On the healthy baseline scenario, where the correct result is that the network is healthy,
 the high-tier models were right in all 10 runs, GLM-5.2 and Qwen3.7-Max in 4 of 5 each,
@@ -79,7 +79,7 @@ The median wall-clock times per run, over all 50 runs of each model, were: Claud
 187\,s, GLM-5.2 248\,s, Qwen3.7-Max 292\,s and Ministral-14B 53\,s. DeepSeek-V3.2's median equals
 the 600-second cap because more than half of its runs were stopped due to the time limit. The true durations beyond the
 cap are unknown. The full wall-clock distribution over all 300 runs, with the stopped runs
-visible at the cap, is shown in \cref{fig:wall-clock-distribution} in the appendix.
+visible at the cap, is shown in \Cref{fig:wall-clock-distribution} in the appendix.
 
 \Cref{fig:time-to-diagnosis} shows the runs that ended in a correct
 diagnosis and finished within the time limit. There the medians are: Claude Opus 4.8 114\,s (48 runs),
@@ -99,13 +99,13 @@ time to a correct diagnosis is 78\,s on easy and only 118\,s on hard scenarios, 
 217\,s. For some models, figuring out that the healthy baseline is healthy took as long as or longer than
 locating an easy fault (Qwen3.7-Max: 477\,s versus 172\,s, though its baseline median rests on only
 four correct runs). A per-scenario breakdown (showing how much time each model took for a correct diagnosis) is shown in
-\cref{fig:scenario-ttd} in the appendix.
+\Cref{fig:scenario-ttd} in the appendix.
 
 Wall-clock time is not the same as LLM inference time. \Cref{fig:inference-time} shows the LLM
 inference time summed over all round-trips of a run next to the wall-clock time, over all 50
 runs of each model.\footnote{Summed
 from the per-request generation times reported by OpenRouter's Generation API. For the nine runs
-where the API did not resolve every round-trip (see \cref{sec:results-cost}), the missing requests
+where the API did not resolve every round-trip (see \Cref{sec:results-cost}), the missing requests
 are not part of the sum.} On average this sum exceeds the wall-clock time for every model because the orchestrator agent can launch multiple sub-agents, which then issue LLM requests in parallel. This means overlapping
 requests are each counted in full. The size of
 the gap between the two measures indicates how much of a model's work ran concurrently.
@@ -122,12 +122,12 @@ time per run.}
 \subsection{Cost and Effort}
 \label{sec:results-cost}
 
-\Cref{tab:model-summary} summarises the main per-model numbers. \cref{fig:cost-vs-correctness}
+\Cref{tab:model-summary} summarises the main per-model numbers. \Cref{fig:cost-vs-correctness}
 shows mean cost per run against found rate. ``Cost/correct'' is a model's total cost divided by
 its number of correct results. For Ministral-14B this rests on only 8 correct runs. The 300
 runs cost \$242 in API fees in total, \$145
 of which (60\,\%) went to GPT-5.5. All costs are OpenRouter list prices at run time. The exact
-rates used in the experiments are shown in \cref{app:model-prices}.
+rates used in the experiments are shown in \Cref{app:model-prices}.
 
 \begin{table}[H]
 \centering
@@ -180,7 +180,7 @@ quarter of GPT-5.5's input tokens.
 \label{fig:token-usage}
 \end{figure}
 
-The number of tool calls per run, shown in \cref{fig:tool-calls}, largely mirrors the input-token
+The number of tool calls per run, shown in \Cref{fig:tool-calls}, largely mirrors the input-token
 ranking. The exception is DeepSeek-V3.2, which processed the most input tokens of all models despite
 a mid-field tool-call count. GPT-5.5 issued by far the most calls (mean 124 per run), followed by Qwen3.7-Max (98),
 GLM-5.2 and DeepSeek-V3.2 (60 and 59) and Claude Opus 4.8 (46). Ministral-14B stopped after a
@@ -197,5 +197,5 @@ giving a final result.
 \end{figure}
 
 A figure showing the number of invalid commands executed is shown in
-\cref{fig:invalid-commands} in the appendix. Malformed commands were rarest for Ministral-14B
+\Cref{fig:invalid-commands} in the appendix. Malformed commands were rarest for Ministral-14B
 and the high-tier models and by far most frequent for Qwen3.7-Max.

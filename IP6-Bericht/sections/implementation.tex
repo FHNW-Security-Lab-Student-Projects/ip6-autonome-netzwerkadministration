@@ -1,20 +1,20 @@
 \section{Implementation}
 \label{sec:implementation}
-The implementation of the design in \cref{sec:concepts} is described in this chapter. The full source is available in the
+The implementation of the design in \Cref{sec:concepts} is described in this chapter. The full source is available in the
 project repository\footnote{\url{https://github.com/FHNW-Security-Lab-Student-Projects/ip6-autonome-netzwerkadministration}}.
 
 \subsection{Agent Framework and Harness}
 \label{sec:impl-framework}
-The agent harness introduced conceptually in \cref{sec:agent-loop} is provided in this work by
+The agent harness introduced conceptually in \Cref{sec:agent-loop} is provided in this work by
 \emph{Pydantic AI}, a Python agent framework \parencite{pydantic_ai}. Pydantic AI implements the agent loop,
 does the function-calling exchange with the model, manages the message history across iterations and
 exposes the tools of each agent.
 
-Every LLM-driven agent of \cref{sec:agent-roles} is one Pydantic AI agent, defined by four things, a
+Every LLM-driven agent of \Cref{sec:agent-roles} is one Pydantic AI agent, defined by four things, a
 name, an instruction text (its system prompt), a model and tools. The only exception is the topology
 agent, which has no model and is described separately below. All agents run in a
 single Python process. Agents are plain objects that call each other directly. There is no network protocol
-or separate service per agent, only the MCP tool servers of \cref{sec:impl-tools} run as separate
+or separate service per agent, only the MCP tool servers of \Cref{sec:impl-tools} run as separate
 subprocesses. At the start of the project, the plan was to use the A2A
 protocol\footnote{Agent2Agent (A2A), an open protocol for communication between AI agents,
 \url{https://a2a-protocol.org/}.} for communication between the agents. This would have allowed the agents
@@ -26,17 +26,17 @@ additional complexity, without helping answer the project's research questions.
 All models are accessed through \emph{OpenRouter}, a gateway that exposes models from different vendors
 behind one API \parencite{openrouter}. Switching the model an agent uses only means changing a
 model identifier (a string). This is what makes the experiment matrix of
-\cref{sec:experiments} practical, because the model can be changed without touching the agent logic.
+\Cref{sec:experiments} practical, because the model can be changed without touching the agent logic.
 
 Two settings are applied to every agent. First, the reasoning effort is fixed to the same level
 (\enquote{high}) for all models, so that model versus model comparisons are not influenced by each provider picking its own
 default reasoning depth. Second, usage accounting is enabled on every request, so each model response
 carries its usage information. This usage information is the basis for the cost and token metrics of
-\cref{sec:metrics}.
+\Cref{sec:metrics}.
 
 \subsection{Delegation as Tool Calls}
 \label{sec:impl-delegation}
-Delegation between the orchestrator and its sub-agents (\cref{sec:architecture}) is realised as ordinary
+Delegation between the orchestrator and its sub-agents (\Cref{sec:architecture}) is realised as ordinary
 function calling. Each sub-agent is registered on the orchestrator as a tool. The tool description tells
 the orchestrator's model what the sub-agent can do and when to use it. When the model calls the tool, the
 wrapper runs the sub-agent's own agent loop to completion and returns its final answer as the tool result.
@@ -53,8 +53,8 @@ Since topology retrieval is deterministic and follows a strict order of events, 
 
 \subsection{Tool Servers and Device Access}
 \label{sec:impl-tools}
-Following the design of \cref{sec:tool-layer}, each agent using tools via MCP is served by its own MCP server
-(\cref{sec:mcp}), implemented with \emph{FastMCP} \parencite{fastmcp} and started as a subprocess of the
+Following the design of \Cref{sec:tool-layer}, each agent using tools via MCP is served by its own MCP server
+(\Cref{sec:mcp}), implemented with \emph{FastMCP} \parencite{fastmcp} and started as a subprocess of the
 main process.
 
 All interaction with the lab devices goes through the JSON-RPC interface of Nokia SR Linux
@@ -64,7 +64,7 @@ or running-configuration datastore. As an attempt to keep
 the models from using invalid commands, a reference of valid SR Linux read
 commands is added in the network agent's system prompt. When a device still rejects a command, the
 failure is detected in the tool output and recorded. This is the source of the invalid-command count of
-\cref{sec:metrics}.
+\Cref{sec:metrics}.
 
 For syslog, all devices log to a central \emph{Loki} instance \parencite{grafana_loki}, which the syslog
 agent queries through its MCP tool. A practical challenge here is time. An LLM has no reliable clock and its
@@ -76,7 +76,7 @@ real clock at tool runtime (so the time of the device where the tool code runs i
 \label{sec:impl-context}
 Device command output is the biggest factor in terms of context growth in this project. On every iteration of an agent loop, the full
 message history is sent again, so large tool returns are paid for again on every subsequent step (without prompt caching).
-Two actions were taken to address this, both following from \cref{sec:tokens-context-cost}.
+Two actions were taken to address this, both following from \Cref{sec:tokens-context-cost}.
 
 The first acts at the source. Tool responses are cut off at a fixed size of 15\,000 characters. A
 truncated response ends with a note telling the model to retry with a more narrowly scoped query
@@ -93,7 +93,7 @@ how to avoid repeating the same mistake. This keeps long runs inside the context
 \newpage
 \subsection{Autonomous Investigations and Handover}
 \label{sec:impl-investigations}
-The syslog use case of \cref{sec:autonomous-syslog-usecase} is driven by a background task that polls Loki
+The syslog use case of \Cref{sec:autonomous-syslog-usecase} is driven by a background task that polls Loki
 every 30 seconds. A log event matching the configured severity opens an investigation, keyed
 by device and a normalised message so that repeating log lines do not open multiple investigations for the same type of log message.
 The investigation is then run as a background task via the investigation orchestrator agent (\enquote{investigation\_orchestrator} in \Cref{fig:architecture-overview}). Because this orchestrator lacks the tools to open or
@@ -101,9 +101,9 @@ continue investigations (only the user-facing orchestrator agent has them), an i
 
 Each investigation is persisted to disk as a record containing the complete
 serialised message history of the agent run. This history is what realises the handover described in
-\cref{sec:autonomous-syslog-usecase}, the user-facing orchestrator has tools to list, inspect and continue
+\Cref{sec:autonomous-syslog-usecase}, the user-facing orchestrator has tools to list, inspect and continue
 investigations and continuing a case loads the stored history and feeds it back to the investigation orchestrator, which
-is the agent that produced it (\cref{sec:agent-roles}).
+is the agent that produced it (\Cref{sec:agent-roles}).
 The model therefore still holds all earlier findings and tool results and continues from
 where the autonomous run stopped, instead of re-running the same commands. The user is also able to ask questions about previous investigation steps.
 
@@ -118,6 +118,6 @@ All agent runs, tool calls and device requests are traced with \emph{Logfire} \p
 traces show, per run, which sub-agents were called with which requests and what each tool returned. This
 was the main debugging instrument during development.
 
-The experiments of \cref{sec:methodology} reuse the interactive system unchanged, except that the
+The experiments of \Cref{sec:methodology} reuse the interactive system unchanged, except that the
 configuration agent and the investigation tools are disabled through feature flags, so the measured system
 is exactly the read-only troubleshooting core.
