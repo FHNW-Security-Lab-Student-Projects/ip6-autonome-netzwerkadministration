@@ -3,14 +3,14 @@
 This section gives the necessary background information about the technologies used in this work.
 
 \subsection{Agents and AI Agents}
+\label{sec:Agent_and_AI_Agents}
 This subsection first defines the traditional term \emph{Agent} and then the newer \emph{AI Agent}.
 
-\subsubsection{Agent}
+\paragraph{Agent}
 From a very basic perspective, an agent is an entity which is able to produce some effect or make changes in its
 environment \parencite{CASTELFRANCHI1998157}.
 
-\subsubsection{AI Agent}
-\label{sec:AI_Agent}
+\paragraph{AI Agent}
 With the rise of generative AI a new term \enquote{AI Agent} has emerged.
 An AI Agent is a piece of software that works towards a goal it has been given.
 It takes in information from its environment (structured or not), reasons about what it sees and then
@@ -20,13 +20,12 @@ adjusting its behaviour and the results it produces as the situation changes. At
 agent are made by an LLM (see \Cref{sec:LLMs}) \parencite{Sapkota_2026}.
 
 
-
 \subsection{Large Language Models (LLMs)}
 \label{sec:LLMs}
 An LLM is a statistical model that predicts the likelihood of the next token in
 a sequence of text. Trained on very large text corpora, largely taken from the
 public internet, it learns to produce plausible continuations for a given input
-prompt \parencite{douglas2023largelanguagemodels}.
+prompt \parencite{douglas2023largelanguagemodels}. Nowadays most of the \enquote{AI Agents} are based on LLMs.
 
 
 \subsection{Tokens, Context Windows and Cost}
@@ -92,6 +91,11 @@ It mitigates these problems by giving LLMs the ability to interact with external
 \newpage
 \subsection{Agent Loop and Agent Harness}
 \label{sec:agent-loop}
+Function calling (see \Cref{sec:func-calling}) explains how a model can request the execution of external code, but it does not
+explain how an agent works on a task over multiple steps. Two concepts are needed for this. The \emph{agent loop}
+describes the repeated cycle of reasoning, acting and observing that an agent goes through until a task is finished.
+The \emph{agent harness} is the software around the model that actually runs this cycle. This subsection introduces
+both, starting with the loop itself and then with the harness that drives it.
 
 \subsubsection{Agent Loop}
 Function calling (see \Cref{sec:func-calling}) describes a \emph{single} exchange in which the model receives a function, requests a
@@ -103,7 +107,7 @@ result is appended to the context, and the cycle repeats until the model returns
 reached \parencite{yao2023reactsynergizingreasoningacting,anthropic_effective_agents,strands_agent_loop}. These steps of reasoning and acting were introduced
 as the \emph{ReAct} pattern by \textcite{yao2023reactsynergizingreasoningacting}. The agent loop is what turns isolated
 function calls into the adaptive, goal-oriented behaviour of an AI agent as introduced in
-\Cref{sec:AI_Agent}.
+\Cref{sec:Agent_and_AI_Agents}.
 
 \Cref{fig:agent-loop} shows this cycle: an initial input and context enter the loop, the model reasons and selects a
 tool, the tool is executed and its result is fed back for the next round of reasoning, and the loop repeats until the

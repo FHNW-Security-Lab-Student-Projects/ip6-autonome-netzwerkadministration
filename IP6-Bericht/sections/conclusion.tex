@@ -1,7 +1,12 @@
 \section{Conclusion and Future Work}
 \label{sec:conclusion}
 
+This section answers the five research questions of
+\Cref{sec:research-questions} in short form and states what the project does and does not show.
+\Cref{sec:future-work} then collects the open points that follow from this work. 
+
 \subsection{Conclusion}
+\label{sec:conclusion-summary}
 
 This project built an AI-driven multi-agent system that troubleshoots network problems by
 splitting and delegating work to specialised sub-agents. This system was used to
@@ -49,6 +54,7 @@ production network, with more devices, more alarms and multiple faults, remains 
 
 \newpage
 \subsection{Future Work}
+\label{sec:future-work}
 
 The weakest assumption in this evaluation is the estimated manual baseline. A study in which
 network operators troubleshoot the same faults would replace it with measured
@@ -83,5 +89,11 @@ The third is mixed-model configurations. In the
 experiments the same model was used across all agents (\Cref{sec:experiments}), although the
 sub-agents work on narrower tasks than the orchestrator. A configuration with a high-tier
 orchestrator and cheaper sub-agent models was not tested.
+
+The last point is the scenario catalogue stopping at the hard tier. The originally planned fourth tier, faults that
+are only visible by comparing the current state against a recorded working state (not visible in syslog and not visible using show commands) via state-snapshot agent
+(\Cref{sec:scenario-descriptions}), was never realised, because the intended use-case turned out
+to be solvable via syslog (visible in syslog). No scenario in the final catalogue therefore forces the
+state-snapshot agent (\Cref{sec:agent-roles}) to be used. A new scenario that does not appear in the syslog and cannot be seen using the device show commands would need to be constructed.
 
 
