@@ -5,7 +5,7 @@ The results of \Cref{sec:results} are interpreted here with focus on the five re
 questions from \Cref{sec:research-questions}.
 
 \subsubsection{Success Rate by Difficulty}
-\label{sec:eval-success}
+\label{sec:discussion-success}
 
 Three patterns stand out in the correctness numbers
 (\Cref{tab:found-rate-tier}, \Cref{fig:found-rate-scenario}).
@@ -23,7 +23,7 @@ but they miss runs on medium and hard scenarios. Their misses concentrate on \te
 wrong conclusion. 16 of their 22 misses are runs that hit the 600-second cap without
 delivering a final answer and only two ended in an actual wrong diagnosis. (Four of GLM-5.2's
 misses have a completely different cause, runs that ended without any investigation, see
-\Cref{sec:eval-limitations}.)
+\Cref{sec:limitations}.)
 The nominally hard
 \texttt{mtu-blackhole} scenario was not a problem for them, so the manually
 assigned difficulty tiers only partially predict what the models actually struggle with.
@@ -47,7 +47,7 @@ split by model in \Cref{tab:found-rate-tier} is the more informative view, and i
 success rate depends far more on the model than on the scenario difficulty.
 
 \subsubsection{Time to Diagnosis}
-\label{sec:eval-time}
+\label{sec:discussion-time}
 
 For the time question the relevant metric is the wall-clock time from query to a correct
 final answer (\Cref{fig:time-to-diagnosis}). Wrong diagnoses are excluded since they save no time,
@@ -83,7 +83,7 @@ can stop at the first plausible cause it finds, whereas declaring a network heal
 possibility. In practice this is very relevant since some problems might not be related to the network and the result should indicate this.
 
 \subsubsection{Cost}
-\label{sec:eval-cost}
+\label{sec:discussion-cost}
 
 Cost is best compared per correct diagnosis, a model's total spend divided by its number of
 correct diagnoses (the ``cost/correct'' column of \Cref{tab:model-summary}), since a wrong
@@ -97,7 +97,7 @@ is simply worse on both axes than a cheaper one. The two low-tier models are ver
 found rate is too low to be usable.
 
 \paragraph{A saving estimate} As an example we assume the cost of CHF 100 per network operator hour.
-With the manual-time estimates from \Cref{sec:eval-time}, diagnosing a medium fault
+With the manual-time estimates from \Cref{sec:discussion-time}, diagnosing a medium fault
 manually costs around CHF 50--100 and a hard one CHF 100--200. The same diagnosis by the agent
 system costs \$1--3 in API fees with a high-tier model plus a few minutes of network operator time to
 read and verify the report. This is estimated at CHF 10--15 in total. Even under these assumptions
@@ -123,7 +123,7 @@ experiment at the rates of 6 July 2026 changes the total by under 1\,\%, so the 
 are robust to this change.
 
 \subsubsection{Influence of the Model}
-\label{sec:eval-model}
+\label{sec:discussion-model}
 
 Across all metrics, model choice is a bigger factor than scenario difficulty. The found rate
 spans 16\,\% to 100\,\% across the model price tiers, while within one model the difference between

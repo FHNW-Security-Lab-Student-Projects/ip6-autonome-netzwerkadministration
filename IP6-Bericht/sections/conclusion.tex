@@ -13,7 +13,7 @@ splitting and delegating work to specialised sub-agents. This system was used to
 run 300 experiments. The experiments consisted of a healthy baseline plus nine fault scenarios across
 three difficulty tiers, using six models from three price tiers, with five runs each. Every run was scored manually against the known root cause.
 With respect to the research questions from \Cref{sec:research-questions}, the experiment
-supports the following answers (within the limitations mentioned in \Cref{sec:eval-limitations}).
+supports the following answers (within the limitations mentioned in \Cref{sec:limitations}).
 
 \begin{enumerate}
     \item \textbf{Time}: With certain models the system delivers a correct result in two to
@@ -96,7 +96,7 @@ the decomposition of \Cref{sec:architecture} contributes to the success rate or 
 model would perform equally well without it.
 
 \paragraph{Sensitivity to the wall-clock cap} The mid-tier models failed mostly by hitting the 600-second cap without a
-result (\Cref{sec:eval-limitations}), so their measured success rate depends partly on where
+result (\Cref{sec:limitations}), so their measured success rate depends partly on where
 the cap sits. Repeating the failed combinations with a higher cap would show better where the limits of these models are.
 
 \paragraph{Mixed-model configurations} In the

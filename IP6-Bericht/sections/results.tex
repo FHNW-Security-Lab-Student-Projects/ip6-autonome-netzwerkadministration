@@ -1,7 +1,7 @@
 \subsection{Results}
 \label{sec:results}
 
-The dataset
+This subsection reports the measured numbers without interpretation. The dataset
 consists of 300 runs (10 scenarios $\times$ 6 models $\times$ 5 repetitions). Every run was evaluated manually (by the author of this work) against the scenario's root cause as
 described in \Cref{sec:evaluation-procedure}. 55 of the 300 runs hit the 600-second wall-clock
 cap and were stopped (DNF), 38 for DeepSeek-V3.2, 8 each for GLM-5.2 and Qwen3.7-Max, and 1 for
@@ -63,7 +63,7 @@ answer after a single LLM request without calling a single tool. This means that
 investigation had taken place. All four runs (one each on \texttt{acl-silent-drop},
 \texttt{client3-port-down}, \texttt{duplicate-ip-arp} and \texttt{one-way-route-filter}) were
 counted as misses. No other model showed this type of failure. The consequences for GLM-5.2's reported
-success rate are discussed in \Cref{sec:eval-limitations}.
+success rate are discussed in \Cref{sec:limitations}.
 
 On the healthy baseline scenario, where the correct result is that the network is healthy,
 the high-tier models were right in all 10 runs, GLM-5.2 and Qwen3.7-Max in 4 of 5 each,

@@ -177,7 +177,7 @@ The full matrix is the cartesian product of all scenarios and all models, with e
 repeated 5 times because of the non-deterministic nature of the models. The same model is used
 across all agents. A wall-clock cap
 of 600 seconds per run bounds the cost and duration of the 300-run matrix. Its influence on
-the results is discussed in \Cref{sec:eval-limitations}. A run that exceeds
+the results is discussed in \Cref{sec:limitations}. A run that exceeds
 the cap is recorded as \emph{did-not-finish} (DNF) while keeping the statistics of any sub-agents that
 already completed.
 
@@ -208,7 +208,7 @@ orchestrator receives this description and is explicitly instructed not to ask f
 further information. From there the system (multi-agent network) has to work autonomously to a final answer. This
 restriction exists because the matrix runs unattended. There is no human who could reply.
 Real operation would be interactive, with a network operator able to guide the investigation.
-\Cref{sec:eval-limitations} discusses what this restriction likely costs in success rate. The experiments
+\Cref{sec:limitations} discusses what this restriction likely costs in success rate. The experiments
 measure the system in its most restricted mode of use.
 
 Correctness for the experiments is scored separately (based on the final result of the orchestrator agent)
