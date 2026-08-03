@@ -1,15 +1,15 @@
-\section{Results}
+\subsection{Results}
 \label{sec:results}
 
-This section reports the results from the conducted experiments of \Cref{sec:experiments}.
-What they mean for the research questions is discussed in \Cref{sec:evaluation}. The dataset
+The dataset
 consists of 300 runs (10 scenarios $\times$ 6 models $\times$ 5 repetitions). Every run was evaluated manually (by the author of this work) against the scenario's root cause as
 described in \Cref{sec:evaluation-procedure}. 55 of the 300 runs hit the 600-second wall-clock
 cap and were stopped (DNF), 38 for DeepSeek-V3.2, 8 each for GLM-5.2 and Qwen3.7-Max, and 1 for
 Claude Opus 4.8. None of them had delivered a correct final answer when stopped, so
-all 55 count as misses. Supplementary figures are collected in \Cref{app:extra-figures}.
+all 55 count as misses. What the numbers mean for the research questions is discussed in
+\Cref{sec:discussion}. Supplementary figures are collected in \Cref{app:extra-figures}.
 
-\subsection{Correctness}
+\subsubsection{Correctness}
 \label{sec:results-correctness}
 
 \Cref{tab:found-rate-tier} shows how many runs ended with a correct result, per difficulty
@@ -72,7 +72,7 @@ two failure reasons. Six (4 DeepSeek-V3.2, 1 GLM-5.2, 1 Qwen3.7-Max) hit the 600
 without delivering any answer (DNF) and Ministral-14B's three wrong results each reported a fault that
 did not exist.
 \newpage
-\subsection{Time}
+\subsubsection{Time}
 \label{sec:results-time}
 
 The median wall-clock times per run, over all 50 runs of each model, were: Claude Opus 4.8 118\,s, GPT-5.5
@@ -119,7 +119,7 @@ time per run.}
 \label{fig:inference-time}
 \end{figure}
 
-\subsection{Cost and Effort}
+\subsubsection{Cost and Effort}
 \label{sec:results-cost}
 
 \Cref{tab:model-summary} summarises the main per-model numbers. \Cref{fig:cost-vs-correctness}

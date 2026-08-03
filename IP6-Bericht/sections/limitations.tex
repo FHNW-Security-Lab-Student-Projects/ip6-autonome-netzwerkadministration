@@ -1,0 +1,45 @@
+\newpage
+\subsection{Limitations}
+\label{sec:eval-limitations}
+
+The results must be considered within the limits of the experiment.
+
+The lab is small and single-vendor: four Nokia SR Linux nodes and four clients, with exactly
+one injected fault at a time. An enterprise network has many more devices,
+mixed vendors, concurrent faults and noisy alarms. Nothing here shows how the system scales
+to that. The results are a feasibility statement for small environments and not for big enterprise networks.
+The runs are also non-interactive, each consists of a single symptom
+description with no follow-up dialogue (\Cref{sec:experiment-execution}). In a real use case,
+a network operator could answer questions the agents raise, add observations, or steer the
+investigation. Such help would plausibly raise the success rate, particularly for the models
+that stopped at a plausible but wrong explanation. The reported numbers measure the fully
+autonomous mode.
+
+Three restrictions have to be considered regarding the measurements. The time and cost savings compare against an estimate
+of how long an engineer would need. No human trials were run. Each scenario--model pair was
+repeated only five times, so one additional or one fewer successful run shifts a rate by 20 percentage points.
+And the decision whether a run was a success or a miss was made by one person against a fixed criterion. Borderline answers
+could be judged differently by another person.
+
+Two further restrictions concern the recorded data. First, GLM-5.2's success rate may be
+understated. In 4 of its 50 runs the model ended the agent loop after a single response
+without calling any tools (the reasoning stated that tools should be called, but none were), so no investigation took place (\Cref{sec:results-correctness}),
+all four count as misses. Excluding these degenerate runs, its found rate would be 37/46
+($\approx$80\,\%) instead of 74\,\%. GLM-5.2 had been released not long before the
+experiment window, so issues in its tool-calling layer are a plausible cause. This means the reported 74\,\% may understate the model's actual diagnostic ability.
+Secondly, runs were capped at 600 seconds, and this cap does not weigh equally on all models.
+The cap also shapes the difficulty answer for the mid tier: 16 of the mid-tier models' 22
+misses are cap hits rather than wrong conclusions, so with a longer time budget their picture
+on the medium and hard scenarios could look better.
+Token generation speed differs between models, and for the open-weight models it
+is partly a property of the serving provider (compute power) rather than of the model itself. A slowly served
+model reaches the time limit, without being able to do as much work as a fast one, independent
+of its diagnostic ability. DeepSeek-V3.2 is the clearest case. A large part of its timeouts can be attributed to slow
+token generation rather than to a deeper investigation, since its tool-call count is close to
+GLM-5.2's (\Cref{fig:tool-calls}) while far more of its runs hit the cap, so its low
+found rate partly reflects serving speed instead of only diagnostic capability. Its true time
+and success numbers beyond the cap are unknown (more than half of its runs were cut off). Token and cost figures for DNF
+runs are even a bit undercounted. Usage is recorded only when an agent run returns, so the cap
+discards the orchestrator's own consumption and that of any sub-agent still working,
+counting only the sub-agents that had already completed. The reported cost of models with many
+DNFs understates what they actually consumed.
