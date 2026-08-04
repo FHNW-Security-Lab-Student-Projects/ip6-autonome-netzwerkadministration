@@ -57,3 +57,6 @@ IP6-Bericht/**/*.snm
 IP6-Bericht/**/*.vrb
 # compiled output (top level only — do NOT ignore graphics/*.pdf assets)
 IP6-Bericht/*.pdf
+
+# Website (managed separately, not part of this repo)
+IP6-Webauftritt/
