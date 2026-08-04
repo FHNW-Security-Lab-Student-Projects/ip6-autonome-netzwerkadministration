@@ -156,7 +156,7 @@ healthy.
 
 A fourth, \emph{history-required} tier was originally planned: faults that are visible only
 by comparing the current state against a recorded baseline, which would have made the
-state-snapshot agent (\Cref{sec:agent-roles}) strictly necessary. Its intended use-case,
+state-snapshot agent (\Cref{sec:agent-roles}) strictly necessary. Its intended use case,
 \texttt{duplicate-ip-arp}, turned out to be visible in syslog on real SR Linux gear and was
 therefore classified as medium instead. As a consequence, no scenario in the final catalogue
 strictly requires the state-snapshot agent.
@@ -173,7 +173,7 @@ tiers, with two models per tier:
     \item \textbf{Low:} \texttt{deepseek/deepseek-v3.2}, \texttt{mistralai/ministral-14b-2512}
 \end{itemize}
 
-The full matrix is the cartesian product of all scenarios and all models, with each combination
+The full matrix is the Cartesian product of all scenarios and all models, with each combination
 repeated 5 times because of the non-deterministic nature of the models. The same model is used
 across all agents. A wall-clock cap
 of 600 seconds per run bounds the cost and duration of the 300-run matrix. Its influence on

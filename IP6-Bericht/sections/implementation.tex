@@ -1,6 +1,6 @@
 \section{Implementation}
 \label{sec:implementation}
-The implementation of the design in \Cref{sec:concepts} is described in this chapter. The full source is available in the
+The implementation of the design in \Cref{sec:concepts} is described in this section. The full source is available in the
 project repository\footnote{\url{https://github.com/FHNW-Security-Lab-Student-Projects/ip6-autonome-netzwerkadministration}}.
 
 \subsection{Agent Framework and Harness}
@@ -60,7 +60,7 @@ main process.
 All interaction with the lab devices goes through the JSON-RPC interface of Nokia SR Linux
 \parencite{srlinux_jsonrpc}. The tools offer two routes to device
 data. The first is executing formatted show commands and the second is reading a specific YANG path directly from the state
-or running-configuration datastore. As an attempt to keep
+or running-configuration datastore. In an attempt to keep
 the models from using invalid commands, a reference of valid SR Linux read
 commands is added in the network agent's system prompt. When a device still rejects a command, the
 failure is detected in the tool output and recorded. This is the source of the invalid-command count of

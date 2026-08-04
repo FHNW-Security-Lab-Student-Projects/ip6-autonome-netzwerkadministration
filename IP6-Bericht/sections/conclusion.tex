@@ -28,7 +28,7 @@ supports the following answers (within the limitations mentioned in \Cref{sec:li
           concluding wrongly. The manually assigned tiers predicted model behaviour only partially.
     \item \textbf{Success rate}: GPT-5.5 diagnosed 50/50 runs correctly and Claude Opus 4.8
           48/50. The mid tier reached 74--82\,\% overall (near-perfect on easy, about 70\,\%
-          on medium and hard combined). The low tier models were unusable at 16--22\,\%.
+          on medium and hard combined). The low-tier models were unusable at 16--22\,\%.
     \item \textbf{Cost}: A complete investigation costs \$0.01--\$2.91 in API
           fees per run depending on the model, or \$0.07--\$2.91 per correct diagnosis
           (\$0.21--\$2.91 for the mid- and high-tier models that are actually usable). Against an
@@ -74,7 +74,7 @@ stayed fixed, but the harness is a system of its own. One technique that was not
 work is \emph{agent skills}. They package instructions and reference material that an agent
 discovers through a name and a short description, whose full content is loaded into the
 context only when the task requires it. This is a principle called \emph{progressive
-disclosure} \parencite{anthropic_agent_skills}. A second improvement is explicit prompt caching (for models which allow client side steering), which would
+disclosure} \parencite{anthropic_agent_skills}. A second improvement is explicit prompt caching (for models which allow client-side steering), which would
 lower the real API cost per run (the cost metric of \Cref{sec:metrics} deliberately prices
 uncached tokens). A third is a finer history compaction that summarises older tool returns instead of
 replacing them entirely (\Cref{sec:impl-context}).
@@ -106,7 +106,7 @@ orchestrator and cheaper sub-agent models was not tested.
 
 \paragraph{A fourth difficulty tier} The scenario catalogue stops at the hard tier. The originally planned fourth tier, faults that
 are only visible by comparing the current state against a recorded working state (not visible in syslog and not visible using show commands) via state-snapshot agent
-(\Cref{sec:scenario-descriptions}), was never realised, because the intended use-case turned out
+(\Cref{sec:scenario-descriptions}), was never realised, because the intended use case turned out
 to be solvable via syslog (visible in syslog). No scenario in the final catalogue therefore forces the
 state-snapshot agent (\Cref{sec:agent-roles}) to be used. A new scenario that does not appear in the syslog and cannot be seen using the device show commands would need to be constructed and tested.
 
