@@ -26,7 +26,12 @@ understated. In 4 of its 50 runs the model ended the agent loop after a single r
 without calling any tools (the reasoning stated that tools should be called, but none were), so no investigation took place (\Cref{sec:results-correctness}),
 all four count as misses. Excluding these degenerate runs, its found rate would be 37/46
 ($\approx$80\,\%) instead of 74\,\%. GLM-5.2 had been released not long before the
-experiment window, so issues in its tool-calling layer are a plausible cause. This means the reported 74\,\% may understate the model's actual diagnostic ability.
+experiment window, so issues in its tool-calling layer are a plausible cause. A follow-up
+check on a self-hosted GLM-5.2 instance at FHNW did not reproduce the behaviour, which
+points towards the serving layer of the API provider rather than the model itself. But this
+check covered only a very small set of runs. Since the failure appeared in 4 of 50 runs
+(8\,\%) in the main experiment, its absence in such a small sample could also be
+chance, so this observation is an indication and not proof. This means the reported 74\,\% may understate the model's actual diagnostic ability.
 Secondly, runs were capped at 600 seconds, and this cap does not weigh equally on all models.
 The cap also shapes the difficulty answer for the mid tier: 16 of the mid-tier models' 22
 misses are cap hits rather than wrong conclusions, so with a longer time budget their picture
