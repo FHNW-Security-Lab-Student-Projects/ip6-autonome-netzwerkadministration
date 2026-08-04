@@ -10,6 +10,15 @@ often requires many steps and much time. As networks
 grow in size and complexity, this diagnostic effort translates directly into
 operational cost and a longer mean time to repair (MTTR).
 
+Most of these faults fall into a few recurring type of faults: link and hardware failures, such as a disabled
+interface or a broken uplink, misconfigurations such as a VLAN missing
+from a trunk, an overly strict access control list, a faulty routing policy, a
+duplicate IP address or a mismatched MTU. What makes these faults hard and time consuming to
+diagnose is their visibility. Some show themselves in
+the logs and are found with a single show command, while others are very hard to find
+and only show themselves once or need correlation of multiple show commands.
+This is what makes some problems take minutes of work and others hours.
+
 Recent advances in large language models (LLMs) and, in particular, in
 agentic systems that let an LLM call external tools, observe the results
 and decide on the next action, suggest a new way to support this work. Instead of

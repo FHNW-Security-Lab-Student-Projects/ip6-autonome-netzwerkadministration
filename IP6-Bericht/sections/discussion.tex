@@ -110,7 +110,7 @@ illustration rather than an evidence-based measurement, because the operator hou
 \paragraph{Price volatility} Two constraints apply to the cost figures. First, they are
 modelled from token counts and the models' advertised OpenRouter prices at run time and not from
 OpenRouter's billing system. Provider routing and prompt caching can make the billed amount differ, typically
-downward because cached prompt tokens are not billed by a provider that applies caching.
+downward because cached prompt tokens have a discount decided by the provider that applies caching.
 Caching was therefore excluded deliberately from the cost calculation because its availability varies by provider and model and is often
 best-effort, which would have made the cross-model comparison depend on routing luck and on whether a model even does implicit caching.
 Second, OpenRouter prices are volatile (based on provider) especially for open models, where multiple providers compete for the
