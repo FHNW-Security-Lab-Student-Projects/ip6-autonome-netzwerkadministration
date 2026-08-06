@@ -6,7 +6,7 @@ Every network node in the lab (SR Linux switches and routers, and any future Ari
 
 | Component | Image | Role |
 |---|---|---|
-| **Grafana Alloy** | `grafana/alloy:latest` | Syslog TCP receiver; labels and ships log lines |
+| **Grafana Alloy** | `grafana/alloy:latest` | Syslog UDP receiver; labels and ships log lines |
 | **Loki** | `grafana/loki:3.0.0` | Log storage and query engine |
 | **Grafana** | `grafana/grafana:11.0.0` | Visualization UI; Loki datasource is auto-provisioned |
 
@@ -14,7 +14,7 @@ All three containers are declared as `linux` nodes in `testlab.clab.yml` with fi
 
 | Container | Fixed IP | Exposed port |
 |---|---|---|
-| alloy | `172.20.20.100` | `12345` (web UI), `1514` (syslog receiver) |
+| alloy | `172.20.20.100` | `12345` (web UI), `1514` (syslog receiver, UDP) |
 | loki | `172.20.20.101` | `3100` (HTTP API) |
 | grafana | `172.20.20.102` | `3000` (UI) |
 
@@ -25,10 +25,10 @@ All three containers are declared as `linux` nodes in `testlab.clab.yml` with fi
 ```
 ┌─────────────────────── 172.20.20.0/24 (clab-mgmt) ──────────────────────────┐
 │                                                                               │
-│  switch1 (.x)  ──syslog TCP──►                                                │
-│  switch2 (.x)  ──syslog TCP──►  alloy (.100:1514)                             │
-│  router1 (.x)  ──syslog TCP──►       │ push                                   │
-│  router2 (.x)  ──syslog TCP──►       ▼                                        │
+│  switch1 (.x)  ──syslog UDP──►                                                │
+│  switch2 (.x)  ──syslog UDP──►  alloy (.100:1514)                             │
+│  router1 (.x)  ──syslog UDP──►       │ push                                   │
+│  router2 (.x)  ──syslog UDP──►       ▼                                        │
 │                                  loki (.101:3100)                              │
 │                                       │ query                                  │
 │                                       ▼                                        │
@@ -38,7 +38,7 @@ All three containers are declared as `linux` nodes in `testlab.clab.yml` with fi
 ```
 
 Every syslog message travels:
-1. **Network node → Alloy** over TCP on port `1514`
+1. **Network node → Alloy** over UDP on port `1514`
 2. **Alloy → Loki** via HTTP push to `172.20.20.101:3100`
 3. **Loki → Grafana** via the pre-provisioned Loki datasource when you run a query
 
@@ -50,7 +50,7 @@ Every syslog message travels:
 
 Alloy uses its own River-based config language (`.alloy` files). The pipeline is wired as three components:
 
-**`loki.source.syslog "network_syslog"`** — opens a TCP syslog listener on `0.0.0.0:1514`. For each incoming message it applies `relabel_rules` from `loki.relabel.syslog_meta` before forwarding to the process stage.
+**`loki.source.syslog "network_syslog"`** — opens a UDP syslog listener on `0.0.0.0:1514`. For each incoming message it applies `relabel_rules` from `loki.relabel.syslog_meta` before forwarding to the process stage.
 
 **`loki.relabel "syslog_meta"`** — extracts labels from the RFC 5424 syslog header:
 - `host` — the hostname field (e.g. `clab-testlab-router1`)
@@ -85,31 +85,34 @@ Anonymous access is enabled so you can open the UI immediately without logging i
 
 ---
 
-## SR Linux Syslog Configuration — `configs/srl-syslog.cfg`
+## SR Linux Syslog Configuration — `configs/<node>.cfg`
 
-Each SR Linux node references this file via `startup-config` in the topology:
+Each SR Linux node references its own per-device startup config via `startup-config` in the topology:
 
 ```yaml
 switch1:
   kind: nokia_srlinux
-  startup-config: configs/srl-syslog.cfg
+  startup-config: configs/switch1.cfg
 ```
 
-The file contains three SR Linux CLI `set` commands that containerlab applies when the node boots:
+All four files (`configs/switch1.cfg`, `switch2.cfg`, `router1.cfg`, `router2.cfg`) inline the same syslog block alongside the node's forwarding config, applied by containerlab when the node boots (from `configs/switch1.cfg`):
 
 ```
-set / system logging remote-server 172.20.20.100 transport tcp
-set / system logging remote-server 172.20.20.100 port 1514
-set / system logging remote-server 172.20.20.100 subsystem all severity informational
+set / system logging network-instance mgmt
+set / system logging remote-server 172.20.20.100 transport udp
+set / system logging remote-server 172.20.20.100 remote-port 1514
+set / system logging remote-server 172.20.20.100 facility local6 priority match-above informational
 ```
 
-This configures a remote syslog destination at `172.20.20.100:1514` (the Alloy container). All subsystems at severity `informational` and above are forwarded. SR Linux management-plane traffic (including syslog) automatically uses the `mgmt` network instance, so no explicit network-instance binding is needed here.
+This configures a remote syslog destination at `172.20.20.100:1514` (the Alloy container) over UDP, explicitly bound to the `mgmt` network instance. Messages of facility `local6` at priority `informational` and above are forwarded.
 
 ---
 
 ## Adding a New Vendor
 
-The steps are the same regardless of vendor. Alloy already has pipeline stages for Arista EOS, Cisco IOS-XR, and Cisco IOS-XE in `monitoring/alloy/config.alloy`.
+The steps are the same regardless of vendor. Alloy already has pipeline stages for Arista EOS, Cisco IOS-XR, and Cisco IOS-XE in `monitoring/alloy/config.alloy` — this vendor path is prepared in the pipeline but was **never implemented in the lab**, which contains only Nokia SR Linux devices.
+
+For Arista cEOS the image must be obtained manually first: register a free account at [arista.com](https://www.arista.com/en/user-registration), download the cEOS-lab tarball from **Software Downloads → cEOS-lab** (e.g. `cEOS-lab-4.32.0F.tar.xz`), and load it with `docker import cEOS-lab-4.32.0F.tar.xz ceos:4.32.0`.
 
 ### Step 1 — Add the node to the topology
 
@@ -129,9 +132,9 @@ Each vendor has its own command to point syslog at the Alloy receiver (`172.20.2
 
 | Vendor | Command |
 |---|---|
-| **Arista EOS** | `logging host 172.20.20.100 1514 protocol tcp` |
+| **Arista EOS** | `logging host 172.20.20.100 1514 protocol udp` |
 | **Cisco IOS-XR** | `logging 172.20.20.100 vrf mgmt port 1514` |
-| **Cisco IOS-XE** | `logging host 172.20.20.100 transport tcp port 1514` |
+| **Cisco IOS-XE** | `logging host 172.20.20.100 transport udp port 1514` |
 | **FRR / Linux** | Add a forward rule to `/etc/rsyslog.conf` |
 
 For Arista cEOS you can apply this via a startup config file:
@@ -146,7 +149,7 @@ leaf1:
 `configs/eos-syslog.cfg`:
 ```
 !
-logging host 172.20.20.100 1514 protocol tcp
+logging host 172.20.20.100 1514 protocol udp
 logging on
 !
 ```
@@ -217,9 +220,10 @@ The `host` label value is always the containerlab container name (`clab-testlab-
 ## File Reference
 
 ```
-testlab.clab.yml                            ← mgmt network + monitoring nodes + SR Linux startup-config
+testlab.clab.yml                            ← mgmt network + monitoring nodes + SR Linux startup-configs
 configs/
-  srl-syslog.cfg                            ← SR Linux: sets remote-server 172.20.20.100:1514
+  switch1.cfg  switch2.cfg
+  router1.cfg  router2.cfg                  ← per-device startup configs, each inlines the syslog block
 monitoring/
   alloy/config.alloy                        ← syslog receiver + per-vendor pipeline stages
   loki/config.yml                           ← storage config (filesystem, single-node)

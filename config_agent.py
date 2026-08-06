@@ -34,7 +34,7 @@ if not OPENROUTER_API_KEY:
 llm = OpenRouterModel(
     'z-ai/glm-5',
     provider=OpenRouterProvider(api_key=OPENROUTER_API_KEY),
-    settings=agent_model_settings(parallel_tool_calls=True),  # Sequential — safety for config changes
+    settings=agent_model_settings(parallel_tool_calls=False),  # Sequential — safety for config changes
 )
 
 config_mcp = MCPServerStdio(

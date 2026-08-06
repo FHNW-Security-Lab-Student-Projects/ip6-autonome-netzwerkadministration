@@ -6,9 +6,9 @@ Explains where the `cost_usd` values in `experiment_log.jsonl` come from, what
 the underlying OpenRouter prices actually are, and what that means for the
 cost analysis in the project report.
 
-> **Note:** This doc supersedes `sync-pricing.md`. The mechanism described
-> there (`sync_pricing.py` writing `model_pricing.json`) was removed; pricing
-> is now fetched live at run time by `model_config.py`.
+> **Note:** An earlier mechanism (`sync_pricing.py` writing `model_pricing.json`,
+> once described in a separate `sync-pricing.md` doc, both since removed) is gone;
+> pricing is fetched live at run time by `model_config.py`.
 
 ---
 

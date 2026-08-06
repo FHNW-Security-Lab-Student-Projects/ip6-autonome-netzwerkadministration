@@ -96,7 +96,7 @@ def _effective_model() -> str:
 
 # Cache of Model objects keyed by model_name to avoid re-creating
 # HTTP clients on every tool call.
-_model_cache: dict[tuple[str, bool], OpenRouterModel] = {}
+_model_cache: dict[str, OpenRouterModel] = {}
 
 
 def _get_agent_model() -> OpenRouterModel | None:

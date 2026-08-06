@@ -16,24 +16,50 @@ A single orchestrator (`client_agent.py`) routes each request to the right sub-a
 | Agent | Module | Responsibility |
 |---|---|---|
 | **Orchestrator** | `client_agent.py` | Routes requests, owns the conversation, coordinates delegation |
-| **Network** | `network_agent.py` + `mcp_server.py` | Read-only SR Linux show commands (netmiko) |
+| **Network** | `network_agent.py` + `mcp_server.py` | Read-only SR Linux show commands (JSON-RPC via `srl_jsonrpc.py`) |
 | **Topology** | `topology_agent.py` | LLDP-based topology discovery (no LLM, background refresh) |
-| **Config** | `config_agent.py` | Validate-then-apply configuration changes |
+| **Config** | `config_agent.py` + `config_mcp_server.py` | Validate-then-apply configuration changes |
 | **Snapshot** | `state_snapshot_agent.py` | Capture / compare device state snapshots |
 | **Syslog** | `syslog_agent.py` + `syslog_mcp_server.py` | Syslog incident investigation + background Loki poller |
+| **Investigation orchestrator** | `investigation_orchestrator.py` | Dedicated orchestrator for autonomous syslog-event analysis — read-only sub-agent roster, config agent excluded |
+
+## Prerequisites
+
+ContainerLab needs Linux, so the easiest path on any OS is the included **devcontainer**:
+open the repo in VS Code and choose *Reopen in Container*. The image ships Docker-in-Docker
+and containerlab, and the post-create hook installs uv, Python 3.13, and all dependencies —
+only Docker and VS Code are needed on the host. Alternatively, on a native Linux host,
+install [Docker](https://docs.docker.com/engine/install/),
+[containerlab](https://containerlab.dev/install/), and [uv](https://docs.astral.sh/uv/)
+yourself.
+
+All lab images (Nokia SR Linux 24.10.1, network-multitool, Grafana/Loki/Alloy) are publicly
+pullable — no vendor account or license required — and are downloaded on first deploy. Give
+Docker roughly 8 GB of RAM for the four SR Linux nodes.
 
 ## Setup
 
 ```bash
 cp .env.example .env        # set OPENROUTER_API_KEY (LOGFIRE_TOKEN optional)
-uv sync                     # install dependencies (Python 3.13+, uv)
+uv sync                     # install dependencies (already done inside the devcontainer)
 ```
+
+The API key comes from [openrouter.ai](https://openrouter.ai/) — a few dollars of credit is
+enough to try the system out. The default model is `z-ai/glm-5`, configured per agent
+module.
 
 | Variable | Required | Description |
 |---|---|---|
 | `OPENROUTER_API_KEY` | Yes | OpenRouter key — used by all LLM agents |
 | `LOGFIRE_TOKEN` | No | Logfire observability (skipped if absent) |
+| `LOGFIRE_READ_TOKEN` | No | Logfire read token for `fetch_logfire_exports.py` |
 | `AUTO_INVESTIGATIONS_ENABLED` | No | Pause automatic Loki-driven investigations (`true`/`false`) |
+| `INVESTIGATION_STATUS_PORT` | No | Port for the `investigation_status.py` web UI (default 7933) |
+| `AGENT_API_PORT` | No | Port for the syslog agent's internal HTTP API (default 7934) |
+
+Two additional code flags, `ENABLE_CONFIG_AGENT` and `ENABLE_INVESTIGATIONS` (default on,
+set to `0` to disable), let `experiment_runner.py` run a reduced orchestrator without the
+config agent or the syslog investigation tools.
 
 ### Start the network lab
 
@@ -47,11 +73,13 @@ Topology (see [testlab.clab.yml](testlab.clab.yml)):
 
 ```
 client1 ─ switch1 ─ router1 ═BGP═ router2 ─ switch2 ─ client3
-client2 ─┘
+client2 ─┘                                         └─ client4
 ```
 
-Containers are named `clab-testlab-<node>` (e.g. `clab-testlab-router1`). The monitoring
-stack (Grafana, Promtail) defined in the same file starts automatically.
+client3 (10.10.10.10) and client4 (10.10.10.11) share VLAN30 behind switch2 (ports e1-2
+and e1-3). Containers are named `clab-testlab-<node>` (e.g. `clab-testlab-router1`). The
+monitoring stack (Grafana, Loki, and Grafana Alloy) defined in the same file starts
+automatically.
 
 ## Running
 
@@ -65,37 +93,52 @@ uv run python web_ui.py           # chat UI at http://127.0.0.1:7932
 
 See [docs/running-the-system.md](docs/running-the-system.md) for the full startup guide.
 
-## Experiments
+### Quick test drive
 
-The fault-injection workflow: define a broken scenario, run the agents against it, score
-whether they found the real root cause, then aggregate.
+Inject a known fault, ask the orchestrator to find it, then restore the baseline:
 
 ```bash
-# ① author a scenario folder under scenarios/<name>/
-#    (queries.txt, ground_truth.yaml, setup.sh, teardown.sh)
-
-# ② run — injects fault → queries → restores baseline; appends to experiment_log.jsonl
-uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6 -s intf-down --multi-turn
-
-# ③ evaluate by hand (press f/m/s per answer) → evaluation_log.jsonl
-uv run python evaluate_experiments.py
-
-# ④ aggregate / visualize
-uv run python analyze_experiments.py
-uv run python visualize_experiments.py --out figures
+./scenarios/intf-down/setup.sh      # captures a healthy baseline, then disables a router link
+uv run python client_agent.py
+# You: Client1 reports it can no longer reach client3. Investigate the root cause.
+./scenarios/intf-down/teardown.sh   # restores the healthy state
 ```
 
-Full runbook: [docs/running-experiments.md](docs/running-experiments.md) ·
-flag reference: [docs/experiment-runner.md](docs/experiment-runner.md).
+The agent should trace the outage to `ethernet-1/2` being admin-disabled on router1.
+
+## Automatic syslog investigations
+
+While the agents are running, a background poller checks Loki every 30 seconds for syslog
+events of severity `error` and above from the lab devices. Each new event automatically
+opens an **investigation**: a dedicated read-only orchestrator
+(`investigation_orchestrator.py`, config agent excluded) queries the logs around the
+event, inspects the affected devices, and writes its root-cause analysis to
+`investigations.json`.
+
+Watch it live in the status UI (standalone process, run alongside either entry point):
+
+```bash
+uv run python investigation_status.py     # → http://127.0.0.1:7933
+```
+
+The page lists every investigation with its status — `investigating` (agent working) →
+`waiting` (analysis done, awaiting review) → `resolved`. Click a row to see the
+triggering event, the full investigation log, and the agent's summary; the detail panel
+has a button to mark the investigation resolved.
+
+Nothing needs to be forced to see it work: the SR Linux nodes emit error-level events on
+their own (license notices at startup, memory-utilization criticals), so investigations
+appear shortly after lab and agents are up. From the chat you can also list
+investigations, ask follow-up questions on one, or open one manually ("open an
+investigation for router1").
+
+Set `AUTO_INVESTIGATIONS_ENABLED=false` in `.env` to pause automatic openings.
 
 ## Documentation
 
 Architecture and how-to notes live in [docs/](docs/):
 
 - [running-the-system.md](docs/running-the-system.md) — start the lab, agents, and web UI
-- [running-experiments.md](docs/running-experiments.md) — end-to-end experiment workflow
-- [experiment-runner.md](docs/experiment-runner.md) · [analyze-experiments.md](docs/analyze-experiments.md) · [visualize-experiments.md](docs/visualize-experiments.md)
-- [target-topology.md](docs/target-topology.md) · [adding-arista-ceos.md](docs/adding-arista-ceos.md) · [containerlab-commands.md](docs/containerlab-commands.md)
-- [syslog-incident-agent.md](docs/syslog-incident-agent.md) · [monitoring-stack.md](docs/monitoring-stack.md) · [multi-model-web-ui.md](docs/multi-model-web-ui.md)
+- [target-topology.md](docs/target-topology.md) · [containerlab-commands.md](docs/containerlab-commands.md) · [monitoring-stack.md](docs/monitoring-stack.md)
 
 The written report lives in [IP6-Bericht/](IP6-Bericht/).

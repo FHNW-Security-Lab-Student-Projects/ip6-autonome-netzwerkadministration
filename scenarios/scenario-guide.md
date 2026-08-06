@@ -185,10 +185,11 @@ record). The runner otherwise just sends `queries.txt` against the unbroken topo
 > lab to confirm it actually stays silent (the same check that caught `duplicate-ip-arp`). **None is
 > defined yet.**
 
-### Snapshot mechanism (still recorded by `duplicate-ip-arp`'s `setup.sh`)
+### Snapshot mechanism (recorded by every fault scenario's `setup.sh`)
 
 The snapshot agent's background refresh loop only runs *while the orchestrator is alive*, i.e.
-**after** `setup.sh`. So `setup.sh` records the healthy baseline itself, by calling the snapshot
+**after** `setup.sh`. So every fault scenario's `setup.sh` (all nine — only the no-fault
+baseline omits it, see above) records the healthy baseline itself, by calling the snapshot
 agent's one-shot capture *before* injecting the persistent fault:
 
 ```
@@ -209,6 +210,7 @@ timestamps, then `state_before` / `state_diff`. `teardown.sh` removes the persis
 
 | Scenario | Tier | Device | Layer | In syslog? | What localizes it |
 |---|---|---|---|---|---|
+| `basic-client-communication` | baseline | — (no fault) | — | — | full reachability confirmed, nothing to find |
 | `intf-down` | easy | router1 e1-2 | L1 | ✅ | one `show interface` |
 | `client3-port-down` | easy | switch2 e1-2 | L1 | ✅ | one `show interface` / LLDP |
 | `switch1-uplink-down` | easy | switch1 e1-3 | L1 | ✅ | one `show interface` / LLDP (client1+client2 both down) |

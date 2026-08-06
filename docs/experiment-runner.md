@@ -40,16 +40,17 @@ Steps 2–4 are decoupled — running an experiment never evaluates it, re-evalu
 ```bash
 # Folder-based scenario (recommended) — runner loads scenarios/<name>/queries.txt,
 # runs setup.sh before the queries, runs teardown.sh after (best-effort).
-uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario basic-client-communication
+uv run python experiment_runner.py --model anthropic/claude-opus-4.8 --scenario basic-client-communication
 
 # Multi-turn — carry conversation history between queries in the same run
-uv run python experiment_runner.py --model z-ai/glm-5 --scenario basic-client-communication --multi-turn
+# (available, but unused in the recorded experiments: all scenarios are single-query)
+uv run python experiment_runner.py --model z-ai/glm-5.2 --scenario basic-client-communication --multi-turn
 
 # Skip setup/teardown — sanity run against the unbroken topology
-uv run python experiment_runner.py --model z-ai/glm-5 --scenario basic-client-communication --no-fault
+uv run python experiment_runner.py --model z-ai/glm-5.2 --scenario basic-client-communication --no-fault
 
 # Legacy flat file (still works for ad-hoc query lists outside scenarios/)
-uv run python experiment_runner.py --model z-ai/glm-5 --scenario adhoc --file path/to/queries.txt
+uv run python experiment_runner.py --model z-ai/glm-5.2 --scenario adhoc --file path/to/queries.txt
 ```
 
 ### CLI options
@@ -59,8 +60,9 @@ uv run python experiment_runner.py --model z-ai/glm-5 --scenario adhoc --file pa
 | `--model` / `-m` | `z-ai/glm-5` | OpenRouter model ID for all agents |
 | `--scenario` / `-s` | `$EXPERIMENT_SCENARIO` or `""` | Scenario name. If `scenarios/<name>/` exists, queries.txt is loaded and setup.sh/teardown.sh are run automatically. |
 | `--file` / `-f` | *(interactive)* | Path to query file (one query per line). Ignored when `--scenario` resolves to a folder. |
-| `--multi-turn` | off | Carry message history between queries |
+| `--multi-turn` | off | Carry message history between queries (unused in the recorded experiments) |
 | `--no-fault` | off | Skip the scenario's setup.sh / teardown.sh (for baseline / sanity runs) |
+| `--max-seconds` | `$EXPERIMENT_MAX_SECONDS` or `0` (no cap) | Wall-clock cap per query. On expiry the turn is logged as DNF: `success=false`, `error="DNF (wall-clock timeout after Ns)"` — completed sub-agents' token/cost stats are kept. The matrix ran with 600 s; 55/300 recorded runs are DNF. |
 
 ---
 
@@ -69,13 +71,19 @@ uv run python experiment_runner.py --model z-ai/glm-5 --scenario adhoc --file pa
 Run the same scenario with each model you want to compare:
 
 ```bash
-uv run python experiment_runner.py -m z-ai/glm-5                   -s basic-client-communication
-uv run python experiment_runner.py -m anthropic/claude-sonnet-4.6  -s basic-client-communication
-uv run python experiment_runner.py -m google/gemini-2.0-flash-001  -s basic-client-communication
+uv run python experiment_runner.py -m z-ai/glm-5.2                -s basic-client-communication
+uv run python experiment_runner.py -m anthropic/claude-opus-4.8   -s basic-client-communication
+uv run python experiment_runner.py -m openai/gpt-5.5              -s basic-client-communication
 ```
 
 All three runs share the same `scenario` label (and the same setup.sh / teardown.sh,
 so each model faces the identical injected fault). The `model` field differs.
+
+For a full model × scenario × repeat sweep, don't invoke each combo by hand —
+[run_experiment_matrix.sh](../run_experiment_matrix.sh) automates it (redeploys the
+lab between runs, applies the 600 s cap, supports `--resume`); the 300 recorded runs
+were produced this way. See
+[running-experiments.md](running-experiments.md#automated-the-full-matrix-with-run_experiment_matrixsh).
 
 ---
 
@@ -128,12 +136,18 @@ instead of writing pandas by hand.
 
 ### Top-level comparison — one row per (scenario, model)
 
+Note on `duration_s`: it is the **summed LLM inference time** of the session
+(OpenRouter `generation_time` over all round-trips, see `experiment_tracker.py`),
+not the elapsed wall-clock time. For real elapsed time join
+`wall_clock_durations.jsonl` on `session_id` — see
+[wall-clock-recovery.md](wall-clock-recovery.md).
+
 ```python
 summary = (
     df.groupby(['scenario', 'model'])
     .agg(
         turns            = ('session_id',          'count'),
-        avg_duration_s   = ('duration_s',           'mean'),
+        avg_duration_s   = ('duration_s',           'mean'),  # summed inference time, not wall clock
         avg_input_tokens = ('total_input_tokens',   'mean'),
         avg_output_tokens= ('total_output_tokens',  'mean'),
         avg_tool_calls   = ('total_tool_calls',     'mean'),
@@ -162,7 +176,7 @@ for rec in records:
             'output_tokens': run['output_tokens'],
             'tool_calls'   : run['tool_calls'],
             'duration_s'   : run['duration_s'],
-            'cost_usd'     : run['estimated_cost_usd'],
+            'cost_usd'     : run['cost_usd'],
         })
 
 agents_df = pd.DataFrame(agent_rows)
@@ -190,7 +204,7 @@ print("\nSub-agents avg cost per turn:")
 print(subs.groupby('model')['cost_usd'].mean())
 ```
 
-### Slowest turns
+### Slowest turns (by summed inference time)
 
 ```python
 print(
@@ -267,8 +281,8 @@ the reference printed alongside the answer.
 |---|---|---|
 | `scenarios/basic-client-communication/` | none | Probes end-to-end reachability between client1, client2 and client3 in the healthy topology |
 
-This is the baseline (no-fault) scenario. The 10 fault scenarios live alongside it in
-[../scenarios/](../scenarios/) — see
+This is the baseline (no-fault) scenario. `scenarios/` holds 10 folders in total:
+9 fault scenarios plus this baseline — see
 [../scenarios/scenario-guide.md](../scenarios/scenario-guide.md). Author new fault scenarios
 by creating a folder with all four files above.
 
@@ -291,7 +305,7 @@ uv run python evaluate_experiments.py --redo
 
 # Filter by date, model, or scenario
 uv run python evaluate_experiments.py --since 2026-05-20
-uv run python evaluate_experiments.py --model anthropic/claude-sonnet-4.6
+uv run python evaluate_experiments.py --model anthropic/claude-opus-4.8
 uv run python evaluate_experiments.py --scenario bgp-router1-router2-down
 ```
 
@@ -331,19 +345,23 @@ Each query produces a summary table printed to the terminal:
 ────────────────────────────────────────────────────────────────────────
   Agent                Model                             In tok  Out tok  Tools      s
   ──────────────────── ────────────────────────────────  ───────  ───────  ─────  ──────
-  network_agent        anthropic/claude-sonnet-4.6         4,821      412      4     9.2
-  orchestrator         anthropic/claude-sonnet-4.6         1,204      183      2    14.8
+  syslog_agent         anthropic/claude-opus-4.8          15,932    1,908      4    24.4
+  network_agent        anthropic/claude-opus-4.8          32,531    1,820      5    36.1
+  orchestrator         anthropic/claude-opus-4.8           8,964    1,492      3    22.9
 ────────────────────────────────────────────────────────────────────────
-  Total: 6,025 in / 595 out  |  6 tool calls  |  14.8s  |  $0.000224  |  OK
+  Total: 57,427 in / 5,220 out  |  12 tool calls  |  83.5s  |  $0.417635  |  OK
 ```
+
+(`s` per agent — like the session `duration_s` — is summed LLM inference time,
+not elapsed time; see [wall-clock-recovery.md](wall-clock-recovery.md).)
 
 Followed by a session summary at the end of all queries:
 
 ```
 ════════════════════════════════════════════════════════════════════════
   EXPERIMENT SUMMARY
-  Model:    anthropic/claude-sonnet-4.6
-  Scenario: bgp-01
+  Model:    anthropic/claude-opus-4.8
+  Scenario: intf-down
   Turns:    3  (3 successful)
 ════════════════════════════════════════════════════════════════════════
   Avg duration:     12.4s
@@ -361,24 +379,60 @@ Followed by a session summary at the end of all queries:
 In the runner, each session record in `experiment_log.jsonl` includes both the
 final natural-language answer (`output`) and a `run_id` shared across all turns
 of the same invocation, plus an `agent_runs` list with an entry for the
-orchestrator alongside the sub-agents:
+orchestrator alongside the sub-agents. Real shape (values abridged from an
+actual record):
 
 ```json
 {
-  "session_id": "abc12345...",
-  "run_id":     "f0e1d2c3...",         // shared by every turn in one invocation
-  "model":      "anthropic/claude-sonnet-4.6",
-  "scenario":   "bgp-router1-router2-down",
-  "user_query": "Summarize the root cause.",
-  "output":     "Interface e1-2 on router1 is admin-down, which has torn down...",
+  "session_id": "f3ad41df81b948ce981cc97fc66af81f",
+  "started_at": "2026-06-29T07:34:48.433863+00:00",
+  "model":      "anthropic/claude-opus-4.8",
+  "user_query": "Pings from client1 to client3 fail. Investigate root cause...",
+  "scenario":   "acl-silent-drop",
   "agent_runs": [
-    { "agent_name": "network_agent",  "input_tokens": 4821, "tool_calls": 4 },
-    { "agent_name": "orchestrator",   "input_tokens": 1204, "tool_calls": 2 }
+    {
+      "agent_name": "syslog_agent",
+      "model": "anthropic/claude-opus-4.8",
+      "input_tokens": 15932,
+      "output_tokens": 1908,
+      "normalized_input_tokens": 7570,
+      "normalized_output_tokens": 915,
+      "normalized_complete": true,
+      "llm_requests": 2,
+      "tool_calls": 4,
+      "duration_s": 24.419,
+      "cost_usd": 0.12736,
+      "cost_estimated": false
+    },
+    { "agent_name": "network_agent", "...": "same fields" },
+    { "agent_name": "orchestrator",  "...": "same fields" }
   ],
+  "run_id": "b4995b40aae5412f961de21191299271",
+  "first_generation_id": "gen-1782718489-ADJzojq9xJSm8ePO0kV9",
+  "last_generation_id":  "gen-1782718564-kbU6iTYunSJvmed1LieK",
+  "output": "Investigation complete. Here is the root cause. ...",
+  "duration_s": 83.471,
+  "total_input_tokens": 57427,
+  "total_output_tokens": 5220,
+  "total_normalized_input_tokens": 31370,
+  "total_normalized_output_tokens": 2665,
+  "normalized_complete": true,
+  "total_cost_usd": 0.417635,
+  "cost_estimated": false,
+  "total_tool_calls": 12,
+  "total_llm_requests": 9,
+  "invalid_commands": 1,
   "success": true,
-  "error":   ""
+  "error": ""
 }
 ```
+
+`agent_name` in the recorded experiments takes the values `network_agent`,
+`syslog_agent`, `snapshot_agent`, and `orchestrator` (the config agent is
+disabled by the runner, and the topology agent makes no LLM calls). The
+session-level `duration_s` — like each run's `duration_s` — is **summed LLM
+inference time**, not wall clock; the real elapsed time is in
+`wall_clock_durations.jsonl` (see [wall-clock-recovery.md](wall-clock-recovery.md)).
 
 The orchestrator entry in `agent_runs` captures the LLM calls made by the
 orchestrator itself — deciding which tool to call, routing between sub-agents,
@@ -393,6 +447,6 @@ only the final (concluding) answer of each invocation for evaluation.
 
 ## Limitations
 
-- **Syslog investigator not tracked**: Background LLM investigation tasks (`syslog_investigator`) run independently and are not part of a query's session record. Their usage is captured in Logfire.
-- **All sub-agents start**: `main_lifespan()` starts MCP servers for all agents (network, config, syslog, topology, snapshot). There is currently no way to start only a subset.
+- **Syslog investigator not tracked**: Background LLM investigation tasks (`syslog_investigator`) run independently and are not part of a query's session record. Their usage is captured in Logfire. (In experiments this is moot — the runner sets `ENABLE_INVESTIGATIONS=0`.)
+- **Reduced agent set in experiments**: `main_lifespan()` starts the sub-agent MCP servers, but which ones is configurable — `ENABLE_CONFIG_AGENT` / `ENABLE_INVESTIGATIONS` (`client_agent.py`, default on) toggle the config agent and the syslog investigation tools, and `experiment_runner.py` sets both to `0` so experiments run a reduced orchestrator (network, syslog, topology, snapshot).
 - **No streaming output**: The orchestrator's answer is printed only after the full run completes, unlike the web UI which streams tokens live.

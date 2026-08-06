@@ -83,15 +83,50 @@ unambiguous — all 300 sessions match 1:1 (20 of the 320 exported root spans
 belong to no experiment session; they are dev/interactive runs and stay
 unclaimed).
 
-Per session it derives:
+Per session it derives (the full 14-field record):
 
 | Field | Meaning |
 |---|---|
 | `wall_clock_s` | root-span end − session `started_at` — the real elapsed time |
 | `inference_s` | the log's `duration_s` (summed generation_time), for contrast |
 | `overhead_s` | `wall_clock_s − inference_s` (negative ⇒ parallel LLM calls) |
+| `span_duration_s` | root-span end − root-span start (≈ `wall_clock_s` minus the pre-span ~0.1 s) |
 | `span_start_delta_s` | join sanity value: span start − `started_at` |
 | `trace_id` | the matched Logfire trace |
+| `session_id`, `run_id`, `scenario`, `model`, `success`, `error` | copied from the session record, so the file is self-describing (and DNF rows are identifiable via `error`) |
+| `gen_id_match`, `join_verified` | verification verdict from Step 2 below |
+
+## How generation IDs are recorded
+
+The verification in Step 2 rests on two run-level fields that every session
+record in `experiment_log.jsonl` carries:
+
+| Field | Description |
+|---|---|
+| `first_generation_id` | First OpenRouter generation ID seen across the whole run (`run_id`), in chronological order |
+| `last_generation_id` | Last OpenRouter generation ID seen across the whole run |
+
+Both values are **identical on every session sharing the same `run_id`** (one
+`experiment_runner.py` invocation). They are written by `finalize_costs()` in
+`experiment_tracker.py` from the `x-generation-id` response headers captured
+during the run. No visualization or statistic reads them — their sole purpose
+is after-the-fact lookup, which is exactly what the join verification exploits.
+
+The OpenRouter generation ID is the **exact same value** that Pydantic AI's
+instrumentation records in Logfire under the span attribute
+**`gen_ai.response.id`** (e.g. `gen-1782147674-7d7pT7CMP74SO4RoHEWc`); it
+appears on both the inner `Chat Completion …` span and the `chat <model>`
+span. That identity is what makes the logged IDs resolvable to a unique trace.
+The checked-in `logfire_generation_ids.jsonl` is precisely this
+`gen_ai.response.id → (trace_id, pos, n_gens)` lookup, exported while Logfire
+retention still covered the experiment window. Against live Logfire (or a
+restored archive) the same lookup is one query:
+
+```sql
+SELECT span_name, trace_id, start_timestamp
+FROM records
+WHERE attributes->>'gen_ai.response.id' = '<paste gen id>'
+```
 
 ## Step 2 — generation-ID verification of the join
 
@@ -195,8 +230,8 @@ recovery.
 
 ## Related docs
 
-- `experiment-tracker.md` — how sessions, tokens and generation IDs are
-  recorded at run time
+- `experiment_tracker.py` (source) — the run-time recording of sessions,
+  tokens and generation IDs; see "How generation IDs are recorded" above
 - `analyze-experiments.md` / `visualize-experiments.md` — the consumers of
   `wall_clock_durations.jsonl`
 - `model-pricing.md` — the cost side of the same experiment log

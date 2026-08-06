@@ -1,5 +1,17 @@
 # Logfire trace archive
 
+> **Status (2026-08-06): this archive was never produced.** `logfire_archive/`
+> does not exist and its `manifest.json` was never committed, and the retention
+> deadline stated below (~2026-07-29) has passed — the full traces (prompts,
+> responses, tool calls) are presumably no longer retrievable from Logfire.
+> What survives independently of this archive: the small checked-in exports
+> `logfire_root_spans.jsonl` and `logfire_generation_ids.jsonl`, plus the
+> derived `wall_clock_durations.jsonl` / `join_verification.jsonl` — everything
+> the report pipeline actually consumed (see
+> [wall-clock-recovery.md](wall-clock-recovery.md)). The rest of this document
+> describes how the export *would* work, and remains applicable if an archive
+> ever turns up or a new experiment window is exported in time.
+
 Logfire's free plan retains telemetry for ~30 days. All 300 experiment
 sessions (2026-06-29 → 2026-07-06) were traced there — including the **full
 prompts and responses of every LLM round-trip** and every tool/MCP call —
@@ -40,12 +52,18 @@ The export window is derived from `experiment_log.jsonl` (same logic as
 `fetch_logfire_exports.py`). Completed days are recorded in the manifest and
 skipped on re-runs, so the script is safe to interrupt and resume.
 
-Verification proves the archive can replace live Logfire for everything the
-report pipeline used: per-day row/trace counts match live `COUNT(*)` at
-export time, and the checked-in `logfire_root_spans.jsonl` /
-`logfire_generation_ids.jsonl` exports plus all 300
-`wall_clock_durations.jsonl` trace IDs are exactly reproducible from the
-archive alone.
+Further flags: `--file` (experiment log to derive the window from), `--out`
+(archive directory), `--page-size` (rows per query page, default 1000).
+The metrics export has a hard `METRICS_LIMIT = 10_000` ceiling — if more
+metric points exist than that, the script raises instead of exporting a
+truncated table (paging for metrics is unimplemented).
+
+Verification (`--verify`) would prove — had the archive been produced — that
+it can replace live Logfire for everything the report pipeline used: per-day
+row/trace counts matching live `COUNT(*)` at export time, and the checked-in
+`logfire_root_spans.jsonl` / `logfire_generation_ids.jsonl` exports plus all
+300 `wall_clock_durations.jsonl` trace IDs being exactly reproducible from
+the archive alone.
 
 ## Querying the archive (no Logfire needed)
 

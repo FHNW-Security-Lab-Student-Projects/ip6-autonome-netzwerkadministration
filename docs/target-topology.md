@@ -18,7 +18,7 @@ fail to apply cleanly.
 ```
 client1 (192.168.1.10/24) ─┐                                          ┌─ client3 (10.10.10.10/24)
                        switch1 ── router1 ════ eBGP ════ router2 ── switch2
-client2 (192.168.10.10/24)─┘   AS 65001   10.0.0.0/30   AS 65002
+client2 (192.168.10.10/24)─┘   AS 65001   10.0.0.0/30   AS 65002      └─ client4 (10.10.10.11/24)
        (L2 access)          (L3 gateways)            (L3 gateway)     (L2 access)
 ```
 
@@ -32,6 +32,7 @@ Cabling (from [../testlab.clab.yml](../testlab.clab.yml)):
 | router1 → router2 | `router1:e1-2` | `router2:e1-1` |
 | router2 → switch2 | `router2:e1-2` | `switch2:e1-1` |
 | switch2 → client3 | `switch2:e1-2` | `client3:eth1` |
+| switch2 → client4 | `switch2:e1-3` | `client4:eth1` |
 
 The clients are fixed: their IPs and default routes are set by the topology file and must
 not be changed. The network's job is to make those gateways exist and route between them.
@@ -41,6 +42,7 @@ not be changed. The network's job is to make those gateways exist and route betw
 | client1 | 192.168.1.10/24 | 192.168.1.1 |
 | client2 | 192.168.10.10/24 | 192.168.10.1 |
 | client3 | 10.10.10.10/24 | 10.10.10.1 |
+| client4 | 10.10.10.11/24 | 10.10.10.1 |
 
 ---
 
@@ -51,7 +53,7 @@ not be changed. The network's job is to make those gateways exist and route betw
 | client1 | 10 | 192.168.1.0/24 | router1 `ethernet-1/1.10` = 192.168.1.1 |
 | client2 | 20 | 192.168.10.0/24 | router1 `ethernet-1/1.20` = 192.168.10.1 |
 | router1 ↔ router2 | — (routed p2p) | 10.0.0.0/30 | router1 = .1, router2 = .2 |
-| client3 | 30 | 10.10.10.0/24 | router2 `ethernet-1/2.30` = 10.10.10.1 |
+| client3 + client4 | 30 | 10.10.10.0/24 | router2 `ethernet-1/2.30` = 10.10.10.1 |
 
 **BGP:** eBGP, router1 in AS 65001 and router2 in AS 65002, peering over the 10.0.0.0/30
 link. Each router advertises its directly-connected LAN subnets to the other.
@@ -122,11 +124,11 @@ set / network-instance default protocols bgp group ebgp export-policy [ export-l
 set / network-instance default protocols bgp neighbor 10.0.0.2 peer-group ebgp
 ```
 
-### 3.2 router2 — AS 65002 (LAN gateway for client3 + eBGP)
+### 3.2 router2 — AS 65002 (LAN gateway for client3/client4 + eBGP)
 
 Intent: mirror of router1. e1-1 is the routed p2p to router1; e1-2 is an 802.1q trunk to
-switch2 with one **routed** sub-interface that is the gateway for VLAN30; eBGP advertises
-10.10.10.0/24.
+switch2 with one **routed** sub-interface that is the gateway for VLAN30 (client3 and
+client4); eBGP advertises 10.10.10.0/24.
 
 ```
 # e1-1: routed p2p to router1
@@ -136,7 +138,7 @@ set / interface ethernet-1/1 subinterface 0 admin-state enable
 set / interface ethernet-1/1 subinterface 0 ipv4 admin-state enable
 set / interface ethernet-1/1 subinterface 0 ipv4 address 10.0.0.2/30
 
-# e1-2: trunk to switch2, routed sub-interface = client3 gateway
+# e1-2: trunk to switch2, routed sub-interface = VLAN30 gateway
 set / interface ethernet-1/2 admin-state enable
 set / interface ethernet-1/2 vlan-tagging true
 set / interface ethernet-1/2 subinterface 30 type routed
@@ -200,16 +202,21 @@ set / network-instance vlan20 interface ethernet-1/2.0
 set / network-instance vlan20 interface ethernet-1/3.20
 ```
 
-### 3.4 switch2 — L2 access (VLAN30 client3)
+### 3.4 switch2 — L2 access (VLAN30 client3 + client4)
 
-Intent: single broadcast domain. e1-2 (untagged) bridges client3 into VLAN30; e1-1 is the
-tagged trunk to router2.
+Intent: single broadcast domain. e1-2 (untagged) bridges client3 into VLAN30; e1-3
+(untagged) bridges client4 into VLAN30; e1-1 is the tagged trunk to router2.
 
 ```
 # access port (untagged) to client3
 set / interface ethernet-1/2 admin-state enable
 set / interface ethernet-1/2 subinterface 0 type bridged
 set / interface ethernet-1/2 subinterface 0 admin-state enable
+
+# access port (untagged) to client4
+set / interface ethernet-1/3 admin-state enable
+set / interface ethernet-1/3 subinterface 0 type bridged
+set / interface ethernet-1/3 subinterface 0 admin-state enable
 
 # trunk to router2 (tagged VLAN30)
 set / interface ethernet-1/1 admin-state enable
@@ -221,6 +228,7 @@ set / interface ethernet-1/1 subinterface 30 vlan encap single-tagged vlan-id 30
 set / network-instance vlan30 type mac-vrf
 set / network-instance vlan30 admin-state enable
 set / network-instance vlan30 interface ethernet-1/2.0
+set / network-instance vlan30 interface ethernet-1/3.0
 set / network-instance vlan30 interface ethernet-1/1.30
 ```
 
@@ -234,6 +242,7 @@ set / network-instance vlan30 interface ethernet-1/1.30
    sudo docker exec clab-testlab-client1 ping -c2 10.10.10.10    # client1 → client3
    sudo docker exec clab-testlab-client3 ping -c2 192.168.1.10   # client3 → client1
    sudo docker exec clab-testlab-client2 ping -c2 10.10.10.10    # client2 → client3
+   sudo docker exec clab-testlab-client4 ping -c2 192.168.1.10   # client4 → client1
    ```
 
 2. **Gateways answer** — each client can ping its own gateway (.1 of its subnet).
@@ -248,7 +257,7 @@ set / network-instance vlan30 interface ethernet-1/1.30
    ```
 
 4. **L2 segments correct** — on switch1, client1's port is in `mac-vrf vlan10` and client2's
-   in `mac-vrf vlan20`; on switch2, client3's port is in `mac-vrf vlan30`.
+   in `mac-vrf vlan20`; on switch2, client3's and client4's ports are in `mac-vrf vlan30`.
 
 ---
 

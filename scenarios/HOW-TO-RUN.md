@@ -8,7 +8,7 @@ scenario in this folder. For the catalog of scenarios and difficulty tiers see
 ## TL;DR
 
 ```bash
-uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario intf-down
+uv run python experiment_runner.py --model anthropic/claude-opus-4.8 --scenario intf-down
 ```
 
 Run it from the repo root, inside the **devcontainer** where the lab lives (the runner
@@ -29,16 +29,17 @@ When `--scenario <name>` matches a folder in `scenarios/`, the runner automatica
 
 ```bash
 # Pick a different model (any OpenRouter model ID)
-uv run python experiment_runner.py --model z-ai/glm-5 --scenario missing-vlan-on-trunk
+uv run python experiment_runner.py --model z-ai/glm-5.2 --scenario missing-vlan-on-trunk
 
 # Multi-turn: carry conversation history between the queries in queries.txt
-uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario mtu-blackhole --multi-turn
+# (unused in the recorded experiments — all scenarios are single-query)
+uv run python experiment_runner.py --model anthropic/claude-opus-4.8 --scenario mtu-blackhole --multi-turn
 
 # Sanity run against the UNBROKEN topology (skip setup.sh / teardown.sh)
-uv run python experiment_runner.py --model anthropic/claude-sonnet-4.6 --scenario intf-down --no-fault
+uv run python experiment_runner.py --model anthropic/claude-opus-4.8 --scenario intf-down --no-fault
 
 # Ad-hoc queries from a file outside scenarios/ (no fault injection)
-uv run python experiment_runner.py --model z-ai/glm-5 --scenario adhoc --file path/to/queries.txt
+uv run python experiment_runner.py --model z-ai/glm-5.2 --scenario adhoc --file path/to/queries.txt
 ```
 
 | Flag | Purpose |
@@ -49,6 +50,15 @@ uv run python experiment_runner.py --model z-ai/glm-5 --scenario adhoc --file pa
 | `--multi-turn` | Keep conversation history across the queries in one run |
 | `--no-fault` | Skip `setup.sh` / `teardown.sh` (baseline sanity check) |
 
+## Batch runs: `run_experiment_matrix.sh`
+
+The recorded experiments were driven by [`../run_experiment_matrix.sh`](../run_experiment_matrix.sh),
+which sweeps the full matrix (6 models × 10 scenarios × 5 repeats = 300 runs) by invoking
+`experiment_runner.py` per combo. Flags: `--models a/b,c/d`, `--scenarios x,y`, `--repeats N`,
+`--dry-run` (print the plan, run nothing), `--resume` (skip combos already done). Each run has a
+600 s wall-clock cap (`MAX_SECONDS`) — on expiry it is logged as a DNF (`success=false`). Progress
+and per-run logs go to `logs/matrix/<TIMESTAMP>/`; its `progress.txt` is what `--resume` reads.
+
 ## After the run
 
 Evaluate correctness by hand (no LLM judge — you read each answer and press f/m/s):
@@ -57,6 +67,11 @@ Evaluate correctness by hand (no LLM judge — you read each answer and press f/
 uv run python evaluate_experiments.py
 uv run python evaluate_experiments.py --review   # → evaluation_review.md (read-only report)
 ```
+
+Other flags: `--review-csv` (CSV report, combinable with `--review`), `--redo` (re-evaluate
+sessions that already have a verdict), `--since YYYY-MM-DD` / `--model` / `--scenario`
+(filter which sessions are shown), `--sample N` (random subset for a review report,
+seeded via `--sample-seed`).
 
 > **Reset between runs:** if a teardown leaves the lab in a bad state, or BGP hasn't
 > reconverged, redeploy the lab:
