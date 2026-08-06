@@ -1,3 +1,8 @@
+% Top-align figures that land alone on a float page (default vertically centers them)
+\makeatletter
+\setlength{\@fptop}{0pt}
+\makeatother
+
 \begin{appendix} %Anhang
 \section{Appendix}
 \label{sec:appendix}
@@ -66,6 +71,34 @@ the 600-second cap.
 Boxes show median and interquartile range. Dots are individual runs. The clusters at 600\,s
 are the 55 runs stopped at the wall-clock cap.}
 \label{fig:wall-clock-distribution}
+\end{figure}
+
+\clearpage
+\subsection{User Interface Screenshots}
+\label{app:ui-screenshots}
+
+\Cref{fig:chat-interface} shows the web chat interface of \Cref{sec:impl-interfaces} in a troubleshooting scenario (a conversation).
+\Cref{fig:investigation-status} shows the status page of the
+autonomous syslog investigations (\Cref{sec:impl-investigations}). Each row is one automatically
+opened case with its device, state and a summary of the findings. The detail view below lists the
+triggering syslog event and the stored report of the selected case.
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=\linewidth]{graphics/chat-interface.png}
+\end{center}
+\caption{The web chat interface with model selector, showing the closing answer of a
+troubleshooting conversation.}
+\label{fig:chat-interface}
+\end{figure}
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=\linewidth]{graphics/automatic-investigations.png}
+\end{center}
+\caption{The status page of the autonomous syslog investigations, with the list of open and
+resolved cases and the detail view of one resolved investigation.}
+\label{fig:investigation-status}
 \end{figure}
 
 \end{appendix}
