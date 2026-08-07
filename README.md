@@ -1,4 +1,4 @@
-# IP6 — AI Multi-Agent Network Troubleshooting
+# IP6: Troubleshooting Network Problems With An AI-Driven Multi-Agent System
 
 An AI-driven multi-agent system for troubleshooting network problems, built with
 [Pydantic AI](https://ai.pydantic.dev/) at FHNW. An orchestrator agent delegates to
