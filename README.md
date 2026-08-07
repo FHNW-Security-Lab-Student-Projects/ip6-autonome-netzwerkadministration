@@ -6,7 +6,7 @@ specialised sub-agents that inspect a live [ContainerLab](https://containerlab.d
 network of Nokia SR Linux devices over MCP tools.
 
 The project evaluates **what kinds of network problems can be troubleshooted by an agent
-network** — measuring time saved, the difficulty levels that can be diagnosed, the
+network**, measuring time saved, the difficulty levels that can be diagnosed, the
 success rate per difficulty level, and the potential cost savings.
 
 ## Agents
@@ -21,20 +21,20 @@ A single orchestrator (`client_agent.py`) routes each request to the right sub-a
 | **Config** | `config_agent.py` + `config_mcp_server.py` | Validate-then-apply configuration changes |
 | **Snapshot** | `state_snapshot_agent.py` | Capture / compare device state snapshots |
 | **Syslog** | `syslog_agent.py` + `syslog_mcp_server.py` | Syslog incident investigation + background Loki poller |
-| **Investigation orchestrator** | `investigation_orchestrator.py` | Dedicated orchestrator for autonomous syslog-event analysis — read-only sub-agent roster, config agent excluded |
+| **Investigation orchestrator** | `investigation_orchestrator.py` | Dedicated orchestrator for autonomous syslog-event analysis, read-only sub-agent roster, config agent excluded |
 
 ## Prerequisites
 
 ContainerLab needs Linux, so the easiest path on any OS is the included **devcontainer**:
 open the repo in VS Code and choose *Reopen in Container*. The image ships Docker-in-Docker
-and containerlab, and the post-create hook installs uv, Python 3.13, and all dependencies —
+and containerlab, and the post-create hook installs uv, Python 3.13, and all dependencies,
 only Docker and VS Code are needed on the host. Alternatively, on a native Linux host,
 install [Docker](https://docs.docker.com/engine/install/),
 [containerlab](https://containerlab.dev/install/), and [uv](https://docs.astral.sh/uv/)
 yourself.
 
 All lab images (Nokia SR Linux 24.10.1, network-multitool, Grafana/Loki/Alloy) are publicly
-pullable — no vendor account or license required — and are downloaded on first deploy. Give
+pullable no vendor account or license required and are downloaded on first deploy. Give
 Docker roughly 8 GB of RAM for the four SR Linux nodes.
 
 ## Setup
@@ -44,13 +44,13 @@ cp .env.example .env        # set OPENROUTER_API_KEY (LOGFIRE_TOKEN optional)
 uv sync                     # install dependencies (already done inside the devcontainer)
 ```
 
-The API key comes from [openrouter.ai](https://openrouter.ai/) — a few dollars of credit is
+The API key comes from [openrouter.ai](https://openrouter.ai/) a few dollars of credit is
 enough to try the system out. The default model is `z-ai/glm-5`, configured per agent
 module.
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENROUTER_API_KEY` | Yes | OpenRouter key — used by all LLM agents |
+| `OPENROUTER_API_KEY` | Yes | OpenRouter key (used by all LLM agents) |
 | `LOGFIRE_TOKEN` | No | Logfire observability (skipped if absent) |
 | `LOGFIRE_READ_TOKEN` | No | Logfire read token for `fetch_logfire_exports.py` |
 | `AUTO_INVESTIGATIONS_ENABLED` | No | Pause automatic Loki-driven investigations (`true`/`false`) |
@@ -83,7 +83,7 @@ automatically.
 
 ## Running
 
-All sub-agents and their MCP servers start from a single entry point — you do **not**
+All sub-agents and their MCP servers start from a single entry point, you do **not**
 launch them separately.
 
 ```bash
@@ -121,9 +121,9 @@ Watch it live in the status UI (standalone process, run alongside either entry p
 uv run python investigation_status.py     # → http://127.0.0.1:7933
 ```
 
-The page lists every investigation with its status — `investigating` (agent working) →
+The page lists every investigation with its status `investigating` (agent working) →
 `waiting` (analysis done, awaiting review) → `resolved`. Click a row to see the
-triggering event, the full investigation log, and the agent's summary; the detail panel
+triggering event, the full investigation log, and the agent's summary, the detail panel
 has a button to mark the investigation resolved.
 
 Nothing needs to be forced to see it work: the SR Linux nodes emit error-level events on
@@ -138,7 +138,7 @@ Set `AUTO_INVESTIGATIONS_ENABLED=false` in `.env` to pause automatic openings.
 
 Architecture and how-to notes live in [docs/](docs/):
 
-- [running-the-system.md](docs/running-the-system.md) — start the lab, agents, and web UI
+- [running-the-system.md](docs/running-the-system.md): start the lab, agents, and web UI
 - [target-topology.md](docs/target-topology.md) · [containerlab-commands.md](docs/containerlab-commands.md) · [monitoring-stack.md](docs/monitoring-stack.md)
 
 The written report lives in [IP6-Bericht/](IP6-Bericht/).
